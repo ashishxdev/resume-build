@@ -1,0 +1,28 @@
+{
+  "name": "@make-my-resume/resume-engine",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint .",
+    "test": "vitest run src"
+  },
+  "devDependencies": {
+    "@make-my-resume/eslint-config": "workspace:*",
+    "@make-my-resume/typescript-config": "workspace:*",
+    "@types/node": "^24.7.2",
+    "eslint": "^9.37.0",
+    "typescript": "^5.9.3",
+    "vitest": "^5.0.2"
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "name": "make-my-resume",
+  "private": true,
+  "packageManager": "pnpm@12.8.1",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "turbo run dev",
+    "web": "pnpm --filter @make-my-resume/web dev",
+    "api": "pnpm --filter @make-my-resume/api dev:api",
+    "worker": "pnpm --filter @make-my-resume/api dev:worker",
+    "build": "turbo run build",
+    "build:web": "pnpm --filter @make-my-resume/web... build",
+    "build:api": "pnpm --filter @make-my-resume/api... build",
+    "typecheck": "turbo run typecheck",
+    "lint": "turbo run lint",
+    "test": "turbo run test",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "devDependencies": {
+    "prettier": "^3.6.2",
+    "turbo": "^2.11.5",
+    "typescript": "^5.9.3",
+    "vitest": "^5.0.2"
+  }
+}

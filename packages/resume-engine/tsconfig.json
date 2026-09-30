@@ -1,0 +1,10 @@
+{
+  "extends": "@make-my-resume/typescript-config/node.json",
+  "compilerOptions": {
+    "declaration": true,
+    "outDir": "dist",
+    "rootDir": "src"
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": ["src/**/*.test.ts"]
+}
