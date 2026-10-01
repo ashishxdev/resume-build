@@ -82,7 +82,7 @@ Update this file whenever a major feature is started, completed, materially rede
   - Fixed stale post-authentication UI transitions, whitespace-only names, email normalization, a backslash-based open redirect, and response session-cookie logging.
   - Added regression coverage for normalized credentials, safe redirects, and request/response credential redaction.
   - Added the detailed test record in `docs/AUTHENTICATION_QA_REPORT.md`.
-- **Verification:** 8 web tests and 5 API tests pass; web/API type checks and linters pass; the production workspace build passes. Chrome retests passed for affected UI flows, and MongoDB persistence was verified across an API restart.
+- **Verification:** 8 web tests and 8 API tests pass; web/API type checks and linters pass; the production workspace build passes. Chrome retests passed for affected UI flows, and MongoDB persistence was verified across an API restart.
 - **Remaining limitations:** Google OAuth and production HTTPS cookie attributes require deployment credentials/environment testing; natural multi-day session renewal and a forced database outage were not exercised. The dashboard is a client-side protected shell, so all future private data endpoints must retain server-side authorization.
 - **Primary files:**
   - `apps/web/components/auth/auth-page.tsx`
