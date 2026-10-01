@@ -19,7 +19,10 @@ Make My Resume is a resume-tailoring SaaS built as a TypeScript modular monolith
 
 ## Development
 
-Copy `.env.example` to `.env` only when local service configuration is needed. Never commit real secrets.
+Copy `.env.example` to the repository-root `.env.local` when local service
+configuration is needed. The web app, API, and worker all load the root
+`.env.local` first and then `.env` as a fallback. Deployment-provided
+environment variables take precedence. Never commit real secrets.
 
 ```bash
 pnpm dev

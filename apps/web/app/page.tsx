@@ -240,10 +240,10 @@ export default function HomePage() {
                 </div>
                 <div className="decision">
                   <span>⌁ &nbsp; Your decision required</span>
-                  <button type="button">× &nbsp; Reject</button>
-                  <button className="approve" type="button">
+                  <span className="mock-action">× &nbsp; Reject</span>
+                  <span className="mock-action approve">
                     ✓ &nbsp; Approve change
-                  </button>
+                  </span>
                 </div>
               </div>
             </div>
@@ -251,7 +251,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section className="wash-section">
+      <section className="wash-section" id="integrity">
         <div className="shell">
           <header className="section-heading centered">
             <p className="eyebrow">Our ethical oath</p>
@@ -457,11 +457,12 @@ export default function HomePage() {
                 />
               </label>
               <label>
-                Experience<button type="button">4 roles organized</button>
+                Experience
+                <span className="mock-control">4 roles organized</span>
               </label>
               <label>
                 Core competencies
-                <button type="button">18 skills categorized</button>
+                <span className="mock-control">18 skills categorized</span>
               </label>
             </div>
             <div className="paper">
@@ -679,15 +680,20 @@ export default function HomePage() {
           <FooterLinks
             title="Product"
             links={[
-              "Resume tailoring",
-              "ATS analysis",
-              "How it works",
-              "Pricing",
+              ["Resume tailoring", "/#product"],
+              ["ATS analysis", "/#match-and-ats"],
+              ["How it works", "/#how-it-works"],
+              ["Pricing", "/#pricing"],
             ]}
           />
           <FooterLinks
             title="Company"
-            links={["FAQ", "Privacy", "Terms", "Security"]}
+            links={[
+              ["FAQ", "/#faq"],
+              ["Privacy", "/privacy"],
+              ["Terms", "/terms"],
+              ["Security", "/#integrity"],
+            ]}
           />
           <div className="pledge">
             <h3>Our commitment</h3>
@@ -811,8 +817,8 @@ function Suggestion({
         </p>
       </div>
       <aside>
-        <button type="button">Reject</button>
-        <button type="button">Accept</button>
+        <span>Reject</span>
+        <span>Accept</span>
       </aside>
     </article>
   );
@@ -904,14 +910,20 @@ function PriceCard({
   );
 }
 
-function FooterLinks({ title, links }: { title: string; links: string[] }) {
+function FooterLinks({
+  title,
+  links,
+}: {
+  title: string;
+  links: Array<readonly [label: string, href: string]>;
+}) {
   return (
     <div className="footer-links">
       <h3>{title}</h3>
-      {links.map((link) => (
-        <a href="#" key={link}>
-          {link}
-        </a>
+      {links.map(([label, href]) => (
+        <Link href={href} key={label}>
+          {label}
+        </Link>
       ))}
     </div>
   );

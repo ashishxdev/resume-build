@@ -491,7 +491,7 @@ section {
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
-.decision button {
+.decision .mock-action {
   padding: 8px 11px;
   border: 1px solid var(--line);
   border-radius: 4px;
@@ -966,7 +966,7 @@ section {
   display: flex;
   gap: 7px;
 }
-.suggestion aside button {
+.suggestion aside span {
   padding: 9px 11px;
   border: 1px solid var(--line);
   border-radius: 4px;
@@ -975,7 +975,7 @@ section {
   font-size: 9px;
   font-weight: 800;
 }
-.suggestion aside button:last-child {
+.suggestion aside span:last-child {
   border-color: var(--plum);
   background: var(--plum);
   color: white;
@@ -1057,7 +1057,7 @@ section {
 }
 .fields input,
 .fields textarea,
-.fields button {
+.fields .mock-control {
   width: 100%;
   padding: 10px;
   border: 1px solid var(--line);

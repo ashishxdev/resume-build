@@ -3,6 +3,7 @@ node_modules/
 .turbo/
 dist/
 .next/
+apps/web/next-env.d.ts
 coverage/
 
 .env

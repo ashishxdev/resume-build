@@ -14,7 +14,7 @@ Update this file whenever a major feature is started, completed, materially rede
 | --- | --- | --- |
 | Project foundation | Complete | pnpm/Turborepo monorepo with web, API, shared contracts, resume engine, renderer, linting, TypeScript, and test foundations. |
 | Marketing homepage | Complete | Responsive Stitch-inspired homepage implementing the Atelier Digital visual system and core product messaging. |
-| Authentication | Foundation only | Client dependency and environment boundary exist; sign-in and sign-up experiences are not implemented yet. |
+| Authentication | In progress | Email/password authentication, MongoDB-backed sessions, sign-out, redirect hardening, protected API access, and the dashboard shell passed focused QA. Password reset is not implemented, and Google OAuth still requires configuration and verification. |
 | Resume workflows | Not started | Import, verification, editing, tailoring, ATS analysis, versions, export, and sharing remain future milestones. |
 | Backend business modules | Not started | The API health route and shared infrastructure exist; domain modules remain to be implemented. |
 
@@ -51,9 +51,64 @@ Update this file whenever a major feature is started, completed, materially rede
   - `apps/web/app/layout.tsx`
   - `apps/web/app/icon.svg`
 
+### 3. Authentication and Protected Workspace
+
+- **Date:** 2026-10-01
+- **Status:** In progress
+- **Scope delivered:**
+  - Added Better Auth to the Express API with credentialed CORS, trusted-origin validation, secure cookie settings, and a protected current-user endpoint.
+  - Added optional Better Auth Infrastructure dashboard integration when `BETTER_AUTH_API_KEY` is configured.
+  - Added a development-safe in-memory auth store and a production-ready MongoDB adapter selected through environment configuration.
+  - Added email/password sign-up, sign-in, session restoration, sign-out, safe post-auth redirects, and optional Google OAuth when credentials are configured.
+  - Built responsive Stitch-inspired sign-in and sign-up pages with clear loading, validation, and error states.
+  - Added a protected dashboard shell that redirects signed-out visitors and provides the entry point for future resume workflows.
+- **Verification:** Workspace type checking, linting, automated API tests, and the production build pass. The sign-up API, browser sign-in, protected dashboard, sign-out redirect, desktop layouts, and 390 px mobile layouts were verified with no horizontal overflow or browser console errors.
+- **Deployment note:** Local development uses the in-memory adapter by default. Production persistence and Google OAuth require the MongoDB and Google credentials documented in `.env.example`. Better Auth Infrastructure is enabled only when its separate API key is supplied; the API key does not replace `BETTER_AUTH_SECRET`.
+- **Remaining PRD scope:** Password-reset flows are not implemented. Google OAuth is conditional on deployment credentials and has not been verified end to end, so the authentication milestone remains in progress.
+- **Primary files:**
+  - `apps/api/src/infrastructure/auth/auth.ts`
+  - `apps/api/src/http/routes/auth.ts`
+  - `apps/web/components/auth/auth-page.tsx`
+  - `apps/web/app/login/page.tsx`
+  - `apps/web/app/signup/page.tsx`
+  - `apps/web/app/dashboard/page.tsx`
+
+### 4. Authentication QA and Hardening
+
+- **Date:** 2026-10-01
+- **Status:** Complete with documented environment limitations
+- **Scope delivered:**
+  - Exercised signup, signin, logout, refresh, browser history, protected-route, invalid/expired-session, cookie, trusted-origin, MongoDB persistence, console, and network behavior in the local application.
+  - Fixed stale post-authentication UI transitions, whitespace-only names, email normalization, a backslash-based open redirect, and response session-cookie logging.
+  - Added regression coverage for normalized credentials, safe redirects, and request/response credential redaction.
+  - Added the detailed test record in `docs/AUTHENTICATION_QA_REPORT.md`.
+- **Verification:** 8 web tests and 5 API tests pass; web/API type checks and linters pass; the production workspace build passes. Chrome retests passed for affected UI flows, and MongoDB persistence was verified across an API restart.
+- **Remaining limitations:** Google OAuth and production HTTPS cookie attributes require deployment credentials/environment testing; natural multi-day session renewal and a forced database outage were not exercised. The dashboard is a client-side protected shell, so all future private data endpoints must retain server-side authorization.
+- **Primary files:**
+  - `apps/web/components/auth/auth-page.tsx`
+  - `apps/web/app/dashboard/page.tsx`
+  - `apps/web/lib/auth/email-credentials.ts`
+  - `apps/web/lib/auth/safe-redirect.ts`
+  - `apps/api/src/shared/logging/logger.ts`
+  - `docs/AUTHENTICATION_QA_REPORT.md`
+
+### 5. Security and Reliability Remediation
+
+- **Date:** 2026-10-01
+- **Status:** Complete in the repository; credential rotation remains an external action
+- **Scope delivered:**
+  - Removed the committed Stitch credential from tracked configuration and switched the MCP header to the local `STITCH_API_KEY` environment variable.
+  - Required MongoDB-backed authentication storage in production.
+  - Made root `.env.local` and `.env` loading consistent across the web app, API, and worker.
+  - Added recoverable sign-out and Google sign-in error states.
+  - Added functional Terms and Privacy pages and corrected homepage and authentication navigation.
+  - Removed interactive semantics from homepage demonstration controls that do not perform actions.
+  - Stopped tracking Next.js's generated `next-env.d.ts` file so builds no longer dirty the working tree.
+- **External action:** The previously exposed Google API key must be revoked or rotated in Google Cloud. Repository history was purged separately so the old value is no longer present in the rewritten branch.
+
 ## Next Major Milestone
 
-Not selected yet. Likely candidates from the product plan include authentication, dashboard foundations, or resume import and verification.
+Finish the agreed authentication scope by implementing password reset and configuring and verifying Google OAuth. Resume import and source verification inside the protected dashboard follows that work.
 
 ## Status Definitions
 
@@ -62,4 +117,3 @@ Not selected yet. Likely candidates from the product plan include authentication
 - **Blocked:** Progress depends on a decision, external system, credential, or unresolved technical constraint.
 - **Complete:** The agreed scope is implemented and verified in proportion to its risk.
 - **Deferred:** The feature was intentionally moved out of the current delivery scope.
-

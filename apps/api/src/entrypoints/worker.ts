@@ -1,5 +1,8 @@
 import { loadEnvironment } from "../config/environment.js";
+import { loadLocalEnvironmentFiles } from "../config/load-local-environment.js";
 import { createLogger } from "../shared/logging/logger.js";
+
+loadLocalEnvironmentFiles();
 
 const environment = loadEnvironment();
 const logger = createLogger(environment);
