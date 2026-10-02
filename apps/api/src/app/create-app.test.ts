@@ -117,6 +117,22 @@ describe("authentication", () => {
     const token = browserRedirect.searchParams.get("token");
     expect(token).toBeTruthy();
 
+    const validTokenResponse = await request(app)
+      .post("/api/auth/password-reset-token-status")
+      .set("Origin", testEnvironment.WEB_ORIGIN)
+      .send({ token });
+
+    expect(validTokenResponse.status).toBe(200);
+    expect(validTokenResponse.body).toEqual({ valid: true });
+
+    const invalidTokenResponse = await request(app)
+      .post("/api/auth/password-reset-token-status")
+      .set("Origin", testEnvironment.WEB_ORIGIN)
+      .send({ token: "invalid-local-test-token" });
+
+    expect(invalidTokenResponse.status).toBe(200);
+    expect(invalidTokenResponse.body).toEqual({ valid: false });
+
     await request(app)
       .post("/api/auth/reset-password")
       .set("Origin", testEnvironment.WEB_ORIGIN)
@@ -130,6 +146,13 @@ describe("authentication", () => {
       .set("Origin", testEnvironment.WEB_ORIGIN)
       .send({ newPassword: "another-password-789", token })
       .expect(400);
+
+    const consumedTokenResponse = await request(app)
+      .post("/api/auth/password-reset-token-status")
+      .set("Origin", testEnvironment.WEB_ORIGIN)
+      .send({ token });
+
+    expect(consumedTokenResponse.body).toEqual({ valid: false });
 
     await request(app)
       .post("/api/auth/sign-in/email")
@@ -165,6 +188,24 @@ describe("authentication", () => {
       "If this email exists in our system, check your email for the reset link",
     );
     expect(sentMessages).toHaveLength(0);
+  });
+
+  it("rate limits password-reset token validation", async () => {
+    const app = createTestApp();
+    const statuses: number[] = [];
+
+    for (let attempt = 0; attempt < 11; attempt += 1) {
+      const response = await request(app)
+        .post("/api/auth/password-reset-token-status")
+        .set("Origin", testEnvironment.WEB_ORIGIN)
+        .send({ token: `invalid-token-${attempt}` });
+
+      statuses.push(response.status);
+    }
+
+    expect(statuses).toContain(200);
+    expect(statuses).toContain(429);
+    expect(statuses.at(-1)).toBe(429);
   });
 
   it("rate limits repeated password reset requests", async () => {

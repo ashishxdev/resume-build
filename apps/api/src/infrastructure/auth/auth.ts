@@ -10,6 +10,7 @@ import {
   createTransactionalEmailService,
   type TransactionalEmailService,
 } from "../email/email-service.js";
+import { passwordResetTokenStatus } from "./password-reset-token-status.js";
 
 export function createAuthRuntime(
   environment: Environment,
@@ -77,9 +78,12 @@ export function createAuthRuntime(
           },
         }
       : undefined,
-    plugins: environment.BETTER_AUTH_API_KEY
-      ? [dash({ apiKey: environment.BETTER_AUTH_API_KEY })]
-      : [],
+    plugins: [
+      passwordResetTokenStatus(),
+      ...(environment.BETTER_AUTH_API_KEY
+        ? [dash({ apiKey: environment.BETTER_AUTH_API_KEY })]
+        : []),
+    ],
     advanced: {
       database: {
         joins: true,

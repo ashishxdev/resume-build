@@ -1,16 +1,22 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import type { FormEvent } from "react";
 
 import { authClient } from "@/lib/auth/client";
+import {
+  getPasswordResetErrorMessage,
+  isInvalidResetTokenError,
+} from "@/lib/auth/password-recovery-state";
+import { clientEnvironment } from "@/lib/env/client";
 
 import { AuthBrand } from "./auth-page";
 import styles from "./auth-page.module.css";
 
 type RecoveryMode = "request" | "reset";
+type TokenStatus = "checking" | "invalid" | "unavailable" | "valid";
 
 interface PasswordRecoveryPageProps {
   errorCode?: string;
@@ -23,15 +29,70 @@ export function PasswordRecoveryPage({
   mode,
   token,
 }: PasswordRecoveryPageProps) {
+  const isRequest = mode === "request";
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmation, setConfirmation] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isComplete, setIsComplete] = useState(false);
+  const [validationAttempt, setValidationAttempt] = useState(0);
+  const [tokenStatus, setTokenStatus] = useState<TokenStatus>(() =>
+    isRequest
+      ? "valid"
+      : errorCode === "INVALID_TOKEN" || !token
+        ? "invalid"
+        : "checking",
+  );
 
-  const isRequest = mode === "request";
-  const invalidLink = !isRequest && (errorCode === "INVALID_TOKEN" || !token);
+  useEffect(() => {
+    if (isRequest || errorCode === "INVALID_TOKEN" || !token) return;
+
+    const controller = new AbortController();
+
+    async function validateToken() {
+      setTokenStatus("checking");
+
+      try {
+        const response = await fetch(
+          `${clientEnvironment.NEXT_PUBLIC_API_URL}/api/auth/password-reset-token-status`,
+          {
+            body: JSON.stringify({ token }),
+            cache: "no-store",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            method: "POST",
+            signal: controller.signal,
+          },
+        );
+
+        if (!response.ok) {
+          setTokenStatus("unavailable");
+          return;
+        }
+
+        const result = (await response.json()) as { valid?: boolean };
+        setTokenStatus(result.valid === true ? "valid" : "invalid");
+      } catch (validationError) {
+        if (
+          validationError instanceof DOMException &&
+          validationError.name === "AbortError"
+        ) {
+          return;
+        }
+
+        setTokenStatus("unavailable");
+      }
+    }
+
+    void validateToken();
+
+    return () => controller.abort();
+  }, [errorCode, isRequest, token, validationAttempt]);
+
+  const invalidLink = !isRequest && tokenStatus === "invalid";
+  const isCheckingLink = !isRequest && tokenStatus === "checking";
+  const isLinkCheckUnavailable = !isRequest && tokenStatus === "unavailable";
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -49,6 +110,11 @@ export function PasswordRecoveryPage({
       return;
     }
 
+    if (!isRequest && password.length > 128) {
+      setError("Use no more than 128 characters for your new password.");
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
@@ -63,10 +129,13 @@ export function PasswordRecoveryPage({
           });
 
       if (result.error) {
+        if (!isRequest && isInvalidResetTokenError(result.error)) {
+          setTokenStatus("invalid");
+        }
         setError(
           isRequest
             ? "We could not process that request. Please try again shortly."
-            : "This reset link is invalid or has expired. Request a new one.",
+            : getPasswordResetErrorMessage(result.error),
         );
         return;
       }
@@ -107,7 +176,27 @@ export function PasswordRecoveryPage({
             </span>
           </div>
 
-          {invalidLink ? (
+          {isCheckingLink ? (
+            <div className={styles.recoveryActions} aria-live="polite">
+              <p className={styles.success}>Checking your secure reset link…</p>
+            </div>
+          ) : isLinkCheckUnavailable ? (
+            <div className={styles.recoveryActions}>
+              <p className={styles.error} role="alert">
+                We could not verify this reset link right now. Please try again.
+              </p>
+              <button
+                className={styles.submitButton}
+                onClick={() => setValidationAttempt((attempt) => attempt + 1)}
+                type="button"
+              >
+                Try again
+              </button>
+              <Link className={styles.recoveryLink} href="/forgot-password">
+                Request a new link
+              </Link>
+            </div>
+          ) : invalidLink ? (
             <div className={styles.recoveryActions}>
               <p className={styles.error} role="alert">
                 This password-reset link is invalid or has expired.
@@ -151,6 +240,7 @@ export function PasswordRecoveryPage({
                     New password
                     <input
                       autoComplete="new-password"
+                      maxLength={128}
                       minLength={8}
                       name="password"
                       onChange={(event) => setPassword(event.target.value)}
@@ -164,6 +254,7 @@ export function PasswordRecoveryPage({
                     Confirm new password
                     <input
                       autoComplete="new-password"
+                      maxLength={128}
                       minLength={8}
                       name="confirmation"
                       onChange={(event) => setConfirmation(event.target.value)}
