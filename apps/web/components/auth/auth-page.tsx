@@ -41,7 +41,7 @@ function GoogleIcon() {
   );
 }
 
-function AuthBrand() {
+export function AuthBrand() {
   return (
     <Link className={styles.brand} href="/" aria-label="Make My Resume home">
       <span className={styles.brandMark} aria-hidden="true">
@@ -251,7 +251,12 @@ export function AuthPage({ mode, redirectTo }: AuthPageProps) {
             </label>
             <label>
               <span className={styles.passwordLabel}>
-                Password{isSignIn && <span>Minimum 8 characters</span>}
+                Password
+                {isSignIn ? (
+                  <Link href="/forgot-password">Forgot password?</Link>
+                ) : (
+                  <span>Minimum 8 characters</span>
+                )}
               </span>
               <span className={styles.passwordField}>
                 <input

@@ -1,6 +1,6 @@
 # Make My Resume — Project Status
 
-Last updated: 2026-10-01
+Last updated: 2026-10-02
 
 ## Purpose
 
@@ -14,7 +14,7 @@ Update this file whenever a major feature is started, completed, materially rede
 | --- | --- | --- |
 | Project foundation | Complete | pnpm/Turborepo monorepo with web, API, shared contracts, resume engine, renderer, linting, TypeScript, and test foundations. |
 | Marketing homepage | Complete | Responsive Stitch-inspired homepage implementing the Atelier Digital visual system and core product messaging. |
-| Authentication | In progress | Email/password authentication, MongoDB-backed sessions, sign-out, redirect hardening, protected API access, and the dashboard shell passed focused QA. Password reset is not implemented, and Google OAuth still requires configuration and verification. |
+| Authentication | In progress | Email/password authentication now includes Resend-backed, rate-limited password recovery with single-use tokens and session revocation. Google OAuth still requires configuration and end-to-end verification. |
 | Resume workflows | Not started | Import, verification, editing, tailoring, ATS analysis, versions, export, and sharing remain future milestones. |
 | Backend business modules | Not started | The API health route and shared infrastructure exist; domain modules remain to be implemented. |
 
@@ -59,12 +59,12 @@ Update this file whenever a major feature is started, completed, materially rede
   - Added Better Auth to the Express API with credentialed CORS, trusted-origin validation, secure cookie settings, and a protected current-user endpoint.
   - Added optional Better Auth Infrastructure dashboard integration when `BETTER_AUTH_API_KEY` is configured.
   - Added a development-safe in-memory auth store and a production-ready MongoDB adapter selected through environment configuration.
-  - Added email/password sign-up, sign-in, session restoration, sign-out, safe post-auth redirects, and optional Google OAuth when credentials are configured.
+  - Added email/password sign-up, sign-in, session restoration, sign-out, password recovery, safe post-auth redirects, and optional Google OAuth when credentials are configured.
   - Built responsive Stitch-inspired sign-in and sign-up pages with clear loading, validation, and error states.
   - Added a protected dashboard shell that redirects signed-out visitors and provides the entry point for future resume workflows.
 - **Verification:** Workspace type checking, linting, automated API tests, and the production build pass. The sign-up API, browser sign-in, protected dashboard, sign-out redirect, desktop layouts, and 390 px mobile layouts were verified with no horizontal overflow or browser console errors.
 - **Deployment note:** Local development uses the in-memory adapter by default. Production persistence and Google OAuth require the MongoDB and Google credentials documented in `.env.example`. Better Auth Infrastructure is enabled only when its separate API key is supplied; the API key does not replace `BETTER_AUTH_SECRET`.
-- **Remaining PRD scope:** Password-reset flows are not implemented. Google OAuth is conditional on deployment credentials and has not been verified end to end, so the authentication milestone remains in progress.
+- **Remaining PRD scope:** Google OAuth is conditional on deployment credentials and has not been verified end to end, so the authentication milestone remains in progress.
 - **Primary files:**
   - `apps/api/src/infrastructure/auth/auth.ts`
   - `apps/api/src/http/routes/auth.ts`
@@ -106,9 +106,28 @@ Update this file whenever a major feature is started, completed, materially rede
   - Stopped tracking Next.js's generated `next-env.d.ts` file so builds no longer dirty the working tree.
 - **External action:** The previously exposed Google API key must be revoked or rotated in Google Cloud. Repository history was purged separately so the old value is no longer present in the rewritten branch.
 
+### 6. Transactional Email and Password Recovery
+
+- **Date:** 2026-10-02
+- **Status:** Complete
+- **Scope delivered:**
+  - Added a provider-neutral transactional email interface with a Resend implementation and validated production configuration.
+  - Added a branded HTML and plain-text password-reset email with escaped user content and an optional reply-to address.
+  - Added a neutral password-reset request flow that does not reveal whether an account exists.
+  - Added one-hour, single-use reset tokens, rate limiting, expired-link recovery, password confirmation, and revocation of existing sessions after a successful reset.
+  - Added responsive `/forgot-password` and `/reset-password` pages and linked recovery from sign-in.
+- **Verification:** 15 API tests and 8 web tests pass. Coverage includes template escaping, environment validation, account-enumeration resistance, rate limiting, single-use tokens, old-password rejection, new-password sign-in, and session revocation. Workspace type checking, linting, formatting, and the production build pass. Desktop and 390 px mobile recovery states were visually verified. Resend accepted a provider-level delivery to its official test address using the configured development sender.
+- **Remaining limitation:** Production delivery requires an address on a domain verified in Resend. Google OAuth also remains incomplete.
+- **Primary files:**
+  - `apps/api/src/infrastructure/email/email-service.ts`
+  - `apps/api/src/infrastructure/auth/auth.ts`
+  - `apps/web/components/auth/password-recovery-page.tsx`
+  - `apps/web/app/forgot-password/page.tsx`
+  - `apps/web/app/reset-password/page.tsx`
+
 ## Next Major Milestone
 
-Finish the agreed authentication scope by implementing password reset and configuring and verifying Google OAuth. Resume import and source verification inside the protected dashboard follows that work.
+Configure and verify Google OAuth to finish the agreed authentication scope. Resume import and source verification inside the protected dashboard follows that work.
 
 ## Status Definitions
 

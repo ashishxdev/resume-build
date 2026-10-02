@@ -260,6 +260,14 @@
   font-weight: 500;
 }
 
+.passwordLabel > a {
+  color: #3b2d54;
+  font-size: 9px;
+  font-weight: 750;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
 .passwordField {
   position: relative;
   display: block;
@@ -346,6 +354,17 @@
   color: #8e1f2a;
   font-size: 11px;
   line-height: 1.5;
+}
+
+.success {
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid #b9d9cc;
+  border-radius: 5px;
+  background: #f0faf6;
+  color: #155d45;
+  font-size: 11px;
+  line-height: 1.6;
 }
 
 .submitButton {
@@ -607,6 +626,36 @@
   gap: 18px;
 }
 
+.recoveryMain {
+  width: min(100% - 40px, 560px);
+  margin: auto;
+  padding: 48px 0;
+}
+
+.recoveryCard {
+  padding: 42px;
+}
+
+.recoveryCard > .brand {
+  display: inline-flex;
+  margin-bottom: 34px;
+}
+
+.recoveryActions {
+  display: grid;
+  gap: 16px;
+  margin-top: 26px;
+}
+
+.recoveryLink {
+  color: #3b2d54;
+  font-size: 11px;
+  font-weight: 750;
+  text-align: center;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
 @media (max-width: 960px) {
   .main {
     grid-template-columns: 1fr;
@@ -639,6 +688,13 @@
     padding-block: 18px;
   }
   .authCard {
+    padding: 27px 22px;
+  }
+  .recoveryMain {
+    width: min(100% - 24px, 540px);
+    padding-block: 18px;
+  }
+  .recoveryCard {
     padding: 27px 22px;
   }
   .authCard > .brand {

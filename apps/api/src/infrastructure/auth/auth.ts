@@ -5,8 +5,19 @@ import { mongodbAdapter } from "better-auth/adapters/mongodb";
 import { MongoClient } from "mongodb";
 
 import type { Environment } from "../../config/environment.js";
+import { createLogger } from "../../shared/logging/logger.js";
+import {
+  createTransactionalEmailService,
+  type TransactionalEmailService,
+} from "../email/email-service.js";
 
-export function createAuthRuntime(environment: Environment) {
+export function createAuthRuntime(
+  environment: Environment,
+  emailService: TransactionalEmailService = createTransactionalEmailService(
+    environment,
+  ),
+) {
+  const logger = createLogger(environment);
   const mongoClient =
     environment.AUTH_STORAGE === "mongodb" && environment.MONGODB_URI
       ? new MongoClient(environment.MONGODB_URI)
@@ -37,6 +48,26 @@ export function createAuthRuntime(environment: Environment) {
       enabled: true,
       minPasswordLength: 8,
       maxPasswordLength: 128,
+      resetPasswordTokenExpiresIn: 60 * 60,
+      revokeSessionsOnPasswordReset: true,
+      sendResetPassword: async ({ user, url }) => {
+        void emailService
+          .sendPasswordReset({
+            name: user.name,
+            resetUrl: url,
+            to: user.email,
+          })
+          .catch(() => {
+            logger.error(
+              { provider: "resend" },
+              "Password reset email delivery failed",
+            );
+          });
+      },
+    },
+    rateLimit: {
+      enabled: true,
+      storage: environment.AUTH_STORAGE === "mongodb" ? "database" : "memory",
     },
     socialProviders: googleEnabled
       ? {

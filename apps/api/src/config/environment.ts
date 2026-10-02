@@ -30,6 +30,9 @@ const environmentSchema = z
       ),
     GOOGLE_CLIENT_ID: z.string().min(1).optional(),
     GOOGLE_CLIENT_SECRET: z.string().min(1).optional(),
+    RESEND_API_KEY: z.string().min(1).optional(),
+    EMAIL_FROM: z.string().min(1).optional(),
+    EMAIL_REPLY_TO: z.email().optional(),
   })
   .superRefine((environment, context) => {
     if (
@@ -59,6 +62,28 @@ const environmentSchema = z
         code: "custom",
         path: ["GOOGLE_CLIENT_ID"],
         message: "Google OAuth requires both client ID and client secret",
+      });
+    }
+
+    if (
+      (environment.RESEND_API_KEY && !environment.EMAIL_FROM) ||
+      (!environment.RESEND_API_KEY && environment.EMAIL_FROM)
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["RESEND_API_KEY"],
+        message: "Transactional email requires RESEND_API_KEY and EMAIL_FROM",
+      });
+    }
+
+    if (
+      environment.NODE_ENV === "production" &&
+      (!environment.RESEND_API_KEY || !environment.EMAIL_FROM)
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["RESEND_API_KEY"],
+        message: "Production requires Resend transactional email configuration",
       });
     }
 
