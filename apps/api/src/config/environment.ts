@@ -28,6 +28,15 @@ const environmentSchema = z
           .map((origin) => origin.trim())
           .filter(Boolean),
       ),
+    TRUSTED_PROXY_IPS: z
+      .string()
+      .default("")
+      .transform((value) =>
+        value
+          .split(",")
+          .map((address) => address.trim())
+          .filter(Boolean),
+      ),
     GOOGLE_CLIENT_ID: z.string().min(1).optional(),
     GOOGLE_CLIENT_SECRET: z.string().min(1).optional(),
     RESEND_API_KEY: z.string().min(1).optional(),

@@ -115,9 +115,10 @@ Update this file whenever a major feature is started, completed, materially rede
   - Added a branded HTML and plain-text password-reset email with escaped user content and an optional reply-to address.
   - Added a neutral password-reset request flow that does not reveal whether an account exists.
   - Added one-hour, single-use reset tokens, rate limiting, expired-link recovery, password confirmation, and revocation of existing sessions after a successful reset.
+  - Added spoof-resistant client-IP propagation from Express to Better Auth, with an explicit proxy allowlist for reliable per-client throttling behind production reverse proxies.
   - Added responsive `/forgot-password` and `/reset-password` pages and linked recovery from sign-in.
-- **Verification:** 15 API tests and 8 web tests pass. Coverage includes template escaping, environment validation, account-enumeration resistance, rate limiting, single-use tokens, old-password rejection, new-password sign-in, and session revocation. Workspace type checking, linting, formatting, and the production build pass. Desktop and 390 px mobile recovery states were visually verified. Resend accepted a provider-level delivery to its official test address using the configured development sender.
-- **Remaining limitation:** Production delivery requires an address on a domain verified in Resend. Google OAuth also remains incomplete.
+- **Verification:** 16 API tests and 8 web tests pass. Coverage includes template escaping, environment validation, account-enumeration resistance, rate limiting, trusted-proxy normalization, single-use tokens, old-password rejection, new-password sign-in, and session revocation. Workspace type checking, linting, formatting, and the production build pass. Desktop and 390 px mobile recovery states were visually verified. Resend accepted a provider-level delivery to its official test address using the configured development sender. A live API restart confirmed Better Auth resolves a client IP without its shared-bucket warning.
+- **Remaining limitation:** Production delivery requires an address on a domain verified in Resend. Deployments behind a reverse proxy must set `TRUSTED_PROXY_IPS` to the proxy's exact IPs or CIDRs. Google OAuth also remains incomplete.
 - **Primary files:**
   - `apps/api/src/infrastructure/email/email-service.ts`
   - `apps/api/src/infrastructure/auth/auth.ts`

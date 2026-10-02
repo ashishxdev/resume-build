@@ -10,6 +10,8 @@ import { healthRouter } from "../http/routes/health.js";
 import type { Auth } from "../infrastructure/auth/auth.js";
 import { createLogger } from "../shared/logging/logger.js";
 
+const betterAuthClientIpHeader = "x-make-my-resume-client-ip";
+
 function normalizeForwardedHeader(value: string | string[] | undefined) {
   const values = Array.isArray(value) ? value : value?.split(",");
   return values?.at(-1)?.trim();
@@ -24,6 +26,9 @@ export function createApp(
   const logger = createLogger(environment);
 
   app.disable("x-powered-by");
+  if (environment.TRUSTED_PROXY_IPS.length > 0) {
+    app.set("trust proxy", environment.TRUSTED_PROXY_IPS);
+  }
   app.use(pinoHttp({ logger }));
   app.use(helmet());
   app.use(
@@ -40,6 +45,12 @@ export function createApp(
     if (forwardedProtocol) {
       request.headers["x-forwarded-proto"] = forwardedProtocol;
     }
+
+    // Better Auth receives a Fetch Request rather than the Express request, so
+    // pass along the client IP that Express resolved using our trusted-proxy
+    // configuration. Always overwrite the inbound header to prevent spoofing.
+    request.headers[betterAuthClientIpHeader] =
+      request.ip ?? request.socket.remoteAddress ?? "127.0.0.1";
 
     next();
   });

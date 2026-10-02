@@ -51,4 +51,12 @@ describe("loadEnvironment", () => {
       }),
     ).toThrow("Production requires Resend transactional email configuration");
   });
+
+  it("normalizes an explicit trusted proxy allowlist", () => {
+    expect(
+      loadEnvironment({
+        TRUSTED_PROXY_IPS: " loopback, 10.0.0.0/8, ,192.0.2.10 ",
+      }).TRUSTED_PROXY_IPS,
+    ).toEqual(["loopback", "10.0.0.0/8", "192.0.2.10"]);
+  });
 });

@@ -20,6 +20,7 @@ const testEnvironment = {
   BETTER_AUTH_URL: "http://localhost:4000",
   BETTER_AUTH_API_KEY: undefined,
   BETTER_AUTH_TRUSTED_ORIGINS: ["http://localhost:3000"],
+  TRUSTED_PROXY_IPS: [] as string[],
   GOOGLE_CLIENT_ID: undefined,
   GOOGLE_CLIENT_SECRET: undefined,
   RESEND_API_KEY: undefined,

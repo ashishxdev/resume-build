@@ -84,6 +84,9 @@ export function createAuthRuntime(
       database: {
         joins: true,
       },
+      ipAddress: {
+        ipAddressHeaders: ["x-make-my-resume-client-ip"],
+      },
       defaultCookieAttributes: {
         httpOnly: true,
         secure: environment.NODE_ENV === "production",
