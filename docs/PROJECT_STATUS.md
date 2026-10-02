@@ -15,6 +15,7 @@ Update this file whenever a major feature is started, completed, materially rede
 | Project foundation | Complete | pnpm/Turborepo monorepo with web, API, shared contracts, resume engine, renderer, linting, TypeScript, and test foundations. |
 | Marketing homepage | Complete | Responsive Stitch-inspired homepage implementing the Atelier Digital visual system and core product messaging. |
 | Authentication | In progress | Email/password authentication now includes Resend-backed, rate-limited password recovery with single-use tokens and session revocation. Google OAuth still requires configuration and end-to-end verification. |
+| Dashboard workspace | Complete | Responsive authenticated dashboard implements the approved desktop and mobile Stitch designs with truthful empty, loading, navigation, account, plan, activity, and trust states. |
 | Resume workflows | Not started | Import, verification, editing, tailoring, ATS analysis, versions, export, and sharing remain future milestones. |
 | Backend business modules | Not started | The API health route and shared infrastructure exist; domain modules remain to be implemented. |
 
@@ -126,9 +127,26 @@ Update this file whenever a major feature is started, completed, materially rede
   - `apps/web/app/forgot-password/page.tsx`
   - `apps/web/app/reset-password/page.tsx`
 
+### 7. Authenticated Dashboard Workspace
+
+- **Date:** 2026-10-02
+- **Status:** Complete
+- **Scope delivered:**
+  - Rebuilt the protected dashboard from the approved Stitch desktop and mobile references using the Atelier Digital visual system.
+  - Added a responsive top navigation, mobile bottom navigation, plan and usage summary, authenticated account menu, recoverable sign-out feedback, resume-library empty state, recent-activity empty state, and zero-hallucination trust panel.
+  - Added explicit feedback for the notification and plan-upgrade controls so every interactive element communicates its current state.
+  - Kept dashboard content truthful to the current product state: resume and tailored-draft counts are zero until the resume APIs exist, while upload and create actions explain their upcoming milestone instead of behaving like silent mock controls.
+  - Preserved session restoration and signed-out redirection to the login flow.
+- **Verification:** 20 web tests pass across 5 files, including authenticated empty-state rendering, signed-out redirection, staged-feature feedback, hydration with different server/client time bands, homepage-anchor validity, and the zero-unread notification state. Web type checking, linting, Prettier validation, and the Next.js production build pass. The dashboard was visually verified at desktop and 390 × 844 mobile widths; the mobile page has no horizontal overflow. Live browser passes confirmed notification and upgrade feedback, account-menu sign-out, session rejection after sign-out, the protected dashboard redirect, hydration-localized greeting, `/#integrity` destinations, and the absence of an unread pseudo-element at zero notifications. Automatic font preloads were disabled after Chrome reported that the route did not consume them quickly enough; the clean follow-up browser sessions reported no application warnings or errors. Disposable QA accounts and their sessions were removed after testing.
+- **Remaining work:** Resume statistics and activity must be connected to owned API resources when the resume import module is implemented. Upload, create, resume search, and populated resume cards belong to the next milestones.
+- **Primary files:**
+  - `apps/web/app/dashboard/page.tsx`
+  - `apps/web/app/dashboard/dashboard.module.css`
+  - `apps/web/app/dashboard/page.test.tsx`
+
 ## Next Major Milestone
 
-Configure and verify Google OAuth to finish the agreed authentication scope. Resume import and source verification inside the protected dashboard follows that work.
+Resume import is the next active product milestone: create owned resume/import records, upload originals directly to Cloudflare R2, validate stored objects, and expose reliable upload and processing states in the dashboard. Google OAuth remains deferred until deployment credentials are ready.
 
 ## Status Definitions
 

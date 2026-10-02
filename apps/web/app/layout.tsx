@@ -5,11 +5,13 @@ import type { ReactNode } from "react";
 import "./globals.css";
 
 const displayFont = Playfair_Display({
+  preload: false,
   subsets: ["latin"],
   variable: "--display-font",
 });
 
 const bodyFont = Plus_Jakarta_Sans({
+  preload: false,
   subsets: ["latin"],
   variable: "--body-font",
 });
@@ -24,7 +26,11 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: ReactNode }>) {
   return (
-    <html lang="en" className={`${displayFont.variable} ${bodyFont.variable}`}>
+    <html
+      lang="en"
+      className={`${displayFont.variable} ${bodyFont.variable}`}
+      data-scroll-behavior="smooth"
+    >
       <body>{children}</body>
     </html>
   );

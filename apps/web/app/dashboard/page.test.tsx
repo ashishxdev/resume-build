@@ -1,0 +1,156 @@
+// @vitest-environment jsdom
+
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+} from "@testing-library/react";
+import React from "react";
+import { hydrateRoot, type Root } from "react-dom/client";
+import { renderToString } from "react-dom/server";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import DashboardPage from "./page";
+
+const mocks = vi.hoisted(() => ({
+  replace: vi.fn(),
+  signOut: vi.fn(),
+  useSession: vi.fn(),
+}));
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ replace: mocks.replace }),
+}));
+
+vi.mock("@/lib/auth/client", () => ({
+  authClient: {
+    signOut: mocks.signOut,
+    useSession: mocks.useSession,
+  },
+}));
+
+describe("DashboardPage", () => {
+  beforeEach(() => {
+    mocks.replace.mockReset();
+    mocks.signOut.mockReset();
+    mocks.useSession.mockReturnValue({
+      data: {
+        user: {
+          email: "alex@example.com",
+          name: "Alex Mercer",
+        },
+      },
+      isPending: false,
+    });
+  });
+
+  afterEach(() => {
+    cleanup();
+  });
+
+  it("renders an authenticated user's truthful empty workspace", () => {
+    render(React.createElement(DashboardPage));
+
+    expect(screen.getByRole("heading", { name: /Alex\./ })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Your resumes" })).toBeTruthy();
+    expect(screen.getByText("0 active")).toBeTruthy();
+    expect(screen.getByText("No activity yet")).toBeTruthy();
+    expect(mocks.replace).not.toHaveBeenCalled();
+  });
+
+  it("explains that resume upload belongs to the next phase", () => {
+    render(React.createElement(DashboardPage));
+
+    fireEvent.click(screen.getByRole("button", { name: "Upload resume" }));
+
+    expect(
+      screen.getByText(
+        "Resume upload is the next build phase. Your dashboard is ready for it.",
+      ),
+    ).toBeTruthy();
+  });
+
+  it("gives feedback for notifications and plan upgrades", () => {
+    render(React.createElement(DashboardPage));
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Notifications — none unread" }),
+    );
+    expect(
+      screen.getByText("You’re all caught up—there are no new notifications."),
+    ).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Upgrade" }));
+    expect(
+      screen.getByText(
+        "Plan upgrades will be available when billing is introduced. Your free plan includes 2 tailored resumes.",
+      ),
+    ).toBeTruthy();
+  });
+
+  it("keeps the initial greeting stable when server and client times differ", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 9, 2, 8));
+
+    const markup = renderToString(React.createElement(DashboardPage));
+    const container = document.createElement("div");
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
+    let root: Root | undefined;
+
+    expect(markup).toContain("Welcome back");
+    container.innerHTML = markup;
+    document.body.append(container);
+    vi.setSystemTime(new Date(2026, 9, 2, 15));
+
+    try {
+      await act(async () => {
+        root = hydrateRoot(container, React.createElement(DashboardPage));
+      });
+
+      expect(container.textContent).toContain("Good afternoon, Alex.");
+      expect(
+        consoleError.mock.calls.some((call) =>
+          call.some(
+            (value) =>
+              typeof value === "string" &&
+              value.toLowerCase().includes("hydration"),
+          ),
+        ),
+      ).toBe(false);
+    } finally {
+      await act(async () => root?.unmount());
+      container.remove();
+      consoleError.mockRestore();
+      vi.useRealTimers();
+    }
+  });
+
+  it("targets the existing integrity section and hides the unread dot at zero", () => {
+    render(React.createElement(DashboardPage));
+
+    expect(
+      screen.getByRole("link", { name: "Learn about verification →" }),
+    ).toHaveProperty("href", "http://localhost:3000/#integrity");
+    expect(screen.getByRole("link", { name: "Methodology" })).toHaveProperty(
+      "href",
+      "http://localhost:3000/#integrity",
+    );
+    expect(
+      screen
+        .getByRole("button", { name: "Notifications — none unread" })
+        .getAttribute("data-has-unread"),
+    ).toBe("false");
+  });
+
+  it("redirects a signed-out visitor to login", () => {
+    mocks.useSession.mockReturnValue({ data: null, isPending: false });
+
+    render(React.createElement(DashboardPage));
+
+    expect(mocks.replace).toHaveBeenCalledWith("/login?redirect=%2Fdashboard");
+  });
+});

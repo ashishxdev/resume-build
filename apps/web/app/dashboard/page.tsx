@@ -2,17 +2,146 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import {
+  useEffect,
+  useState,
+  useSyncExternalStore,
+  type ReactNode,
+} from "react";
 
 import { authClient } from "@/lib/auth/client";
 
 import styles from "./dashboard.module.css";
 
+type IconName =
+  | "activity"
+  | "bell"
+  | "document"
+  | "dashboard"
+  | "plus"
+  | "profile"
+  | "shield"
+  | "upload";
+
+function Icon({ name }: { name: IconName }) {
+  const paths: Record<IconName, ReactNode> = {
+    activity: <path d="M3 12h4l2.2-6 3.6 12 2.2-6H21" />,
+    bell: (
+      <>
+        <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" />
+        <path d="M10 21h4" />
+      </>
+    ),
+    dashboard: (
+      <>
+        <rect x="3" y="3" width="7" height="7" />
+        <rect x="14" y="3" width="7" height="7" />
+        <rect x="3" y="14" width="7" height="7" />
+        <rect x="14" y="14" width="7" height="7" />
+      </>
+    ),
+    document: (
+      <>
+        <path d="M6 2h8l4 4v16H6z" />
+        <path d="M14 2v5h5M9 12h6M9 16h6" />
+      </>
+    ),
+    plus: <path d="M12 5v14M5 12h14" />,
+    profile: (
+      <>
+        <circle cx="12" cy="8" r="4" />
+        <path d="M4 22c0-4 3.6-7 8-7s8 3 8 7" />
+      </>
+    ),
+    shield: (
+      <>
+        <path d="M12 3 4.5 6v5.5c0 4.8 3 8.2 7.5 9.5 4.5-1.3 7.5-4.7 7.5-9.5V6z" />
+        <path d="m9 12 2 2 4-4" />
+      </>
+    ),
+    upload: (
+      <>
+        <path d="M12 16V4M7.5 8.5 12 4l4.5 4.5" />
+        <path d="M5 14v6h14v-6" />
+      </>
+    ),
+  };
+
+  return (
+    <svg
+      aria-hidden="true"
+      className={styles.icon}
+      fill="none"
+      viewBox="0 0 24 24"
+    >
+      <g
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.8"
+      >
+        {paths[name]}
+      </g>
+    </svg>
+  );
+}
+
+function getGreeting(date = new Date()) {
+  const hour = date.getHours();
+
+  if (hour < 12) return "Good morning";
+  if (hour < 18) return "Good afternoon";
+  return "Good evening";
+}
+
+function subscribeToLocalClock() {
+  return () => {};
+}
+
+function getClientGreeting() {
+  return getGreeting(new Date());
+}
+
+function getServerGreeting() {
+  return "Welcome back";
+}
+
+function getClientYear() {
+  return String(new Date().getFullYear());
+}
+
+function getServerYear() {
+  return "";
+}
+
+function getInitials(name?: string | null) {
+  const parts = name?.trim().split(/\s+/).filter(Boolean) ?? [];
+
+  if (parts.length === 0) return "ME";
+
+  return parts
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join("")
+    .toUpperCase();
+}
+
 export default function DashboardPage() {
   const router = useRouter();
   const { data, isPending } = authClient.useSession();
+  const greeting = useSyncExternalStore(
+    subscribeToLocalClock,
+    getClientGreeting,
+    getServerGreeting,
+  );
+  const currentYear = useSyncExternalStore(
+    subscribeToLocalClock,
+    getClientYear,
+    getServerYear,
+  );
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [signOutError, setSignOutError] = useState<string | null>(null);
+  const [featureNotice, setFeatureNotice] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isPending && !data) {
@@ -45,6 +174,24 @@ export default function DashboardPage() {
     }
   }
 
+  function announceUpcomingFeature(feature: "create" | "upload") {
+    setFeatureNotice(
+      feature === "upload"
+        ? "Resume upload is the next build phase. Your dashboard is ready for it."
+        : "Creating a resume from scratch will be added after resume import and verification.",
+    );
+  }
+
+  function showNotifications() {
+    setFeatureNotice("You’re all caught up—there are no new notifications.");
+  }
+
+  function showUpgradeStatus() {
+    setFeatureNotice(
+      "Plan upgrades will be available when billing is introduced. Your free plan includes 2 tailored resumes.",
+    );
+  }
+
   if (isPending || !data) {
     return (
       <main className={styles.loading} aria-live="polite">
@@ -54,84 +201,248 @@ export default function DashboardPage() {
     );
   }
 
-  const firstName = data.user.name?.split(" ")[0] || "there";
+  const firstName = data.user.name?.trim().split(/\s+/)[0] || "there";
+  const initials = getInitials(data.user.name);
+  const unreadNotificationCount = 0;
 
   return (
     <div className={styles.page}>
-      <aside className={styles.sidebar}>
-        <Link className={styles.brand} href="/">
-          <span>≡</span>
-          <b>
-            MAKE MY
-            <br />
-            RESUME
-          </b>
-        </Link>
-        <nav>
-          <Link className={styles.active} href="/dashboard">
-            Overview
+      <header className={styles.topbar}>
+        <div className={styles.topbarInner}>
+          <Link
+            aria-label="Make My Resume home"
+            className={styles.brand}
+            href="/"
+          >
+            M
           </Link>
-          <span>Resumes</span>
-          <span>Tailoring</span>
-          <span>Versions</span>
-        </nav>
-        <div className={styles.user}>
-          <span>{data.user.name?.slice(0, 2).toUpperCase()}</span>
-          <div>
-            <b>{data.user.name}</b>
-            <small>{data.user.email}</small>
+
+          <nav aria-label="Workspace navigation" className={styles.desktopNav}>
+            <Link className={styles.activeNav} href="/dashboard">
+              Dashboard
+            </Link>
+            <a href="#resumes">Resumes</a>
+            <a href="#activity">Activity</a>
+          </nav>
+
+          <div className={styles.accountArea}>
+            <span className={styles.usageBadge}>
+              <i /> 0 / 2 tailored
+            </span>
+            <button
+              aria-label="Notifications — none unread"
+              className={styles.iconButton}
+              data-has-unread={unreadNotificationCount > 0}
+              onClick={showNotifications}
+              type="button"
+            >
+              <Icon name="bell" />
+            </button>
+            <details className={styles.accountMenu}>
+              <summary aria-label="Open account menu">
+                <span>{initials}</span>
+                <i aria-hidden="true" />
+              </summary>
+              <div>
+                <strong>{data.user.name || "Your account"}</strong>
+                <small>{data.user.email}</small>
+                <button disabled={isSigningOut} onClick={signOut} type="button">
+                  {isSigningOut ? "Signing out…" : "Sign out"}
+                </button>
+              </div>
+            </details>
           </div>
         </div>
-      </aside>
+      </header>
 
       <main className={styles.main}>
-        <header>
+        <section className={styles.welcome} aria-labelledby="dashboard-title">
           <div>
-            <p>Private workspace</p>
-            <h1>Welcome back, {firstName}.</h1>
-            <span>Your evidence-backed resume workspace is ready.</span>
+            <h1 id="dashboard-title">
+              {greeting}, {firstName}.
+            </h1>
+            <p>
+              Tailor only what you can prove. Your verified workspace is ready.
+            </p>
           </div>
-          <button disabled={isSigningOut} onClick={signOut} type="button">
-            {isSigningOut ? "Signing out…" : "Sign out"}
-          </button>
-        </header>
-        {signOutError && (
-          <p className={styles.signOutError} role="alert">
-            {signOutError}
-          </p>
+          <div className={styles.primaryActions}>
+            <button
+              className={styles.primaryButton}
+              onClick={() => announceUpcomingFeature("upload")}
+              type="button"
+            >
+              <Icon name="upload" /> Upload resume
+            </button>
+            <button
+              className={styles.secondaryButton}
+              onClick={() => announceUpcomingFeature("create")}
+              type="button"
+            >
+              <Icon name="plus" /> Create
+            </button>
+          </div>
+        </section>
+
+        {(signOutError || featureNotice) && (
+          <div
+            className={signOutError ? styles.errorNotice : styles.featureNotice}
+            role={signOutError ? "alert" : "status"}
+          >
+            <span>{signOutError || featureNotice}</span>
+            {!signOutError && (
+              <button
+                aria-label="Dismiss notification"
+                onClick={() => setFeatureNotice(null)}
+                type="button"
+              >
+                ×
+              </button>
+            )}
+          </div>
         )}
-        <section className={styles.stats}>
+
+        <section className={styles.stats} aria-label="Workspace summary">
           <article>
             <span>Resumes</span>
-            <b>0</b>
-            <small>Your verified career profiles</small>
+            <div>
+              <strong>0</strong>
+              <small>Verified</small>
+            </div>
           </article>
           <article>
-            <span>Tailored versions</span>
-            <b>0</b>
-            <small>Role-specific applications</small>
+            <span>Tailored drafts</span>
+            <div>
+              <strong>0</strong>
+              <small>Applications</small>
+            </div>
           </article>
           <article>
             <span>Current plan</span>
-            <b>Free</b>
-            <small>2 tailored resumes included</small>
+            <div>
+              <strong>Free</strong>
+              <button
+                className={styles.upgradeButton}
+                onClick={showUpgradeStatus}
+                type="button"
+              >
+                Upgrade
+              </button>
+            </div>
+          </article>
+          <article>
+            <span className={styles.creditLabel}>
+              Credits <b>0 / 2</b>
+            </span>
+            <div
+              className={styles.creditTrack}
+              aria-label="0 of 2 credits used"
+            >
+              <i />
+            </div>
           </article>
         </section>
-        <section className={styles.empty}>
-          <span>01</span>
-          <div>
-            <p>Resume foundation</p>
-            <h2>Bring your experience into the workspace.</h2>
-            <span>
-              Resume import and verification will be the next major product
-              milestone.
-            </span>
+
+        <section className={styles.resumeSection} id="resumes">
+          <div className={styles.sectionHeading}>
+            <div>
+              <h2>Your resumes</h2>
+              <span>0 active</span>
+            </div>
+            <small>0 total</small>
           </div>
-          <button type="button" disabled>
-            Import resume · Coming next
-          </button>
+
+          <div className={styles.emptyLibrary}>
+            <div className={styles.emptyDocument} aria-hidden="true">
+              <Icon name="document" />
+            </div>
+            <div>
+              <span>Your verified baseline starts here</span>
+              <h3>Bring your experience into one trusted workspace.</h3>
+              <p>
+                Upload your existing resume in the next phase. We’ll preserve
+                the original and ask you to verify every extracted detail.
+              </p>
+            </div>
+            <button
+              className={styles.primaryButton}
+              onClick={() => announceUpcomingFeature("upload")}
+              type="button"
+            >
+              <Icon name="upload" /> Upload your first resume
+            </button>
+          </div>
+        </section>
+
+        <section className={styles.lowerGrid}>
+          <article className={styles.activityCard} id="activity">
+            <div className={styles.cardHeading}>
+              <h2>Recent Activity</h2>
+              <span>All caught up</span>
+            </div>
+            <div className={styles.emptyActivity}>
+              <Icon name="activity" />
+              <div>
+                <strong>No activity yet</strong>
+                <p>
+                  Your resume imports, verifications, and tailored drafts will
+                  appear here.
+                </p>
+              </div>
+            </div>
+          </article>
+
+          <article className={styles.trustCard}>
+            <span className={styles.shieldIcon}>
+              <Icon name="shield" />
+            </span>
+            <h2>Zero hallucination</h2>
+            <p>
+              We only tailor statements backed by your verified experiences.
+              Never fabricated for ATS scores.
+            </p>
+            <Link href="/#integrity">Learn about verification →</Link>
+          </article>
         </section>
       </main>
+
+      <footer className={styles.footer}>
+        <span>© {currentYear ? `${currentYear} ` : ""}Make My Resume</span>
+        <nav aria-label="Footer navigation">
+          <Link href="/privacy">Privacy</Link>
+          <Link href="/#integrity">Methodology</Link>
+          <a href="mailto:support@makemyresume.app">Support</a>
+        </nav>
+      </footer>
+
+      <nav
+        aria-label="Mobile workspace navigation"
+        className={styles.mobileNav}
+      >
+        <Link className={styles.mobileActive} href="/dashboard">
+          <Icon name="dashboard" />
+          <span>Dashboard</span>
+        </Link>
+        <a href="#resumes">
+          <Icon name="document" />
+          <span>Resumes</span>
+        </a>
+        <a href="#activity">
+          <Icon name="activity" />
+          <span>Activity</span>
+        </a>
+        <details>
+          <summary>
+            <Icon name="profile" />
+            <span>Profile</span>
+          </summary>
+          <div>
+            <small>{data.user.email}</small>
+            <button disabled={isSigningOut} onClick={signOut} type="button">
+              {isSigningOut ? "Signing out…" : "Sign out"}
+            </button>
+          </div>
+        </details>
+      </nav>
     </div>
   );
 }
