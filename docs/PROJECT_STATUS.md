@@ -16,8 +16,8 @@ Update this file whenever a major feature is started, completed, materially rede
 | Marketing homepage | Complete | Responsive Stitch-inspired homepage implementing the Atelier Digital visual system and core product messaging. |
 | Authentication | In progress | Email/password authentication now includes Resend-backed, rate-limited password recovery with single-use tokens and session revocation. Google OAuth still requires configuration and end-to-end verification. |
 | Dashboard workspace | Complete | Responsive authenticated dashboard implements the approved desktop and mobile Stitch designs with truthful empty, loading, navigation, account, plan, activity, and trust states. |
-| Resume workflows | Not started | Import, verification, editing, tailoring, ATS analysis, versions, export, and sharing remain future milestones. |
-| Backend business modules | Not started | The API health route and shared infrastructure exist; domain modules remain to be implemented. |
+| Resume workflows | In progress | Resume upload and original-file import are complete; extraction, verification, editing, tailoring, ATS analysis, versions, export, and sharing remain future milestones. |
+| Backend business modules | In progress | The first owned domain module now supports resume-import records and R2 originals; extraction, verification, tailoring, and later modules remain. |
 
 ## Milestones
 
@@ -144,9 +144,32 @@ Update this file whenever a major feature is started, completed, materially rede
   - `apps/web/app/dashboard/dashboard.module.css`
   - `apps/web/app/dashboard/page.test.tsx`
 
+### 8. Resume Upload and Import Foundation
+
+- **Date:** 2026-10-02
+- **Status:** Complete
+- **Scope delivered:**
+  - Added authenticated, user-owned resume, file, and import records with memory and MongoDB repository implementations.
+  - Added 15-minute, content-type-bound signed PUT URLs so original files upload directly from the browser to private Cloudflare R2 storage without passing through the API process.
+  - Added server-side size, reported-content-type, and file-signature checks before an import is accepted; invalid objects are rejected and removed.
+  - Bound the validated byte length into each signed PUT request so R2 rejects oversized, undersized, or otherwise length-mismatched uploads before accepting them.
+  - Added PDF, DOCX, JPEG, PNG, and WEBP support with a 10 MB limit, idempotent completion, cancellation, and ownership enforcement.
+  - Replaced the staged dashboard upload control with a responsive drag-and-drop/file-picker workflow with upload progress, verification, success, retry, cancellation, and actionable failure states.
+  - Made verification terminal transitions compare-and-set from `verifying`, preventing concurrent cancellation from being overwritten, and made every unfinished dialog dismissal attempt server-side cancellation before closing.
+  - Connected the dashboard summary, resume library, and recent activity to the authenticated resume API.
+- **Verification:** 31 API tests and 27 web tests pass. Workspace type checking, linting, Prettier validation, and the production build pass. Regression coverage includes cancellation racing both successful and failed verification, signed content-length propagation, cleanup on failed-dialog dismissal, and keeping the dialog open when cleanup cannot be confirmed. A live R2 size-enforcement check accepted an exact five-byte PUT with HTTP 200 and rejected a six-byte PUT using the same five-byte signed URL with HTTP 403; the temporary object was removed. A prior live browser pass verified the complete direct-upload, API verification, success, and dashboard-refresh flow at desktop and 390 × 844 mobile sizes without console warnings or errors. All disposable QA data was removed afterward.
+- **Important limitation:** Resume content extraction and user verification belong to the following milestone. DOCX validation currently confirms the ZIP container signature; full Office-package validation will happen with extraction. Google OAuth remains deferred until deployment credentials are ready.
+- **Primary files:**
+  - `apps/api/src/http/routes/resume-imports.ts`
+  - `apps/api/src/infrastructure/storage/r2-object-storage.ts`
+  - `apps/api/src/modules/resumes/resume-import-repository.ts`
+  - `apps/web/components/dashboard/resume-upload-dialog.tsx`
+  - `apps/web/lib/resume/import-client.ts`
+  - `packages/contracts/src/resume/import.ts`
+
 ## Next Major Milestone
 
-Resume import is the next active product milestone: create owned resume/import records, upload originals directly to Cloudflare R2, validate stored objects, and expose reliable upload and processing states in the dashboard. Google OAuth remains deferred until deployment credentials are ready.
+Resume extraction and evidence verification are the next distinct product phase: parse imported originals into structured claims, preserve source provenance, and let users confirm or correct every extracted detail before tailoring is enabled.
 
 ## Status Definitions
 

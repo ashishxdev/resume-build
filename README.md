@@ -33,6 +33,27 @@ pnpm worker
 
 The web app defaults to `http://localhost:3000`. The API defaults to `http://localhost:4000`, with health information at `GET /health`.
 
+### Cloudflare R2 resume uploads
+
+Resume originals upload directly from the browser to R2 with a short-lived,
+content-type-bound signed URL. Configure the `R2_*` values in `.env.local`,
+then add this CORS policy to the R2 bucket for local development:
+
+```json
+[
+  {
+    "AllowedOrigins": ["http://localhost:3000"],
+    "AllowedMethods": ["PUT"],
+    "AllowedHeaders": ["Content-Type"],
+    "ExposeHeaders": ["ETag"],
+    "MaxAgeSeconds": 3600
+  }
+]
+```
+
+Add the deployed web origin to `AllowedOrigins` before production. Signed URLs
+are bearer credentials, so they must not be logged or shared.
+
 ## Validation
 
 ```bash

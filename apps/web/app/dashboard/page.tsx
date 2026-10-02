@@ -3,13 +3,17 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
+  useCallback,
   useEffect,
   useState,
   useSyncExternalStore,
   type ReactNode,
 } from "react";
+import type { ResumeSummary } from "@make-my-resume/contracts";
 
+import { ResumeUploadDialog } from "@/components/dashboard/resume-upload-dialog";
 import { authClient } from "@/lib/auth/client";
+import { listResumes } from "@/lib/resume/import-client";
 
 import styles from "./dashboard.module.css";
 
@@ -126,9 +130,32 @@ function getInitials(name?: string | null) {
     .toUpperCase();
 }
 
+function importStatusLabel(status: ResumeSummary["importStatus"]) {
+  const labels: Record<ResumeSummary["importStatus"], string> = {
+    awaiting_upload: "Awaiting upload",
+    verifying: "Verifying",
+    uploaded: "Uploaded",
+    failed: "Upload failed",
+    cancelled: "Cancelled",
+  };
+  return labels[status];
+}
+
+function formatUpdatedAt(value: string) {
+  const timestamp = Date.parse(value);
+  if (Number.isNaN(timestamp)) return "Recently updated";
+  const minutes = Math.max(0, Math.round((Date.now() - timestamp) / 60_000));
+  if (minutes < 1) return "Updated just now";
+  if (minutes < 60) return `Updated ${minutes}m ago`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `Updated ${hours}h ago`;
+  return `Updated ${Math.round(hours / 24)}d ago`;
+}
+
 export default function DashboardPage() {
   const router = useRouter();
   const { data, isPending } = authClient.useSession();
+  const authenticatedUserId = data?.user.id;
   const greeting = useSyncExternalStore(
     subscribeToLocalClock,
     getClientGreeting,
@@ -142,12 +169,54 @@ export default function DashboardPage() {
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [signOutError, setSignOutError] = useState<string | null>(null);
   const [featureNotice, setFeatureNotice] = useState<string | null>(null);
+  const [isUploadOpen, setIsUploadOpen] = useState(false);
+  const [resumes, setResumes] = useState<ResumeSummary[]>([]);
+  const [libraryError, setLibraryError] = useState<string | null>(null);
+  const [isLoadingLibrary, setIsLoadingLibrary] = useState(true);
+
+  const refreshResumes = useCallback(async () => {
+    setIsLoadingLibrary(true);
+    setLibraryError(null);
+    try {
+      setResumes(await listResumes());
+    } catch {
+      setLibraryError(
+        "We could not load your resume library. Refresh the page to try again.",
+      );
+    } finally {
+      setIsLoadingLibrary(false);
+    }
+  }, []);
 
   useEffect(() => {
     if (!isPending && !data) {
       router.replace("/login?redirect=%2Fdashboard");
     }
   }, [data, isPending, router]);
+
+  useEffect(() => {
+    if (!authenticatedUserId) return;
+    let cancelled = false;
+
+    void listResumes()
+      .then((nextResumes) => {
+        if (!cancelled) setResumes(nextResumes);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setLibraryError(
+            "We could not load your resume library. Refresh the page to try again.",
+          );
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoadingLibrary(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [authenticatedUserId]);
 
   async function signOut() {
     setSignOutError(null);
@@ -174,11 +243,9 @@ export default function DashboardPage() {
     }
   }
 
-  function announceUpcomingFeature(feature: "create" | "upload") {
+  function announceCreateFeature() {
     setFeatureNotice(
-      feature === "upload"
-        ? "Resume upload is the next build phase. Your dashboard is ready for it."
-        : "Creating a resume from scratch will be added after resume import and verification.",
+      "Creating a resume from scratch will be added after resume import and verification.",
     );
   }
 
@@ -204,6 +271,9 @@ export default function DashboardPage() {
   const firstName = data.user.name?.trim().split(/\s+/)[0] || "there";
   const initials = getInitials(data.user.name);
   const unreadNotificationCount = 0;
+  const uploadedResumes = resumes.filter(
+    (resume) => resume.importStatus === "uploaded",
+  );
 
   return (
     <div className={styles.page}>
@@ -268,14 +338,14 @@ export default function DashboardPage() {
           <div className={styles.primaryActions}>
             <button
               className={styles.primaryButton}
-              onClick={() => announceUpcomingFeature("upload")}
+              onClick={() => setIsUploadOpen(true)}
               type="button"
             >
               <Icon name="upload" /> Upload resume
             </button>
             <button
               className={styles.secondaryButton}
-              onClick={() => announceUpcomingFeature("create")}
+              onClick={announceCreateFeature}
               type="button"
             >
               <Icon name="plus" /> Create
@@ -305,8 +375,8 @@ export default function DashboardPage() {
           <article>
             <span>Resumes</span>
             <div>
-              <strong>0</strong>
-              <small>Verified</small>
+              <strong>{uploadedResumes.length}</strong>
+              <small>Uploaded</small>
             </div>
           </article>
           <article>
@@ -346,49 +416,126 @@ export default function DashboardPage() {
           <div className={styles.sectionHeading}>
             <div>
               <h2>Your resumes</h2>
-              <span>0 active</span>
+              <span>{uploadedResumes.length} uploaded</span>
             </div>
-            <small>0 total</small>
+            <small>{resumes.length} total</small>
           </div>
 
-          <div className={styles.emptyLibrary}>
-            <div className={styles.emptyDocument} aria-hidden="true">
-              <Icon name="document" />
+          {libraryError && (
+            <div className={styles.libraryError} role="alert">
+              <span>{libraryError}</span>
+              <button onClick={() => void refreshResumes()} type="button">
+                Try again
+              </button>
             </div>
-            <div>
-              <span>Your verified baseline starts here</span>
-              <h3>Bring your experience into one trusted workspace.</h3>
-              <p>
-                Upload your existing resume in the next phase. We’ll preserve
-                the original and ask you to verify every extracted detail.
-              </p>
+          )}
+
+          {isLoadingLibrary && resumes.length === 0 ? (
+            <div className={styles.libraryLoading} aria-live="polite">
+              Loading your resume library…
             </div>
-            <button
-              className={styles.primaryButton}
-              onClick={() => announceUpcomingFeature("upload")}
-              type="button"
-            >
-              <Icon name="upload" /> Upload your first resume
-            </button>
-          </div>
+          ) : resumes.length > 0 ? (
+            <div className={styles.resumeGrid}>
+              {resumes.map((resume) => (
+                <article className={styles.resumeCard} key={resume.id}>
+                  <div className={styles.resumePreview} aria-hidden="true">
+                    <i />
+                    <i />
+                    <i />
+                  </div>
+                  <div className={styles.resumeDetails}>
+                    <span
+                      className={styles.resumeStatus}
+                      data-status={resume.importStatus}
+                    >
+                      {importStatusLabel(resume.importStatus)}
+                    </span>
+                    <h3>{resume.name}</h3>
+                    <p>{resume.originalFileName}</p>
+                    <small>{formatUpdatedAt(resume.updatedAt)}</small>
+                  </div>
+                  <div className={styles.resumeCardFooter}>
+                    <span>
+                      {resume.importStatus === "uploaded"
+                        ? "Original preserved"
+                        : "Import needs attention"}
+                    </span>
+                    {resume.importStatus === "failed" && (
+                      <button
+                        onClick={() => setIsUploadOpen(true)}
+                        type="button"
+                      >
+                        Upload again
+                      </button>
+                    )}
+                  </div>
+                </article>
+              ))}
+            </div>
+          ) : (
+            <div className={styles.emptyLibrary}>
+              <div className={styles.emptyDocument} aria-hidden="true">
+                <Icon name="document" />
+              </div>
+              <div>
+                <span>Your verified baseline starts here</span>
+                <h3>Bring your experience into one trusted workspace.</h3>
+                <p>
+                  Upload your existing resume. We’ll preserve the original and
+                  ask you to verify every extracted detail in the next phase.
+                </p>
+              </div>
+              <button
+                className={styles.primaryButton}
+                onClick={() => setIsUploadOpen(true)}
+                type="button"
+              >
+                <Icon name="upload" /> Upload your first resume
+              </button>
+            </div>
+          )}
         </section>
 
         <section className={styles.lowerGrid}>
           <article className={styles.activityCard} id="activity">
             <div className={styles.cardHeading}>
               <h2>Recent Activity</h2>
-              <span>All caught up</span>
+              <span>
+                {resumes.length > 0 ? "Latest imports" : "All caught up"}
+              </span>
             </div>
-            <div className={styles.emptyActivity}>
-              <Icon name="activity" />
-              <div>
-                <strong>No activity yet</strong>
-                <p>
-                  Your resume imports, verifications, and tailored drafts will
-                  appear here.
-                </p>
+            {resumes.length > 0 ? (
+              <ol className={styles.activityList}>
+                {resumes.slice(0, 3).map((resume) => (
+                  <li key={resume.importId}>
+                    <i data-status={resume.importStatus} />
+                    <span>
+                      <strong>{resume.name}</strong>
+                      {resume.importStatus === "uploaded"
+                        ? " uploaded securely"
+                        : ` — ${importStatusLabel(resume.importStatus).toLowerCase()}`}
+                    </span>
+                    <small>
+                      {formatUpdatedAt(resume.updatedAt).replace(
+                        "Updated ",
+                        "",
+                      )}
+                    </small>
+                  </li>
+                ))}
+              </ol>
+            ) : (
+              <div className={styles.emptyActivity}>
+                <Icon name="activity" />
+                <div>
+                  <strong>No activity yet</strong>
+                  <p>
+                    Your resume imports, verifications, and tailored drafts will
+                    appear here.
+                  </p>
+                </div>
               </div>
-            </div>
+            )}
           </article>
 
           <article className={styles.trustCard}>
@@ -443,6 +590,13 @@ export default function DashboardPage() {
           </div>
         </details>
       </nav>
+
+      {isUploadOpen && (
+        <ResumeUploadDialog
+          onClose={() => setIsUploadOpen(false)}
+          onComplete={() => void refreshResumes()}
+        />
+      )}
     </div>
   );
 }

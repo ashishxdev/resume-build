@@ -2,6 +2,8 @@ import { createApp } from "../app/create-app.js";
 import { loadEnvironment } from "../config/environment.js";
 import { loadLocalEnvironmentFiles } from "../config/load-local-environment.js";
 import { createAuthRuntime } from "../infrastructure/auth/auth.js";
+import { createR2ObjectStorage } from "../infrastructure/storage/r2-object-storage.js";
+import { createResumeImportRepositoryRuntime } from "../modules/resumes/resume-import-repository.js";
 import { createLogger } from "../shared/logging/logger.js";
 
 loadLocalEnvironmentFiles();
@@ -9,7 +11,16 @@ loadLocalEnvironmentFiles();
 const environment = loadEnvironment();
 const logger = createLogger(environment);
 const authRuntime = createAuthRuntime(environment);
-const app = createApp(environment, authRuntime.auth, authRuntime.googleEnabled);
+const resumeImportRuntime = createResumeImportRepositoryRuntime(environment);
+const app = createApp(
+  environment,
+  authRuntime.auth,
+  authRuntime.googleEnabled,
+  {
+    repository: resumeImportRuntime.repository,
+    objectStorage: createR2ObjectStorage(environment),
+  },
+);
 
 const server = app.listen(environment.PORT, () => {
   logger.info({ port: environment.PORT }, "API listening");
@@ -25,6 +36,7 @@ function shutdown(signal: string) {
       process.exitCode = 1;
     }
     await authRuntime.close();
+    await resumeImportRuntime.close();
   });
 }
 

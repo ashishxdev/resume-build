@@ -7,6 +7,10 @@ const productionBase = {
   BETTER_AUTH_SECRET: "a-secure-production-secret-with-32-characters",
   RESEND_API_KEY: "re_test_key",
   EMAIL_FROM: "Make My Resume <auth@example.com>",
+  R2_ACCOUNT_ID: "test-account",
+  R2_ACCESS_KEY_ID: "test-access-key",
+  R2_SECRET_ACCESS_KEY: "test-secret-key",
+  R2_BUCKET_NAME: "test-bucket",
 };
 
 describe("loadEnvironment", () => {
@@ -58,5 +62,16 @@ describe("loadEnvironment", () => {
         TRUSTED_PROXY_IPS: " loopback, 10.0.0.0/8, ,192.0.2.10 ",
       }).TRUSTED_PROXY_IPS,
     ).toEqual(["loopback", "10.0.0.0/8", "192.0.2.10"]);
+  });
+
+  it("rejects partial R2 configuration", () => {
+    expect(() =>
+      loadEnvironment({
+        R2_ACCOUNT_ID: "account-id",
+        R2_BUCKET_NAME: "resume-files",
+      }),
+    ).toThrow(
+      "R2 requires account ID, access key ID, secret access key, and bucket name",
+    );
   });
 });

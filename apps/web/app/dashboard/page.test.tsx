@@ -15,6 +15,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import DashboardPage from "./page";
 
 const mocks = vi.hoisted(() => ({
+  listResumes: vi.fn(),
   replace: vi.fn(),
   signOut: vi.fn(),
   useSession: vi.fn(),
@@ -31,14 +32,32 @@ vi.mock("@/lib/auth/client", () => ({
   },
 }));
 
+vi.mock("@/lib/resume/import-client", () => ({
+  listResumes: mocks.listResumes,
+}));
+
+vi.mock("@/components/dashboard/resume-upload-dialog", () => ({
+  ResumeUploadDialog: ({ onClose }: { onClose: () => void }) => (
+    <div role="dialog">
+      <span>Resume upload dialog</span>
+      <button onClick={onClose} type="button">
+        Close upload
+      </button>
+    </div>
+  ),
+}));
+
 describe("DashboardPage", () => {
   beforeEach(() => {
     mocks.replace.mockReset();
     mocks.signOut.mockReset();
+    mocks.listResumes.mockReset();
+    mocks.listResumes.mockResolvedValue([]);
     mocks.useSession.mockReturnValue({
       data: {
         user: {
           email: "alex@example.com",
+          id: "user_alex",
           name: "Alex Mercer",
         },
       },
@@ -55,21 +74,18 @@ describe("DashboardPage", () => {
 
     expect(screen.getByRole("heading", { name: /Alex\./ })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Your resumes" })).toBeTruthy();
-    expect(screen.getByText("0 active")).toBeTruthy();
+    expect(screen.getByText("0 uploaded")).toBeTruthy();
     expect(screen.getByText("No activity yet")).toBeTruthy();
     expect(mocks.replace).not.toHaveBeenCalled();
   });
 
-  it("explains that resume upload belongs to the next phase", () => {
+  it("opens the resume upload workflow", () => {
     render(React.createElement(DashboardPage));
 
     fireEvent.click(screen.getByRole("button", { name: "Upload resume" }));
 
-    expect(
-      screen.getByText(
-        "Resume upload is the next build phase. Your dashboard is ready for it.",
-      ),
-    ).toBeTruthy();
+    expect(screen.getByRole("dialog")).toBeTruthy();
+    expect(screen.getByText("Resume upload dialog")).toBeTruthy();
   });
 
   it("gives feedback for notifications and plan upgrades", () => {

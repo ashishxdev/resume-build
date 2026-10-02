@@ -7,6 +7,10 @@ import { toNodeHandler } from "better-auth/node";
 import type { Environment } from "../config/environment.js";
 import { createAuthInfoRouter } from "../http/routes/auth.js";
 import { healthRouter } from "../http/routes/health.js";
+import {
+  createResumeImportRouter,
+  type ResumeImportServices,
+} from "../http/routes/resume-imports.js";
 import type { Auth } from "../infrastructure/auth/auth.js";
 import { createLogger } from "../shared/logging/logger.js";
 
@@ -21,6 +25,7 @@ export function createApp(
   environment: Environment,
   auth: Auth,
   googleEnabled = false,
+  resumeImportServices?: ResumeImportServices,
 ) {
   const app = express();
   const logger = createLogger(environment);
@@ -58,6 +63,9 @@ export function createApp(
   app.use(express.json({ limit: "1mb" }));
   app.use(healthRouter);
   app.use(createAuthInfoRouter(auth, googleEnabled));
+  if (resumeImportServices) {
+    app.use(createResumeImportRouter(auth, resumeImportServices));
+  }
 
   return app;
 }

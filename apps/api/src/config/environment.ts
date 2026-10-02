@@ -42,6 +42,11 @@ const environmentSchema = z
     RESEND_API_KEY: z.string().min(1).optional(),
     EMAIL_FROM: z.string().min(1).optional(),
     EMAIL_REPLY_TO: z.email().optional(),
+    R2_ACCOUNT_ID: z.string().min(1).optional(),
+    R2_ACCESS_KEY_ID: z.string().min(1).optional(),
+    R2_SECRET_ACCESS_KEY: z.string().min(1).optional(),
+    R2_BUCKET_NAME: z.string().min(1).optional(),
+    R2_ENDPOINT: z.url().optional(),
   })
   .superRefine((environment, context) => {
     if (
@@ -52,6 +57,34 @@ const environmentSchema = z
         code: "custom",
         path: ["AUTH_STORAGE"],
         message: "Production requires AUTH_STORAGE=mongodb",
+      });
+    }
+
+    const r2Values = [
+      environment.R2_ACCOUNT_ID,
+      environment.R2_ACCESS_KEY_ID,
+      environment.R2_SECRET_ACCESS_KEY,
+      environment.R2_BUCKET_NAME,
+    ];
+    const configuredR2Values = r2Values.filter(Boolean).length;
+
+    if (configuredR2Values > 0 && configuredR2Values < r2Values.length) {
+      context.addIssue({
+        code: "custom",
+        path: ["R2_ACCOUNT_ID"],
+        message:
+          "R2 requires account ID, access key ID, secret access key, and bucket name",
+      });
+    }
+
+    if (
+      environment.NODE_ENV === "production" &&
+      configuredR2Values !== r2Values.length
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["R2_ACCOUNT_ID"],
+        message: "Production requires Cloudflare R2 configuration",
       });
     }
 
