@@ -25,11 +25,7 @@ const apiErrorSchema = z.object({
 
 const extensionMimeTypes: Record<string, ResumeMimeType> = {
   docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  jpeg: "image/jpeg",
-  jpg: "image/jpeg",
   pdf: "application/pdf",
-  png: "image/png",
-  webp: "image/webp",
 };
 
 export class ResumeImportApiError extends Error {
@@ -88,7 +84,7 @@ function sourceTypeForMimeType(mimeType: ResumeMimeType): ResumeSourceType {
   ) {
     return "docx";
   }
-  return "image";
+  return "docx";
 }
 
 export function validateResumeFile(
@@ -105,7 +101,7 @@ export function validateResumeFile(
 
   const mimeType = mimeTypeForFile(file);
   if (!mimeType) {
-    return { error: "Choose a PDF, DOCX, JPG, PNG, or WEBP file." };
+    return { error: "Choose a PDF or DOCX file. Images are not supported." };
   }
 
   const parsed = createResumeImportRequestSchema.safeParse({

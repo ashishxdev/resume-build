@@ -645,10 +645,9 @@ The API accepts:
 ```text
 application/pdf
 application/vnd.openxmlformats-officedocument.wordprocessingml.document
-image/jpeg
-image/png
-image/webp
 ```
+
+Image MIME types are intentionally rejected; OCR-based imports are deferred.
 
 The backend must validate both:
 

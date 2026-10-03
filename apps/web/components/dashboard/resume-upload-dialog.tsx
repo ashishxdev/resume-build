@@ -166,7 +166,8 @@ export function ResumeUploadDialog({
             <p>Upload complete</p>
             <h2 id="resume-upload-title">Your original resume is preserved.</h2>
             <p>
-              {file?.name} is ready for the extraction and verification phase.
+              {file?.name} is being extracted. You can review every detail from
+              your resume library.
             </p>
             <button
               className={styles.primaryButton}
@@ -194,7 +195,7 @@ export function ResumeUploadDialog({
               onDrop={handleDrop}
             >
               <input
-                accept=".pdf,.docx,.jpg,.jpeg,.png,.webp"
+                accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                 disabled={busy}
                 onChange={(event) => chooseFile(event.target.files?.[0])}
                 ref={inputRef}
@@ -226,7 +227,7 @@ export function ResumeUploadDialog({
             </div>
 
             <div className={styles.fileRules}>
-              <span>PDF, DOCX, JPG, PNG, or WEBP</span>
+              <span>PDF or DOCX only · images are not accepted</span>
               <span>10 MB maximum</span>
             </div>
 

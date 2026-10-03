@@ -1,0 +1,384 @@
+.page {
+  min-height: 100vh;
+  background: #f8f5fa;
+  color: #21182b;
+}
+.topbar {
+  height: 76px;
+  padding: 0 max(24px, calc((100vw - 1120px) / 2));
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  border-bottom: 1px solid #e7dfeb;
+  background: rgba(251, 249, 252, 0.92);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  backdrop-filter: blur(14px);
+}
+.brand {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  background: #29183f;
+  color: white;
+  border-radius: 4px;
+  font:
+    700 20px Georgia,
+    serif;
+  text-decoration: none;
+}
+.topbar > div {
+  text-align: center;
+  display: grid;
+  gap: 3px;
+}
+.topbar span {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: #776f7c;
+}
+.topbar b {
+  font-size: 13px;
+}
+.topbar > a:last-child {
+  justify-self: end;
+  color: #40285b;
+  font-weight: 700;
+  text-decoration: none;
+}
+.main {
+  width: min(920px, calc(100% - 40px));
+  margin: 0 auto;
+  padding: 64px 0 100px;
+}
+.intro {
+  text-align: center;
+  max-width: 720px;
+  margin: 0 auto 44px;
+}
+.eyebrow {
+  color: #6844db;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.intro h1,
+.statePage h1 {
+  font:
+    600 clamp(38px, 6vw, 64px)/1.05 Georgia,
+    serif;
+  letter-spacing: -0.04em;
+  margin: 14px 0 18px;
+}
+.intro p,
+.statePage p {
+  color: #68606d;
+  line-height: 1.7;
+}
+.reviewTrack,
+.progress {
+  height: 7px;
+  overflow: hidden;
+  border-radius: 20px;
+  background: #e4dce9;
+  margin-top: 28px;
+}
+.reviewTrack i,
+.progress i {
+  display: block;
+  height: 100%;
+  background: #39214f;
+  transition: width 0.3s ease;
+}
+.groups {
+  display: grid;
+  gap: 22px;
+}
+.group {
+  background: white;
+  border: 1px solid #e4dce8;
+  border-radius: 14px;
+  padding: 28px;
+  box-shadow: 0 12px 40px rgba(44, 27, 59, 0.05);
+}
+.groupHeading {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 20px;
+}
+.groupHeading h2 {
+  font:
+    600 28px Georgia,
+    serif;
+  margin: 0;
+}
+.groupHeading span {
+  color: #79717e;
+  font-size: 12px;
+}
+.claim {
+  border: 1px solid #e5dfe8;
+  padding: 18px;
+  border-radius: 10px;
+  margin-top: 14px;
+  background: #fcfbfd;
+}
+.claim[data-status="confirmed"] {
+  border-left: 4px solid #2c8466;
+}
+.claim[data-status="edited"] {
+  border-left: 4px solid #6844db;
+}
+.claim[data-status="rejected"] {
+  opacity: 0.65;
+  border-left: 4px solid #a65b59;
+}
+.claimHead {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+}
+.claimHead > div {
+  min-width: 0;
+  width: 75%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.claimHead input {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  font-weight: 800;
+  color: #352743;
+  width: min(70%, 320px);
+}
+.claimHead select {
+  max-width: 180px;
+  border: 0;
+  background: #f0eaf4;
+  color: #4d3b5a;
+  border-radius: 4px;
+  padding: 6px;
+  font-size: 10px;
+}
+.claimHead span {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #756c7b;
+}
+.claim textarea {
+  width: 100%;
+  min-height: 74px;
+  resize: vertical;
+  border: 0;
+  border-bottom: 1px solid #ded5e2;
+  background: transparent;
+  color: #21182b;
+  font: inherit;
+  line-height: 1.55;
+  padding: 14px 0;
+}
+.claim textarea:focus,
+.claimHead input:focus,
+.claimHead select:focus {
+  outline: 2px solid #b8a4df;
+  outline-offset: 3px;
+}
+.claim blockquote {
+  margin: 14px 0 0;
+  padding: 12px 14px;
+  background: #f2edf5;
+  color: #625a68;
+  font-size: 12px;
+  line-height: 1.5;
+  border-radius: 6px;
+}
+.claim blockquote b {
+  display: block;
+  color: #3d2a50;
+  margin-bottom: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 9px;
+}
+.claimActions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 14px;
+}
+.claimActions button,
+.addButton {
+  border: 1px solid #ddd3e2;
+  background: white;
+  color: #382548;
+  border-radius: 5px;
+  padding: 8px 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.claimActions button:first-child {
+  background: #e8f4ef;
+  border-color: #cde7dc;
+  color: #176149;
+}
+.claimActions button:last-child {
+  margin-left: auto;
+  color: #8a4141;
+}
+.footerActions {
+  margin-top: 28px;
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  align-items: center;
+}
+.footerActions > div {
+  display: flex;
+  gap: 18px;
+  align-items: center;
+}
+.footerActions span {
+  font-size: 12px;
+  color: #716978;
+}
+.saveButton,
+.stateActions button {
+  border: 0;
+  background: #2b1941;
+  color: white;
+  padding: 13px 20px;
+  border-radius: 5px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.saveButton:disabled {
+  opacity: 0.55;
+}
+.error {
+  padding: 14px;
+  border: 1px solid #e6c6c4;
+  background: #fff3f2;
+  color: #842f2b;
+  border-radius: 8px;
+}
+.statePage {
+  min-height: 100vh;
+  padding: 40px;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  text-align: center;
+  background: #f8f5fa;
+  color: #21182b;
+}
+.statePage h1 {
+  max-width: 700px;
+}
+.statePage p {
+  max-width: 600px;
+}
+.statePage > a,
+.stateActions a {
+  color: #4f31a8;
+  font-weight: 800;
+  margin-top: 20px;
+}
+.progress {
+  width: min(500px, 80vw);
+}
+.spinner {
+  width: 34px;
+  height: 34px;
+  border: 3px solid #ded4e4;
+  border-top-color: #39214f;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+.stateActions {
+  display: flex;
+  gap: 20px;
+  align-items: center;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (max-width: 640px) {
+  .topbar {
+    height: 64px;
+    padding: 0 16px;
+    grid-template-columns: auto 1fr auto;
+    gap: 12px;
+  }
+  .topbar > div {
+    text-align: left;
+  }
+  .topbar span {
+    display: none;
+  }
+  .topbar > a:last-child {
+    font-size: 12px;
+  }
+  .main {
+    width: min(100% - 28px, 920px);
+    padding: 38px 0 90px;
+  }
+  .intro {
+    text-align: left;
+  }
+  .intro h1 {
+    font-size: 42px;
+  }
+  .group {
+    padding: 18px 14px;
+    border-radius: 10px;
+  }
+  .groupHeading h2 {
+    font-size: 24px;
+  }
+  .claim {
+    padding: 15px 12px;
+  }
+  .claimHead > div {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .claimHead input,
+  .claimHead select {
+    width: 100%;
+    max-width: none;
+  }
+  .claimActions button:last-child {
+    margin-left: 0;
+  }
+  .footerActions,
+  .footerActions > div {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .saveButton,
+  .addButton {
+    width: 100%;
+  }
+  .statePage {
+    padding: 24px;
+  }
+  .statePage h1 {
+    font-size: 42px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    animation: none;
+  }
+}

@@ -40,11 +40,16 @@ describe("validateResumeFile", () => {
       ).error,
     ).toMatch(/smaller than 10 MB/);
     expect(validateResumeFile(new File(["x"], "resume.txt")).error).toMatch(
-      /PDF, DOCX/,
+      /PDF or DOCX/,
     );
     expect(
       validateResumeFile(new File(["x"], "resume.pdf", { type: "image/png" }))
         .error,
-    ).toMatch(/PDF, DOCX/);
+    ).toMatch(/PDF or DOCX/);
+    expect(
+      validateResumeFile(
+        new File(["image"], "resume.png", { type: "image/png" }),
+      ).error,
+    ).toMatch(/Images are not supported/);
   });
 });

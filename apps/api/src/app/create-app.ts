@@ -11,6 +11,7 @@ import {
   createResumeImportRouter,
   type ResumeImportServices,
 } from "../http/routes/resume-imports.js";
+import { createResumeVerificationRouter } from "../http/routes/resume-verification.js";
 import type { Auth } from "../infrastructure/auth/auth.js";
 import { createLogger } from "../shared/logging/logger.js";
 
@@ -65,6 +66,14 @@ export function createApp(
   app.use(createAuthInfoRouter(auth, googleEnabled));
   if (resumeImportServices) {
     app.use(createResumeImportRouter(auth, resumeImportServices));
+    if (resumeImportServices.extractionRepository) {
+      app.use(
+        createResumeVerificationRouter(
+          auth,
+          resumeImportServices.extractionRepository,
+        ),
+      );
+    }
   }
 
   return app;

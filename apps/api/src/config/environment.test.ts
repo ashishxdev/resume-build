@@ -74,4 +74,36 @@ describe("loadEnvironment", () => {
       "R2 requires account ID, access key ID, secret access key, and bucket name",
     );
   });
+
+  it("accepts a complete Gemini parser configuration", () => {
+    const environment = loadEnvironment({
+      AI_PROVIDER: "gemini",
+      AI_PROVIDER_API_KEY: "test-gemini-key",
+      AI_MODEL: "gemini-test-model",
+    });
+
+    expect(environment).toMatchObject({
+      AI_PROVIDER: "gemini",
+      AI_PROVIDER_API_KEY: "test-gemini-key",
+      AI_MODEL: "gemini-test-model",
+    });
+  });
+
+  it("requires the AI provider and credential together", () => {
+    expect(() =>
+      loadEnvironment({ AI_PROVIDER_API_KEY: "test-gemini-key" }),
+    ).toThrow("AI parsing requires both AI_PROVIDER and AI_PROVIDER_API_KEY");
+  });
+
+  it("treats blank optional AI configuration as disabled", () => {
+    const environment = loadEnvironment({
+      AI_PROVIDER: "",
+      AI_PROVIDER_API_KEY: "",
+      AI_MODEL: "",
+    });
+
+    expect(environment.AI_PROVIDER).toBeUndefined();
+    expect(environment.AI_PROVIDER_API_KEY).toBeUndefined();
+    expect(environment.AI_MODEL).toBe("gemini-3.8-flash");
+  });
 });

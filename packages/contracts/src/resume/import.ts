@@ -5,12 +5,9 @@ export const MAX_RESUME_FILE_SIZE = 10 * 1024 * 1024;
 export const resumeMimeTypeSchema = z.enum([
   "application/pdf",
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  "image/jpeg",
-  "image/png",
-  "image/webp",
 ]);
 
-export const resumeSourceTypeSchema = z.enum(["pdf", "docx", "image"]);
+export const resumeSourceTypeSchema = z.enum(["pdf", "docx"]);
 
 export const resumeImportStatusSchema = z.enum([
   "awaiting_upload",
@@ -57,6 +54,10 @@ export const resumeSummarySchema = z.object({
   originalFileName: z.string(),
   importId: z.string(),
   importStatus: resumeImportStatusSchema,
+  extractionStatus: z
+    .enum(["queued", "processing", "review_required", "verified", "failed"])
+    .nullable(),
+  compatibilityStatus: z.enum(["supported", "unsupported_legacy_format"]),
   updatedAt: z.string(),
 });
 

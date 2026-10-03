@@ -1,6 +1,6 @@
 # Make My Resume — Project Status
 
-Last updated: 2026-10-02
+Last updated: 2026-10-03
 
 ## Purpose
 
@@ -16,8 +16,8 @@ Update this file whenever a major feature is started, completed, materially rede
 | Marketing homepage | Complete | Responsive Stitch-inspired homepage implementing the Atelier Digital visual system and core product messaging. |
 | Authentication | In progress | Email/password authentication now includes Resend-backed, rate-limited password recovery with single-use tokens and session revocation. Google OAuth still requires configuration and end-to-end verification. |
 | Dashboard workspace | Complete | Responsive authenticated dashboard implements the approved desktop and mobile Stitch designs with truthful empty, loading, navigation, account, plan, activity, and trust states. |
-| Resume workflows | In progress | Resume upload and original-file import are complete; extraction, verification, editing, tailoring, ATS analysis, versions, export, and sharing remain future milestones. |
-| Backend business modules | In progress | The first owned domain module now supports resume-import records and R2 originals; extraction, verification, tailoring, and later modules remain. |
+| Resume workflows | In progress | PDF/DOCX import, Gemini-assisted structured extraction, source-backed review, and verified base versions are complete. Tailoring, ATS analysis, later versions, export, and sharing remain future milestones. |
+| Backend business modules | In progress | Owned imports, private R2 originals, extraction jobs, provider-neutral AI parsing with grounded fallback, provenance-backed claims, and verified base-version persistence are complete; tailoring and later modules remain. |
 
 ## Milestones
 
@@ -159,6 +159,7 @@ Update this file whenever a major feature is started, completed, materially rede
   - Connected the dashboard summary, resume library, and recent activity to the authenticated resume API.
 - **Verification:** 31 API tests and 27 web tests pass. Workspace type checking, linting, Prettier validation, and the production build pass. Regression coverage includes cancellation racing both successful and failed verification, signed content-length propagation, cleanup on failed-dialog dismissal, and keeping the dialog open when cleanup cannot be confirmed. A live R2 size-enforcement check accepted an exact five-byte PUT with HTTP 200 and rejected a six-byte PUT using the same five-byte signed URL with HTTP 403; the temporary object was removed. A prior live browser pass verified the complete direct-upload, API verification, success, and dashboard-refresh flow at desktop and 390 × 844 mobile sizes without console warnings or errors. All disposable QA data was removed afterward.
 - **Important limitation:** Resume content extraction and user verification belong to the following milestone. DOCX validation currently confirms the ZIP container signature; full Office-package validation will happen with extraction. Google OAuth remains deferred until deployment credentials are ready.
+- **Scope superseded in milestone 9:** Image import support was removed before extraction shipped. The supported input set is now deliberately limited to PDF and DOCX.
 - **Primary files:**
   - `apps/api/src/http/routes/resume-imports.ts`
   - `apps/api/src/infrastructure/storage/r2-object-storage.ts`
@@ -167,9 +168,42 @@ Update this file whenever a major feature is started, completed, materially rede
   - `apps/web/lib/resume/import-client.ts`
   - `packages/contracts/src/resume/import.ts`
 
+### 9. Resume Extraction and Evidence Verification
+
+- **Date:** 2026-10-02; AI parsing extension completed 2026-10-03
+- **Status:** Complete
+- **Scope delivered:**
+  - Restrict resume imports to PDF and DOCX documents; image and OCR-based imports are intentionally deferred.
+  - Added worker-safe, atomically claimed, retryable extraction jobs backed by memory or MongoDB persistence, with private originals read directly from Cloudflare R2.
+  - Added PDF.js and Mammoth extraction with bounded document text, PDF page provenance, deterministic section classification, and explicit failure states for unreadable documents.
+  - Added authenticated, ownership-enforced verification APIs that preserve server-owned source provenance and establish a persisted base version only after every retained claim is reviewed.
+  - Added a responsive evidence-review workspace where users can confirm, edit, reject, add, remove, recategorize, and reorder extracted details, save partial progress, retry failed extraction, and return later from the dashboard.
+  - Connected dashboard cards to queued, processing, review-required, failed, and verified extraction states.
+  - Hardened post-QA behavior by restarting status polling after a failed extraction is retried, joining fragmented PDF text with coordinate-aware word gaps, and aligning homepage format messaging with the implemented workflow.
+  - Added a derived `unsupported_legacy_format` compatibility state for image imports created before the PDF/DOCX-only decision, with a clear replacement path and protection against accidentally enqueueing those records for extraction.
+  - Added a provider-neutral AI parsing boundary with a Gemini implementation that groups one summary, logical role-level experience entries, qualifications, projects, certifications, achievements, and consolidated skills instead of emitting one claim per source line.
+  - Required every AI claim to carry an exact quote from its declared source page. Ungrounded, malformed, empty, oversized, or unavailable AI responses automatically fall back to deterministic parsing without failing the extraction job.
+  - Disabled provider-side interaction storage, bounded AI input and output, kept credentials and résumé content out of application logs, and retained mandatory user review before a verified base version can be created.
+  - Hardened MongoDB job processing with expiring owner-token leases, safe stale-job reclamation, stale-worker write rejection, and a terminal failure after repeated abandoned attempts.
+  - Made extraction-job creation an atomic upsert protected by a unique `resumeId` index, preventing concurrent import completion from creating duplicate jobs.
+  - Made verification, base-version persistence, and the resume baseline pointer one MongoDB transaction guarded by an optimistic record revision. Failed writes roll back the entire transition, while competing saves return a state conflict.
+  - Assigned DOCX extraction a stable synthetic document page identifier so Gemini claims can use the same exact-quote grounding path as PDF claims.
+- **Verification:** 52 API tests and 30 web tests pass. Workspace type checking, linting, Prettier validation, and production builds pass. Regression coverage includes image-format rejection, legacy-image compatibility, idempotent extraction-job creation, lease expiry and reclamation, stale-worker rejection, abandoned-attempt exhaustion, optimistic concurrent-save rejection, cross-account isolation, immutable provenance, verified-version creation, coordinate-aware PDF word reconstruction, synthetic DOCX provenance, deterministic section classification, grounded Gemini response validation for PDF and DOCX, duplicate and multiple-summary filtering, provider-failure fallback, review UI transitions, retry polling through a second terminal failure, and retry feedback. An isolated live MongoDB check in a disposable database passed concurrent unique upsert, expired-lease reclamation, transactional version and pointer consistency, and full rollback under a forced version-write failure; the database was dropped afterward. A live Gemini smoke test using synthetic résumé content and the configured `gemini-3.8-flash` model returned one personal-information claim, one summary, one role-level experience claim, and one consolidated skills claim with valid page evidence. A generated DOCX smoke document also passed the production extraction path. Manual QA previously passed DOCX and PDF upload/extraction, partial review persistence, verified-version creation, mobile layouts, and dashboard state transitions.
+- **Important limitations:** AI parsing requires configured Gemini credentials; when it is disabled, rate-limited, unavailable, malformed, or ungrounded, extraction deliberately falls back to the less precise deterministic parser. Text extracted from a résumé is transmitted to the configured Gemini service for parsing, with interaction storage disabled. User review remains mandatory. Scanned/image-only PDFs are reported as unreadable because OCR and all image uploads are deferred, and complex multi-column documents still depend on PDF text-extraction quality.
+- **Primary files:**
+  - `apps/api/src/modules/resumes/document-text-extractor.ts`
+  - `apps/api/src/infrastructure/ai/gemini-resume-parser.ts`
+  - `apps/api/src/modules/resumes/resume-ai-parser.ts`
+  - `apps/api/src/modules/resumes/resume-extraction-repository.ts`
+  - `apps/api/src/modules/resumes/resume-extraction-service.ts`
+  - `apps/api/src/http/routes/resume-verification.ts`
+  - `apps/web/components/resume/resume-verification-page.tsx`
+  - `apps/web/app/resumes/[resumeId]/verify/page.tsx`
+  - `packages/contracts/src/resume/verification.ts`
+
 ## Next Major Milestone
 
-Resume extraction and evidence verification are the next distinct product phase: parse imported originals into structured claims, preserve source provenance, and let users confirm or correct every extracted detail before tailoring is enabled.
+Job-description capture and the first tailoring workspace are next: accept a target role, connect it to a verified base resume, analyze grounded gaps, and prepare suggestions that remain individually user-controlled.
 
 ## Status Definitions
 

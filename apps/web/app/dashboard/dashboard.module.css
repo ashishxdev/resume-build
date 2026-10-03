@@ -576,6 +576,18 @@
   color: #9c4d18;
 }
 
+.resumeStatus[data-status="unsupported"] {
+  background: #fff0e8;
+  color: #8a431e;
+}
+
+.resumeStatus[data-status="review_required"],
+.resumeStatus[data-status="queued"],
+.resumeStatus[data-status="processing"] {
+  background: #eeeafd;
+  color: #5540aa;
+}
+
 .resumeStatus[data-status="verifying"],
 .resumeStatus[data-status="awaiting_upload"] {
   background: #eeeafd;
@@ -625,7 +637,8 @@
   font-size: 9px;
 }
 
-.resumeCardFooter button {
+.resumeCardFooter button,
+.resumeCardFooter a {
   padding: 6px 9px;
   border: 1px solid #d9cfde;
   border-radius: 3px;
@@ -634,6 +647,7 @@
   cursor: pointer;
   font-size: 9px;
   font-weight: 750;
+  text-decoration: none;
 }
 
 .lowerGrid {

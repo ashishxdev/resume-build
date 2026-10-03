@@ -24,7 +24,7 @@ const principles = [
 const steps = [
   [
     "Upload your baseline",
-    "Bring a PDF, DOCX, image, or paste your existing resume.",
+    "Upload a PDF or DOCX resume to create your verified baseline.",
   ],
   [
     "Paste the job description",

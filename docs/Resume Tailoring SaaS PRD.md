@@ -394,7 +394,8 @@ Display recent:
 
 - PDF
 - DOCX
-- Image/photo
+
+Image/photo imports and OCR are intentionally outside the current product scope.
 
 ## Upload process
 
@@ -1686,7 +1687,7 @@ The application should never unexpectedly overwrite the user's base resume when 
 
 ## Resume upload
 
-A user can upload PDF, DOCX, or image files and receive a structured resume representation.
+A user can upload PDF or DOCX files and receive a structured resume representation. Image files are rejected.
 
 ## Resume verification
 

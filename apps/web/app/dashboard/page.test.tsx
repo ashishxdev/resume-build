@@ -88,6 +88,29 @@ describe("DashboardPage", () => {
     expect(screen.getByText("Resume upload dialog")).toBeTruthy();
   });
 
+  it("explains legacy image imports and offers a supported replacement", async () => {
+    mocks.listResumes.mockResolvedValue([
+      {
+        id: "resume_legacy",
+        name: "Legacy image resume",
+        originalFileName: "resume.png",
+        importId: "import_legacy",
+        importStatus: "uploaded",
+        extractionStatus: null,
+        compatibilityStatus: "unsupported_legacy_format",
+        updatedAt: "2026-10-02T10:00:00.000Z",
+      },
+    ]);
+    render(React.createElement(DashboardPage));
+
+    expect(await screen.findByText("Unsupported image import")).toBeTruthy();
+    expect(
+      screen.getByText("Replace with a PDF or DOCX to continue"),
+    ).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Upload PDF/DOCX" }));
+    expect(screen.getByRole("dialog")).toBeTruthy();
+  });
+
   it("gives feedback for notifications and plan upgrades", () => {
     render(React.createElement(DashboardPage));
 

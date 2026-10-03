@@ -9,6 +9,7 @@ import type {
   StoredObjectInspection,
 } from "../../infrastructure/storage/r2-object-storage.js";
 import { createMemoryResumeImportRepository } from "../../modules/resumes/resume-import-repository.js";
+import { createMemoryResumeExtractionRepository } from "../../modules/resumes/resume-extraction-repository.js";
 
 const testEnvironment = {
   NODE_ENV: "test",
@@ -54,6 +55,9 @@ function createStorage() {
     async deleteObject(objectKey) {
       deletedKeys.push(objectKey);
     },
+    async readObject() {
+      return Uint8Array.from([0x25, 0x50, 0x44, 0x46, 0x2d]);
+    },
   };
 
   return {
@@ -92,9 +96,11 @@ describe("resume imports", () => {
   it("creates, verifies, and lists an owned import", async () => {
     const authRuntime = createAuthRuntime(testEnvironment);
     const repository = createMemoryResumeImportRepository();
+    const extractionRepository = createMemoryResumeExtractionRepository();
     const { storage } = createStorage();
     const app = createApp(testEnvironment, authRuntime.auth, false, {
       repository,
+      extractionRepository,
       objectStorage: storage,
     });
     const owner = request.agent(app);
@@ -124,6 +130,8 @@ describe("resume imports", () => {
       expect.objectContaining({
         name: "product-designer",
         importStatus: "uploaded",
+        extractionStatus: "queued",
+        compatibilityStatus: "supported",
       }),
     ]);
   });
@@ -251,5 +259,141 @@ describe("resume imports", () => {
     const owner = request.agent(app);
     await signUp(owner, "owner@example.com");
     await owner.post("/api/v1/imports").send(upload).expect(503);
+  });
+
+  it("rejects image upload metadata", async () => {
+    const authRuntime = createAuthRuntime(testEnvironment);
+    const repository = createMemoryResumeImportRepository();
+    const { storage } = createStorage();
+    const app = createApp(testEnvironment, authRuntime.auth, false, {
+      repository,
+      objectStorage: storage,
+    });
+    const owner = request.agent(app);
+    await signUp(owner, "image-owner@example.com");
+
+    const response = await owner
+      .post("/api/v1/imports")
+      .send({
+        fileName: "resume.png",
+        mimeType: "image/png",
+        size: 245,
+        sourceType: "image",
+      })
+      .expect(400);
+    expect(response.body.error.code).toBe("INVALID_UPLOAD");
+  });
+
+  it("marks an existing image import as an unsupported legacy format", async () => {
+    const authRuntime = createAuthRuntime(testEnvironment);
+    const repository = createMemoryResumeImportRepository();
+    const { storage } = createStorage();
+    const app = createApp(testEnvironment, authRuntime.auth, false, {
+      repository,
+      objectStorage: storage,
+    });
+    const owner = request.agent(app);
+    await signUp(owner, "legacy-image-owner@example.com");
+    const session = await owner.get("/api/auth/get-session").expect(200);
+    const now = new Date();
+    await repository.create({
+      id: "import_legacy_image",
+      userId: session.body.user.id,
+      resumeId: "resume_legacy_image",
+      fileId: "file_legacy_image",
+      name: "legacy-image-resume",
+      fileName: "legacy-image-resume.png",
+      mimeType: "image/png" as never,
+      size: 245,
+      sourceType: "image" as never,
+      objectKey: "users/owner/legacy-image-resume.png",
+      status: "uploaded",
+      failureCode: null,
+      etag: "legacy-etag",
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    const resumes = await owner.get("/api/v1/resumes").expect(200);
+    expect(resumes.body.data).toEqual([
+      expect.objectContaining({
+        id: "resume_legacy_image",
+        compatibilityStatus: "unsupported_legacy_format",
+        extractionStatus: null,
+      }),
+    ]);
+  });
+
+  it("keeps extraction review private and creates a verified baseline", async () => {
+    const authRuntime = createAuthRuntime(testEnvironment);
+    const repository = createMemoryResumeImportRepository();
+    const extractionRepository = createMemoryResumeExtractionRepository();
+    const { storage } = createStorage();
+    const app = createApp(testEnvironment, authRuntime.auth, false, {
+      repository,
+      extractionRepository,
+      objectStorage: storage,
+    });
+    const owner = request.agent(app);
+    const stranger = request.agent(app);
+    await signUp(owner, "verification-owner@example.com");
+    await signUp(stranger, "verification-stranger@example.com");
+    const session = await owner.get("/api/auth/get-session").expect(200);
+    const queued = await extractionRepository.createQueued({
+      userId: session.body.user.id,
+      resumeId: "resume_review",
+      importId: "import_review",
+      objectKey: "users/owner/resume.pdf",
+      mimeType: "application/pdf",
+    });
+    const claimed = await extractionRepository.claimNext();
+    expect(claimed?.processingToken).toBeTruthy();
+    await extractionRepository.complete(queued.id, claimed!.processingToken!, [
+      {
+        id: "claim_original",
+        category: "experience",
+        label: "Experience",
+        value: "Built a design system",
+        sourceText: "Built a design system",
+        pageNumber: 2,
+        status: "unreviewed",
+        userAdded: false,
+        order: 0,
+      },
+    ]);
+
+    await stranger
+      .get("/api/v1/resumes/resume_review/verification")
+      .expect(404);
+    const updated = await owner
+      .put("/api/v1/resumes/resume_review/verification")
+      .send({
+        claims: [
+          {
+            id: "claim_original",
+            category: "experience",
+            label: "Experience",
+            value: "Built a verified design system",
+            sourceText: "tampered provenance",
+            pageNumber: 99,
+            status: "edited",
+            userAdded: true,
+            order: 0,
+          },
+        ],
+      })
+      .expect(200);
+
+    expect(updated.body.data).toMatchObject({
+      status: "verified",
+      versionId: expect.stringMatching(/^version_/),
+      claims: [
+        expect.objectContaining({
+          sourceText: "Built a design system",
+          pageNumber: 2,
+          userAdded: false,
+        }),
+      ],
+    });
   });
 });

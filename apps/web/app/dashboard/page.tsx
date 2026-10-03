@@ -141,6 +141,18 @@ function importStatusLabel(status: ResumeSummary["importStatus"]) {
   return labels[status];
 }
 
+function resumeStatusLabel(resume: ResumeSummary) {
+  if (resume.compatibilityStatus === "unsupported_legacy_format") {
+    return "Unsupported image import";
+  }
+  if (resume.extractionStatus === "queued") return "Extraction queued";
+  if (resume.extractionStatus === "processing") return "Extracting";
+  if (resume.extractionStatus === "review_required") return "Review needed";
+  if (resume.extractionStatus === "verified") return "Verified";
+  if (resume.extractionStatus === "failed") return "Extraction failed";
+  return importStatusLabel(resume.importStatus);
+}
+
 function formatUpdatedAt(value: string) {
   const timestamp = Date.parse(value);
   if (Number.isNaN(timestamp)) return "Recently updated";
@@ -272,7 +284,9 @@ export default function DashboardPage() {
   const initials = getInitials(data.user.name);
   const unreadNotificationCount = 0;
   const uploadedResumes = resumes.filter(
-    (resume) => resume.importStatus === "uploaded",
+    (resume) =>
+      resume.importStatus === "uploaded" &&
+      resume.compatibilityStatus === "supported",
   );
 
   return (
@@ -446,9 +460,14 @@ export default function DashboardPage() {
                   <div className={styles.resumeDetails}>
                     <span
                       className={styles.resumeStatus}
-                      data-status={resume.importStatus}
+                      data-status={
+                        resume.compatibilityStatus ===
+                        "unsupported_legacy_format"
+                          ? "unsupported"
+                          : (resume.extractionStatus ?? resume.importStatus)
+                      }
                     >
-                      {importStatusLabel(resume.importStatus)}
+                      {resumeStatusLabel(resume)}
                     </span>
                     <h3>{resume.name}</h3>
                     <p>{resume.originalFileName}</p>
@@ -456,10 +475,34 @@ export default function DashboardPage() {
                   </div>
                   <div className={styles.resumeCardFooter}>
                     <span>
-                      {resume.importStatus === "uploaded"
-                        ? "Original preserved"
-                        : "Import needs attention"}
+                      {resume.compatibilityStatus ===
+                      "unsupported_legacy_format"
+                        ? "Replace with a PDF or DOCX to continue"
+                        : resume.extractionStatus === "verified"
+                          ? "Baseline ready"
+                          : resume.importStatus === "uploaded"
+                            ? "Original preserved"
+                            : "Import needs attention"}
                     </span>
+                    {resume.compatibilityStatus ===
+                      "unsupported_legacy_format" && (
+                      <button
+                        onClick={() => setIsUploadOpen(true)}
+                        type="button"
+                      >
+                        Upload PDF/DOCX
+                      </button>
+                    )}
+                    {resume.compatibilityStatus === "supported" &&
+                      resume.extractionStatus && (
+                        <Link href={`/resumes/${resume.id}/verify`}>
+                          {resume.extractionStatus === "verified"
+                            ? "View baseline"
+                            : resume.extractionStatus === "failed"
+                              ? "Resolve"
+                              : "Review extraction"}
+                        </Link>
+                      )}
                     {resume.importStatus === "failed" && (
                       <button
                         onClick={() => setIsUploadOpen(true)}
@@ -511,9 +554,12 @@ export default function DashboardPage() {
                     <i data-status={resume.importStatus} />
                     <span>
                       <strong>{resume.name}</strong>
-                      {resume.importStatus === "uploaded"
-                        ? " uploaded securely"
-                        : ` — ${importStatusLabel(resume.importStatus).toLowerCase()}`}
+                      {resume.compatibilityStatus ===
+                      "unsupported_legacy_format"
+                        ? " needs a supported replacement"
+                        : resume.importStatus === "uploaded"
+                          ? " uploaded securely"
+                          : ` — ${importStatusLabel(resume.importStatus).toLowerCase()}`}
                     </span>
                     <small>
                       {formatUpdatedAt(resume.updatedAt).replace(

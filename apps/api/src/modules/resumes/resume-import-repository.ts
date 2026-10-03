@@ -78,12 +78,21 @@ interface FileDocument {
 }
 
 function toSummary(record: ResumeImportRecord): ResumeSummary {
+  const compatibilityStatus = [
+    "application/pdf",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  ].includes(record.mimeType)
+    ? "supported"
+    : "unsupported_legacy_format";
+
   return {
     id: record.resumeId,
     name: record.name,
     originalFileName: record.fileName,
     importId: record.id,
     importStatus: record.status,
+    extractionStatus: null,
+    compatibilityStatus,
     updatedAt: record.updatedAt.toISOString(),
   };
 }

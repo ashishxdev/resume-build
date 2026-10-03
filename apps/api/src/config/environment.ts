@@ -1,5 +1,17 @@
 import { z } from "zod";
 
+const optionalNonEmptyString = z.preprocess(
+  (value) =>
+    typeof value === "string" && value.trim().length === 0 ? undefined : value,
+  z.string().trim().min(1).optional(),
+);
+
+const optionalAiProvider = z.preprocess(
+  (value) =>
+    typeof value === "string" && value.trim().length === 0 ? undefined : value,
+  z.enum(["gemini"]).optional(),
+);
+
 const environmentSchema = z
   .object({
     NODE_ENV: z
@@ -47,6 +59,15 @@ const environmentSchema = z
     R2_SECRET_ACCESS_KEY: z.string().min(1).optional(),
     R2_BUCKET_NAME: z.string().min(1).optional(),
     R2_ENDPOINT: z.url().optional(),
+    AI_PROVIDER: optionalAiProvider,
+    AI_PROVIDER_API_KEY: optionalNonEmptyString,
+    AI_MODEL: z.preprocess(
+      (value) =>
+        typeof value === "string" && value.trim().length === 0
+          ? undefined
+          : value,
+      z.string().trim().min(1).default("gemini-3.8-flash"),
+    ),
   })
   .superRefine((environment, context) => {
     if (
@@ -74,6 +95,17 @@ const environmentSchema = z
         path: ["R2_ACCOUNT_ID"],
         message:
           "R2 requires account ID, access key ID, secret access key, and bucket name",
+      });
+    }
+
+    if (
+      (environment.AI_PROVIDER && !environment.AI_PROVIDER_API_KEY) ||
+      (!environment.AI_PROVIDER && environment.AI_PROVIDER_API_KEY)
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["AI_PROVIDER"],
+        message: "AI parsing requires both AI_PROVIDER and AI_PROVIDER_API_KEY",
       });
     }
 

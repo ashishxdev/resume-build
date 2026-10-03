@@ -13,21 +13,24 @@ import type {
   ResumeImportRecord,
   ResumeImportRepository,
 } from "../../modules/resumes/resume-import-repository.js";
+import type { ResumeExtractionRepository } from "../../modules/resumes/resume-extraction-repository.js";
 import { createId } from "../../shared/ids/create-id.js";
 
 export interface ResumeImportServices {
   objectStorage: ResumeObjectStorage | null;
   repository: ResumeImportRepository;
+  extractionRepository?: ResumeExtractionRepository;
 }
 
 const fileExtensions: Record<ResumeMimeType, string> = {
   "application/pdf": "pdf",
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
     "docx",
-  "image/jpeg": "jpg",
-  "image/png": "png",
-  "image/webp": "webp",
 };
+
+function isSupportedMimeType(value: string): value is ResumeMimeType {
+  return Object.hasOwn(fileExtensions, value);
+}
 
 function expectedSourceType(mimeType: ResumeMimeType): ResumeSourceType {
   if (mimeType === "application/pdf") return "pdf";
@@ -37,7 +40,7 @@ function expectedSourceType(mimeType: ResumeMimeType): ResumeSourceType {
   ) {
     return "docx";
   }
-  return "image";
+  return "docx";
 }
 
 function resumeName(fileName: string) {
@@ -92,7 +95,24 @@ export function createResumeImportRouter(
       }
 
       const resumes = await services.repository.listResumes(userId);
-      response.status(200).json({ data: resumes });
+      const extractions = services.extractionRepository
+        ? await services.extractionRepository.findManyOwned(
+            userId,
+            resumes.map((resume) => resume.id),
+          )
+        : [];
+      const statuses = new Map(
+        extractions.map((extraction) => [
+          extraction.resumeId,
+          extraction.status,
+        ]),
+      );
+      response.status(200).json({
+        data: resumes.map((resume) => ({
+          ...resume,
+          extractionStatus: statuses.get(resume.id) ?? null,
+        })),
+      });
     } catch (error) {
       next(error);
     }
@@ -195,6 +215,15 @@ export function createResumeImportRouter(
         sendError(response, 404, "IMPORT_NOT_FOUND", "Import not found.");
         return;
       }
+      if (!isSupportedMimeType(record.mimeType)) {
+        sendError(
+          response,
+          410,
+          "UNSUPPORTED_LEGACY_FORMAT",
+          "This legacy image import must be replaced with a PDF or DOCX file.",
+        );
+        return;
+      }
       response.status(200).json({ data: serializeImport(record) });
     } catch (error) {
       next(error);
@@ -233,7 +262,23 @@ export function createResumeImportRouter(
           sendError(response, 404, "IMPORT_NOT_FOUND", "Import not found.");
           return;
         }
+        if (!isSupportedMimeType(existing.mimeType)) {
+          sendError(
+            response,
+            410,
+            "UNSUPPORTED_LEGACY_FORMAT",
+            "This legacy image import must be replaced with a PDF or DOCX file.",
+          );
+          return;
+        }
         if (existing.status === "uploaded") {
+          await services.extractionRepository?.createQueued({
+            userId,
+            resumeId: existing.resumeId,
+            importId: existing.id,
+            objectKey: existing.objectKey,
+            mimeType: existing.mimeType,
+          });
           response.status(200).json({ data: serializeImport(existing) });
           return;
         }
@@ -326,6 +371,13 @@ export function createResumeImportRouter(
           );
           return;
         }
+        await services.extractionRepository?.createQueued({
+          userId,
+          resumeId: uploaded.resumeId,
+          importId: uploaded.id,
+          objectKey: uploaded.objectKey,
+          mimeType: uploaded.mimeType,
+        });
         response.status(202).json({ data: serializeImport(uploaded) });
       } catch (error) {
         next(error);

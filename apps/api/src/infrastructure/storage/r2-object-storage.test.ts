@@ -27,12 +27,6 @@ describe("resume file signatures", () => {
       "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
       [0x50, 0x4b, 0x03, 0x04],
     ],
-    ["image/jpeg", [0xff, 0xd8, 0xff, 0xe0]],
-    ["image/png", [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]],
-    [
-      "image/webp",
-      [0x52, 0x49, 0x46, 0x46, 0, 0, 0, 0, 0x57, 0x45, 0x42, 0x50],
-    ],
   ])("detects %s content", (mimeType, bytes) => {
     expect(fileSignature.detectMimeType(Uint8Array.from(bytes))).toBe(mimeType);
   });
@@ -41,6 +35,14 @@ describe("resume file signatures", () => {
     expect(fileSignature.detectMimeType(Uint8Array.from([1, 2, 3, 4]))).toBe(
       null,
     );
+  });
+
+  it.each([
+    [0xff, 0xd8, 0xff, 0xe0],
+    [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a],
+    [0x52, 0x49, 0x46, 0x46, 0, 0, 0, 0, 0x57, 0x45, 0x42, 0x50],
+  ])("rejects image content", (bytes) => {
+    expect(fileSignature.detectMimeType(Uint8Array.from(bytes))).toBeNull();
   });
 
   it("binds the declared content length into the signed PUT request", async () => {
