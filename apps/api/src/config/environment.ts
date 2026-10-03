@@ -66,7 +66,7 @@ const environmentSchema = z
         typeof value === "string" && value.trim().length === 0
           ? undefined
           : value,
-      z.string().trim().min(1).default("gemini-3.8-flash"),
+      z.string().trim().min(1).default("gemini-3.1-flash-lite"),
     ),
   })
   .superRefine((environment, context) => {

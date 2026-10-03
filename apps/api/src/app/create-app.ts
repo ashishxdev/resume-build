@@ -12,6 +12,10 @@ import {
   type ResumeImportServices,
 } from "../http/routes/resume-imports.js";
 import { createResumeVerificationRouter } from "../http/routes/resume-verification.js";
+import {
+  createJobDescriptionRouter,
+  type JobDescriptionServices,
+} from "../http/routes/job-descriptions.js";
 import type { Auth } from "../infrastructure/auth/auth.js";
 import { createLogger } from "../shared/logging/logger.js";
 
@@ -27,6 +31,7 @@ export function createApp(
   auth: Auth,
   googleEnabled = false,
   resumeImportServices?: ResumeImportServices,
+  jobDescriptionServices?: JobDescriptionServices,
 ) {
   const app = express();
   const logger = createLogger(environment);
@@ -74,6 +79,9 @@ export function createApp(
         ),
       );
     }
+  }
+  if (jobDescriptionServices) {
+    app.use(createJobDescriptionRouter(auth, jobDescriptionServices));
   }
 
   return app;

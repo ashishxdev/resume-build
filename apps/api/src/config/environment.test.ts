@@ -104,6 +104,6 @@ describe("loadEnvironment", () => {
 
     expect(environment.AI_PROVIDER).toBeUndefined();
     expect(environment.AI_PROVIDER_API_KEY).toBeUndefined();
-    expect(environment.AI_MODEL).toBe("gemini-3.8-flash");
+    expect(environment.AI_MODEL).toBe("gemini-3.1-flash-lite");
   });
 });

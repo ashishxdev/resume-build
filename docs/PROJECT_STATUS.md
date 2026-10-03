@@ -16,8 +16,8 @@ Update this file whenever a major feature is started, completed, materially rede
 | Marketing homepage | Complete | Responsive Stitch-inspired homepage implementing the Atelier Digital visual system and core product messaging. |
 | Authentication | In progress | Email/password authentication now includes Resend-backed, rate-limited password recovery with single-use tokens and session revocation. Google OAuth still requires configuration and end-to-end verification. |
 | Dashboard workspace | Complete | Responsive authenticated dashboard implements the approved desktop and mobile Stitch designs with truthful empty, loading, navigation, account, plan, activity, and trust states. |
-| Resume workflows | In progress | PDF/DOCX import, Gemini-assisted structured extraction, source-backed review, and verified base versions are complete. Tailoring, ATS analysis, later versions, export, and sharing remain future milestones. |
-| Backend business modules | In progress | Owned imports, private R2 originals, extraction jobs, provider-neutral AI parsing with grounded fallback, provenance-backed claims, and verified base-version persistence are complete; tailoring and later modules remain. |
+| Resume workflows | In progress | PDF/DOCX import, Gemini-assisted structured extraction, source-backed review, verified base versions, and grounded job-match analysis are complete. Suggestion review, tailored versions, ATS analysis, export, and sharing remain future milestones. |
+| Backend business modules | In progress | Owned imports, private R2 originals, extraction jobs, provider-neutral grounded AI parsing, verified base-version persistence, and owned job-description analysis are complete. Tailored-version generation remains future work. |
 
 ## Milestones
 
@@ -201,9 +201,35 @@ Update this file whenever a major feature is started, completed, materially rede
   - `apps/web/app/resumes/[resumeId]/verify/page.tsx`
   - `packages/contracts/src/resume/verification.ts`
 
+### 10. Job Description Analysis and Evidence Match
+
+- **Date:** 2026-10-03
+- **Status:** Complete
+- **Scope delivered:**
+  - Capture a target role, company, and full job description against an owned verified résumé baseline.
+  - Analyze requirements through a provider-neutral Gemini integration while treating job text as untrusted data and preserving exact source quotes.
+  - Compare every grounded requirement with verified résumé claims and distinguish strong, partial, and missing or unverified evidence without modifying the base résumé.
+  - Implement the approved Stitch desktop and mobile designs for job-description input, analysis progress, and the evidence-match overview.
+  - Persist the raw job description as source of truth with provider/model/prompt metadata, optimistic analysis transitions, owner-only access, verified-version binding, and a retry path that preserves the saved input.
+  - Persist an immutable evidence-claim snapshot with every analysis so historical scores and evidence text remain bound to the exact verified resume version even after the baseline changes.
+  - Move Gemini work out of the HTTP request lifecycle: create and retry return `202` with a durable queued record, a lease-owning worker processes it, expired leases are reclaimed after worker interruption, and the results view polls through queued and analyzing states.
+  - Limit expensive AI entry points to ten requests per user per hour with a MongoDB-backed atomic bucket and `Retry-After` response, while a partial unique index permits only one queued or processing analysis per user at a time.
+  - Connect verified dashboard resume cards to the workflow and keep the next suggestion-generation action explicitly staged instead of presenting a dead control.
+- **Verification:** 66 API tests and 33 web tests pass, including exact-quote grounding, unknown-claim downgrades, provider privacy (`store: false`), immutable evidence snapshots, optimistic and lease-owned repository transitions, stale-worker reclamation, per-user hourly quotas, concurrent-analysis rejection, immediate queued responses, status polling, verified-resume gating, cross-user isolation, legacy-record snapshot hydration, retry-without-duplicate behavior, match filtering, and historical evidence rendering. Workspace type checking, linting, Prettier validation, and the production build pass. A disposable live MongoDB smoke test passed the partial unique concurrency index, expired-lease reclamation with a new processing token, immutable evidence persistence, and the atomic hourly quota; the test database was dropped afterward. The job-input, analyzing, failure, and match-overview states were exercised in the live app. Desktop and 390 × 844 mobile layouts were visually inspected; both mobile routes had `scrollWidth === clientWidth`, and the browser reported no application warnings or errors. A live Gemini attempt exercised the saved failure state when `gemini-3.8-flash` returned HTTP 503 for temporary high demand; `gemini-3.1-flash-lite` then completed the same grounded synthetic analysis and is now the development/default model.
+- **Important limitations:** Gemini availability and latency remain external dependencies; failed analyses retain their input and can be retried. The built-in quota is ten analysis attempts per user per hour and intentionally permits only one active analysis per user. Match scoring is an evidence-coverage indicator, not an ATS prediction. Suggestion generation, individual accept/reject decisions, and tailored-version persistence belong to the next milestone.
+- **Primary files:**
+  - `apps/api/src/infrastructure/ai/gemini-job-description-analyzer.ts`
+  - `apps/api/src/modules/job-descriptions/job-description-repository.ts`
+  - `apps/api/src/modules/job-descriptions/job-analysis-rate-limiter.ts`
+  - `apps/api/src/modules/job-descriptions/job-description-analysis-loop.ts`
+  - `apps/api/src/http/routes/job-descriptions.ts`
+  - `apps/web/components/tailoring/job-description-workflow.tsx`
+  - `apps/web/components/tailoring/match-overview.tsx`
+  - `packages/contracts/src/job-description/analysis.ts`
+
 ## Next Major Milestone
 
-Job-description capture and the first tailoring workspace are next: accept a target role, connect it to a verified base resume, analyze grounded gaps, and prepare suggestions that remain individually user-controlled.
+Evidence-backed tailoring suggestions are next: generate conservative edits from the completed match analysis, require an explicit accept or reject decision for every suggestion, and persist a new tailored resume version without changing the verified base.
 
 ## Status Definitions
 

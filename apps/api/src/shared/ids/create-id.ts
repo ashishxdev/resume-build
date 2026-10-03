@@ -13,7 +13,8 @@ export type EntityPrefix =
   | "share"
   | "job"
   | "lease"
-  | "claim";
+  | "claim"
+  | "requirement";
 
 export function createId(prefix: EntityPrefix): string {
   return `${prefix}_${uuidv7()}`;

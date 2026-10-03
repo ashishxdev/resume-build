@@ -503,6 +503,12 @@ export default function DashboardPage() {
                               : "Review extraction"}
                         </Link>
                       )}
+                    {resume.compatibilityStatus === "supported" &&
+                      resume.extractionStatus === "verified" && (
+                        <Link href={`/resumes/${resume.id}/tailor`}>
+                          Tailor to a job →
+                        </Link>
+                      )}
                     {resume.importStatus === "failed" && (
                       <button
                         onClick={() => setIsUploadOpen(true)}

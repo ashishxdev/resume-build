@@ -6,6 +6,10 @@ import { createR2ObjectStorage } from "../infrastructure/storage/r2-object-stora
 import { createResumeExtractionRepositoryRuntime } from "../modules/resumes/resume-extraction-repository.js";
 import { createResumeExtractionService } from "../modules/resumes/resume-extraction-service.js";
 import { startResumeExtractionLoop } from "../modules/resumes/resume-extraction-loop.js";
+import { createJobDescriptionAnalyzer } from "../infrastructure/ai/job-description-analyzer.js";
+import { createJobDescriptionRepositoryRuntime } from "../modules/job-descriptions/job-description-repository.js";
+import { createJobDescriptionAnalysisService } from "../modules/job-descriptions/job-description-analysis-service.js";
+import { startJobDescriptionAnalysisLoop } from "../modules/job-descriptions/job-description-analysis-loop.js";
 
 loadLocalEnvironmentFiles();
 
@@ -15,6 +19,8 @@ const logger = createLogger(environment);
 logger.info("Worker started");
 
 const extractionRuntime = createResumeExtractionRepositoryRuntime(environment);
+const jobDescriptionRuntime =
+  createJobDescriptionRepositoryRuntime(environment);
 const stopExtractionLoop = startResumeExtractionLoop(
   createResumeExtractionService(
     extractionRuntime.repository,
@@ -23,11 +29,20 @@ const stopExtractionLoop = startResumeExtractionLoop(
     createResumeAiParser(environment),
   ),
 );
+const stopJobAnalysisLoop = startJobDescriptionAnalysisLoop(
+  createJobDescriptionAnalysisService(
+    jobDescriptionRuntime.repository,
+    createJobDescriptionAnalyzer(environment),
+    logger,
+  ),
+);
 
 function shutdown(signal: string) {
   logger.info({ signal }, "Worker shutting down");
   stopExtractionLoop();
+  stopJobAnalysisLoop();
   void extractionRuntime.close();
+  void jobDescriptionRuntime.close();
 }
 
 process.on("SIGINT", () => shutdown("SIGINT"));
