@@ -15,6 +15,7 @@ import {
   getJobDescription,
   retryJobDescriptionAnalysis,
 } from "@/lib/job-description/client";
+import { createTailoringSession } from "@/lib/tailoring/client";
 
 type Filter = "all" | ResumeMatchStatus;
 
@@ -29,6 +30,7 @@ export function MatchOverview() {
   const [retrying, setRetrying] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const [notice, setNotice] = useState<string | null>(null);
+  const [startingTailoring, setStartingTailoring] = useState(false);
 
   useEffect(() => {
     if (!isPending && !session) {
@@ -121,6 +123,23 @@ export function MatchOverview() {
       );
     } finally {
       setRetrying(false);
+    }
+  }
+
+  async function startTailoring() {
+    if (!record) return;
+    setStartingTailoring(true);
+    setNotice(null);
+    try {
+      const session = await createTailoringSession(record.id);
+      router.push(`/tailoring/${session.id}`);
+    } catch (requestError) {
+      setNotice(
+        requestError instanceof Error
+          ? requestError.message
+          : "We could not start tailoring.",
+      );
+      setStartingTailoring(false);
     }
   }
 
@@ -353,21 +372,18 @@ export function MatchOverview() {
         </section>
         <section className={styles.nextStep}>
           <div>
-            <span className={styles.eyebrow}>Next phase</span>
+            <span className={styles.eyebrow}>Next step</span>
             <h2>Turn evidence into truthful suggestions.</h2>
             <p>
-              Suggestion review and tailored draft creation are next. Your
-              analysis is saved.
+              Generate conservative edits, review every change, and keep your
+              verified base untouched.
             </p>
           </div>
           <button
-            onClick={() =>
-              setNotice(
-                "Tailoring suggestions are the next milestone. This evidence analysis is safely saved.",
-              )
-            }
+            disabled={startingTailoring}
+            onClick={() => void startTailoring()}
           >
-            Continue to suggestions →
+            {startingTailoring ? "Starting…" : "Continue to suggestions →"}
           </button>
           {notice && <div role="status">{notice}</div>}
         </section>

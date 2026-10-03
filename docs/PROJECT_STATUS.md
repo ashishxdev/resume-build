@@ -16,8 +16,8 @@ Update this file whenever a major feature is started, completed, materially rede
 | Marketing homepage | Complete | Responsive Stitch-inspired homepage implementing the Atelier Digital visual system and core product messaging. |
 | Authentication | In progress | Email/password authentication now includes Resend-backed, rate-limited password recovery with single-use tokens and session revocation. Google OAuth still requires configuration and end-to-end verification. |
 | Dashboard workspace | Complete | Responsive authenticated dashboard implements the approved desktop and mobile Stitch designs with truthful empty, loading, navigation, account, plan, activity, and trust states. |
-| Resume workflows | In progress | PDF/DOCX import, Gemini-assisted structured extraction, source-backed review, verified base versions, and grounded job-match analysis are complete. Suggestion review, tailored versions, ATS analysis, export, and sharing remain future milestones. |
-| Backend business modules | In progress | Owned imports, private R2 originals, extraction jobs, provider-neutral grounded AI parsing, verified base-version persistence, and owned job-description analysis are complete. Tailored-version generation remains future work. |
+| Resume workflows | In progress | PDF/DOCX import, Gemini-assisted extraction, verified base versions, grounded job matching, evidence-backed suggestion review, and immutable tailored versions are complete. ATS analysis, export, and sharing remain future milestones. |
+| Backend business modules | In progress | Owned imports, private R2 originals, recoverable AI queues, grounded parsing and matching, explicit suggestion decisions, and transactional tailored-version persistence are complete. ATS analysis remains future work. |
 
 ## Milestones
 
@@ -214,9 +214,9 @@ Update this file whenever a major feature is started, completed, materially rede
   - Persist an immutable evidence-claim snapshot with every analysis so historical scores and evidence text remain bound to the exact verified resume version even after the baseline changes.
   - Move Gemini work out of the HTTP request lifecycle: create and retry return `202` with a durable queued record, a lease-owning worker processes it, expired leases are reclaimed after worker interruption, and the results view polls through queued and analyzing states.
   - Limit expensive AI entry points to ten requests per user per hour with a MongoDB-backed atomic bucket and `Retry-After` response, while a partial unique index permits only one queued or processing analysis per user at a time.
-  - Connect verified dashboard resume cards to the workflow and keep the next suggestion-generation action explicitly staged instead of presenting a dead control.
+  - Connect verified dashboard resume cards to the workflow and its evidence-backed tailoring continuation.
 - **Verification:** 66 API tests and 33 web tests pass, including exact-quote grounding, unknown-claim downgrades, provider privacy (`store: false`), immutable evidence snapshots, optimistic and lease-owned repository transitions, stale-worker reclamation, per-user hourly quotas, concurrent-analysis rejection, immediate queued responses, status polling, verified-resume gating, cross-user isolation, legacy-record snapshot hydration, retry-without-duplicate behavior, match filtering, and historical evidence rendering. Workspace type checking, linting, Prettier validation, and the production build pass. A disposable live MongoDB smoke test passed the partial unique concurrency index, expired-lease reclamation with a new processing token, immutable evidence persistence, and the atomic hourly quota; the test database was dropped afterward. The job-input, analyzing, failure, and match-overview states were exercised in the live app. Desktop and 390 × 844 mobile layouts were visually inspected; both mobile routes had `scrollWidth === clientWidth`, and the browser reported no application warnings or errors. A live Gemini attempt exercised the saved failure state when `gemini-3.8-flash` returned HTTP 503 for temporary high demand; `gemini-3.1-flash-lite` then completed the same grounded synthetic analysis and is now the development/default model.
-- **Important limitations:** Gemini availability and latency remain external dependencies; failed analyses retain their input and can be retried. The built-in quota is ten analysis attempts per user per hour and intentionally permits only one active analysis per user. Match scoring is an evidence-coverage indicator, not an ATS prediction. Suggestion generation, individual accept/reject decisions, and tailored-version persistence belong to the next milestone.
+- **Important limitations:** Gemini availability and latency remain external dependencies; failed analyses retain their input and can be retried. The built-in quota is ten AI attempts per user per hour and intentionally permits only one active analysis per user. Match scoring is an evidence-coverage indicator, not an ATS prediction.
 - **Primary files:**
   - `apps/api/src/infrastructure/ai/gemini-job-description-analyzer.ts`
   - `apps/api/src/modules/job-descriptions/job-description-repository.ts`
@@ -227,9 +227,32 @@ Update this file whenever a major feature is started, completed, materially rede
   - `apps/web/components/tailoring/match-overview.tsx`
   - `packages/contracts/src/job-description/analysis.ts`
 
+### 11. Evidence-Backed Tailoring Suggestions and Versions
+
+- **Date:** 2026-10-03
+- **Status:** Complete
+- **Scope delivered:**
+  - Fetch and implement the approved Stitch desktop and mobile generation, suggestion-review, and completed-version screens in the existing Atelier Digital design system.
+  - Generate conservative Gemini wording suggestions only for verified claims connected to strong or partial job matches, with interaction storage disabled and every suggestion bound to source claim and requirement IDs.
+  - Reject unlinked output, duplicate claim edits, unchanged text, and newly introduced numeric facts before AI output can reach the user.
+  - Run generation through a durable queued workflow with processing leases, stale-worker reclamation, bounded retries, owner-only access, one active generation per user, shared hourly AI quotas, saved failure states, and explicit retry handling.
+  - Require an explicit accept or reject decision for every suggestion, support accept-all, reject-all, and editable accepted wording, and persist each decision optimistically so refreshes preserve progress.
+  - Create a separate immutable tailored resume version only after all decisions are complete. The version records its base version, job analysis, tailoring session, and final claims without changing the verified base pointer.
+  - Surface completed and in-progress tailoring sessions on the dashboard, update tailored-version and free-credit counts, and allow users to reopen saved work.
+- **Verification:** 71 API tests and 39 web tests pass. Coverage includes evidence and requirement binding, invented-number rejection for both provider output and manual edits, queue processing, owner isolation, quota-safe idempotent session reopening, transient polling recovery, pending-decision enforcement, optimistic decision persistence, preservation of manually edited accepted wording, separate tailored-version creation, workflow navigation, truthful dashboard counts, independent resume and tailoring failure states, reopen links, and disabled completion until every decision is made. Workspace type checking, linting, Prettier validation, and the production build pass. A disposable live MongoDB smoke test passed queue claiming, persisted decisions, transactional tailored-version creation, and base-version preservation; the test database was dropped afterward. A live `gemini-3.1-flash-lite` smoke test returned one grounded suggestion for synthetic evidence with the expected source-claim binding. The responsive implementation follows the six approved Stitch desktop/mobile screens; authenticated live visual inspection remains part of final user acceptance.
+- **Important limitations:** Gemini availability and latency remain external dependencies; failed sessions can be retried without losing their bound analysis. The lexical safety layer rejects new numeric facts while the provider prompt and evidence links constrain other factual wording; user review remains mandatory. ATS compatibility analysis, document rendering/export, sharing, billing enforcement, and manual editing outside suggested claims remain future milestones.
+- **Primary files:**
+  - `apps/api/src/infrastructure/ai/gemini-tailoring-generator.ts`
+  - `apps/api/src/modules/tailoring/tailoring-repository.ts`
+  - `apps/api/src/modules/tailoring/tailoring-service.ts`
+  - `apps/api/src/http/routes/tailoring.ts`
+  - `apps/web/components/tailoring/tailoring-session-page.tsx`
+  - `apps/web/components/tailoring/tailoring.module.css`
+  - `packages/contracts/src/tailoring/session.ts`
+
 ## Next Major Milestone
 
-Evidence-backed tailoring suggestions are next: generate conservative edits from the completed match analysis, require an explicit accept or reject decision for every suggestion, and persist a new tailored resume version without changing the verified base.
+ATS compatibility analysis is next: evaluate the completed tailored version against its bound job description, explain category-level compatibility without claiming to reproduce an employer's ATS score, and identify only evidence-safe improvements.
 
 ## Status Definitions
 

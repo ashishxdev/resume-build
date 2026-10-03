@@ -10,6 +10,10 @@ import { createJobDescriptionAnalyzer } from "../infrastructure/ai/job-descripti
 import { createJobDescriptionRepositoryRuntime } from "../modules/job-descriptions/job-description-repository.js";
 import { createJobDescriptionAnalysisService } from "../modules/job-descriptions/job-description-analysis-service.js";
 import { startJobDescriptionAnalysisLoop } from "../modules/job-descriptions/job-description-analysis-loop.js";
+import { createTailoringGenerator } from "../infrastructure/ai/tailoring-generator.js";
+import { startTailoringLoop } from "../modules/tailoring/tailoring-loop.js";
+import { createTailoringRepositoryRuntime } from "../modules/tailoring/tailoring-repository.js";
+import { createTailoringService } from "../modules/tailoring/tailoring-service.js";
 
 loadLocalEnvironmentFiles();
 
@@ -21,6 +25,7 @@ logger.info("Worker started");
 const extractionRuntime = createResumeExtractionRepositoryRuntime(environment);
 const jobDescriptionRuntime =
   createJobDescriptionRepositoryRuntime(environment);
+const tailoringRuntime = createTailoringRepositoryRuntime(environment);
 const stopExtractionLoop = startResumeExtractionLoop(
   createResumeExtractionService(
     extractionRuntime.repository,
@@ -36,13 +41,22 @@ const stopJobAnalysisLoop = startJobDescriptionAnalysisLoop(
     logger,
   ),
 );
+const stopTailoringLoop = startTailoringLoop(
+  createTailoringService(
+    tailoringRuntime.repository,
+    createTailoringGenerator(environment),
+    logger,
+  ),
+);
 
 function shutdown(signal: string) {
   logger.info({ signal }, "Worker shutting down");
   stopExtractionLoop();
   stopJobAnalysisLoop();
+  stopTailoringLoop();
   void extractionRuntime.close();
   void jobDescriptionRuntime.close();
+  void tailoringRuntime.close();
 }
 
 process.on("SIGINT", () => shutdown("SIGINT"));

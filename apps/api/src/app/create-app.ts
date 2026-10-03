@@ -17,6 +17,10 @@ import {
   type JobDescriptionServices,
 } from "../http/routes/job-descriptions.js";
 import type { Auth } from "../infrastructure/auth/auth.js";
+import {
+  createTailoringRouter,
+  type TailoringRouteServices,
+} from "../http/routes/tailoring.js";
 import { createLogger } from "../shared/logging/logger.js";
 
 const betterAuthClientIpHeader = "x-make-my-resume-client-ip";
@@ -32,6 +36,7 @@ export function createApp(
   googleEnabled = false,
   resumeImportServices?: ResumeImportServices,
   jobDescriptionServices?: JobDescriptionServices,
+  tailoringServices?: TailoringRouteServices,
 ) {
   const app = express();
   const logger = createLogger(environment);
@@ -82,6 +87,9 @@ export function createApp(
   }
   if (jobDescriptionServices) {
     app.use(createJobDescriptionRouter(auth, jobDescriptionServices));
+  }
+  if (tailoringServices) {
+    app.use(createTailoringRouter(auth, tailoringServices));
   }
 
   return app;

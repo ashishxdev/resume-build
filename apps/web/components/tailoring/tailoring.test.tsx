@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import {
+  act,
   cleanup,
   fireEvent,
   render,
@@ -12,16 +13,27 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { JobDescriptionWorkflow } from "./job-description-workflow";
 import { MatchOverview } from "./match-overview";
+import { TailoringSessionPage } from "./tailoring-session-page";
 
 const mocks = vi.hoisted(() => ({
   create: vi.fn(),
   getJob: vi.fn(),
   getVerification: vi.fn(),
   listResumes: vi.fn(),
-  params: { resumeId: "resume_1", jobDescriptionId: "jd_1" },
+  params: {
+    resumeId: "resume_1",
+    jobDescriptionId: "jd_1",
+    tailoringSessionId: "tailor_1",
+  },
   push: vi.fn(),
   replace: vi.fn(),
   retry: vi.fn(),
+  createTailoring: vi.fn(),
+  getTailoring: vi.fn(),
+  decideSuggestion: vi.fn(),
+  decideAll: vi.fn(),
+  completeTailoring: vi.fn(),
+  retryTailoring: vi.fn(),
   useSession: vi.fn(),
 }));
 
@@ -46,6 +58,15 @@ vi.mock("@/lib/job-description/client", () => ({
   createJobDescription: mocks.create,
   getJobDescription: mocks.getJob,
   retryJobDescriptionAnalysis: mocks.retry,
+}));
+
+vi.mock("@/lib/tailoring/client", () => ({
+  createTailoringSession: mocks.createTailoring,
+  getTailoringSession: mocks.getTailoring,
+  decideSuggestion: mocks.decideSuggestion,
+  decideAll: mocks.decideAll,
+  completeTailoringSession: mocks.completeTailoring,
+  retryTailoringSession: mocks.retryTailoring,
 }));
 
 const verification = {
@@ -83,7 +104,10 @@ describe("tailoring workflow", () => {
     mocks.getVerification.mockResolvedValue(verification);
   });
 
-  afterEach(cleanup);
+  afterEach(() => {
+    cleanup();
+    vi.useRealTimers();
+  });
 
   it("navigates to the durable analysis record as soon as it is queued", async () => {
     mocks.create.mockResolvedValue({
@@ -192,5 +216,260 @@ describe("tailoring workflow", () => {
       await screen.findByText(/Your analysis is safely queued/),
     ).toBeTruthy();
     await waitFor(() => expect(mocks.getJob).toHaveBeenCalledTimes(2));
+  });
+
+  it("starts the durable tailoring workflow from a completed match", async () => {
+    mocks.getJob.mockResolvedValue({
+      id: "jd_1",
+      resumeId: "resume_1",
+      resumeVersionId: "version_1",
+      role: "Product Designer",
+      company: "Acme",
+      rawText: "A".repeat(120),
+      status: "completed",
+      failureMessage: null,
+      evidenceClaims: verification.claims,
+      analysis: {
+        summary: "One.",
+        requirements: [
+          {
+            id: "req_1",
+            category: "skill",
+            priority: "required",
+            label: "Design systems",
+            sourceQuote: "Design systems",
+          },
+        ],
+        matches: [
+          {
+            requirementId: "req_1",
+            status: "strong",
+            resumeClaimIds: ["claim_1"],
+            explanation: "Direct.",
+          },
+        ],
+      },
+      createdAt: "2026-10-03T00:00:00.000Z",
+      updatedAt: "2026-10-03T00:00:00.000Z",
+    });
+    mocks.createTailoring.mockResolvedValue({ id: "tailor_1" });
+    render(<MatchOverview />);
+    fireEvent.click(
+      await screen.findByRole("button", { name: /Continue to suggestions/ }),
+    );
+    await waitFor(() =>
+      expect(mocks.push).toHaveBeenCalledWith("/tailoring/tailor_1"),
+    );
+  });
+
+  it("requires every suggestion decision before creating a tailored version", async () => {
+    mocks.params.tailoringSessionId = "tailor_1";
+    const session = {
+      id: "tailor_1",
+      jobDescriptionId: "jd_1",
+      resumeId: "resume_1",
+      resumeVersionId: "version_1",
+      role: "Product Designer",
+      company: "Acme",
+      status: "review",
+      failureMessage: null,
+      evidenceClaims: verification.claims,
+      analysis: {
+        summary: "One.",
+        requirements: [
+          {
+            id: "req_1",
+            category: "skill",
+            priority: "required",
+            label: "Design systems",
+            sourceQuote: "Design systems",
+          },
+        ],
+        matches: [
+          {
+            requirementId: "req_1",
+            status: "strong",
+            resumeClaimIds: ["claim_1"],
+            explanation: "Direct.",
+          },
+        ],
+      },
+      suggestions: [
+        {
+          id: "suggestion_1",
+          sourceClaimId: "claim_1",
+          requirementIds: ["req_1"],
+          section: "skills",
+          originalText: "Led design-system work.",
+          suggestedText: "Led design systems across products.",
+          reason: "Matches the role wording.",
+          status: "pending",
+          editedText: null,
+        },
+      ],
+      tailoredVersionId: null,
+      finalClaims: null,
+      revision: 2,
+      createdAt: "2026-10-03T00:00:00.000Z",
+      updatedAt: "2026-10-03T00:00:00.000Z",
+    };
+    mocks.getTailoring.mockResolvedValue(session);
+    mocks.decideSuggestion.mockResolvedValue({
+      ...session,
+      revision: 3,
+      suggestions: [{ ...session.suggestions[0], status: "accepted" }],
+    });
+    render(<TailoringSessionPage />);
+    const finish = await screen.findByRole("button", {
+      name: /Create tailored version/,
+    });
+    expect((finish as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(screen.getByRole("button", { name: "✓ Accept" }));
+    await waitFor(() => expect(mocks.decideSuggestion).toHaveBeenCalled());
+    expect(
+      (
+        screen.getByRole("button", {
+          name: /Create tailored version/,
+        }) as HTMLButtonElement
+      ).disabled,
+    ).toBe(false);
+  });
+
+  it("keeps polling after a transient request failure", async () => {
+    vi.useFakeTimers();
+    const queued = {
+      id: "tailor_1",
+      jobDescriptionId: "jd_1",
+      resumeId: "resume_1",
+      resumeVersionId: "version_1",
+      role: "Product Designer",
+      company: "Acme",
+      status: "queued",
+      failureMessage: null,
+      evidenceClaims: verification.claims,
+      analysis: {
+        summary: "One.",
+        requirements: [
+          {
+            id: "req_1",
+            category: "skill",
+            priority: "required",
+            label: "Design systems",
+            sourceQuote: "Design systems",
+          },
+        ],
+        matches: [
+          {
+            requirementId: "req_1",
+            status: "strong",
+            resumeClaimIds: ["claim_1"],
+            explanation: "Direct.",
+          },
+        ],
+      },
+      suggestions: [],
+      tailoredVersionId: null,
+      finalClaims: null,
+      revision: 0,
+      createdAt: "2026-10-03T00:00:00.000Z",
+      updatedAt: "2026-10-03T00:00:00.000Z",
+    };
+    const review = {
+      ...queued,
+      status: "review",
+      revision: 2,
+      suggestions: [
+        {
+          id: "suggestion_1",
+          sourceClaimId: "claim_1",
+          requirementIds: ["req_1"],
+          section: "skills",
+          originalText: "Led design-system work.",
+          suggestedText: "Led design systems across products.",
+          reason: "Relevant.",
+          status: "pending",
+          editedText: null,
+        },
+      ],
+    };
+    mocks.getTailoring
+      .mockResolvedValueOnce(queued)
+      .mockRejectedValueOnce(new Error("Temporary network error"))
+      .mockResolvedValue(review);
+    render(<TailoringSessionPage />);
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(screen.getByText(/creating conservative suggestions/i)).toBeTruthy();
+    await act(async () => {
+      vi.advanceTimersByTime(1_000);
+      await Promise.resolve();
+    });
+    expect(screen.getByText(/keep trying automatically/i)).toBeTruthy();
+    await act(async () => {
+      vi.advanceTimersByTime(2_500);
+      await Promise.resolve();
+    });
+    expect(screen.getByText("Led design-system work.")).toBeTruthy();
+  });
+
+  it("disables redundant acceptance after manual wording is saved", async () => {
+    mocks.getTailoring.mockResolvedValue({
+      id: "tailor_1",
+      jobDescriptionId: "jd_1",
+      resumeId: "resume_1",
+      resumeVersionId: "version_1",
+      role: "Product Designer",
+      company: "Acme",
+      status: "review",
+      failureMessage: null,
+      evidenceClaims: verification.claims,
+      analysis: {
+        summary: "One.",
+        requirements: [
+          {
+            id: "req_1",
+            category: "skill",
+            priority: "required",
+            label: "Design systems",
+            sourceQuote: "Design systems",
+          },
+        ],
+        matches: [
+          {
+            requirementId: "req_1",
+            status: "strong",
+            resumeClaimIds: ["claim_1"],
+            explanation: "Direct.",
+          },
+        ],
+      },
+      suggestions: [
+        {
+          id: "suggestion_1",
+          sourceClaimId: "claim_1",
+          requirementIds: ["req_1"],
+          section: "skills",
+          originalText: "Led design-system work.",
+          suggestedText: "Led design systems across products.",
+          reason: "Relevant.",
+          status: "accepted",
+          editedText: "Led accessible design systems across products.",
+        },
+      ],
+      tailoredVersionId: null,
+      finalClaims: null,
+      revision: 3,
+      createdAt: "2026-10-03T00:00:00.000Z",
+      updatedAt: "2026-10-03T00:00:00.000Z",
+    });
+    render(<TailoringSessionPage />);
+    const accepted = await screen.findByRole("button", {
+      name: "✓ Accepted",
+    });
+    expect((accepted as HTMLButtonElement).disabled).toBe(true);
+    expect(
+      screen.getByText("Led accessible design systems across products."),
+    ).toBeTruthy();
   });
 });

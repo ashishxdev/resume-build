@@ -9,11 +9,15 @@ import {
   useSyncExternalStore,
   type ReactNode,
 } from "react";
-import type { ResumeSummary } from "@make-my-resume/contracts";
+import type {
+  ResumeSummary,
+  TailoringSession,
+} from "@make-my-resume/contracts";
 
 import { ResumeUploadDialog } from "@/components/dashboard/resume-upload-dialog";
 import { authClient } from "@/lib/auth/client";
 import { listResumes } from "@/lib/resume/import-client";
+import { listTailoringSessions } from "@/lib/tailoring/client";
 
 import styles from "./dashboard.module.css";
 
@@ -184,7 +188,11 @@ export default function DashboardPage() {
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [resumes, setResumes] = useState<ResumeSummary[]>([]);
   const [libraryError, setLibraryError] = useState<string | null>(null);
+  const [tailoringError, setTailoringError] = useState<string | null>(null);
   const [isLoadingLibrary, setIsLoadingLibrary] = useState(true);
+  const [tailoringSessions, setTailoringSessions] = useState<
+    TailoringSession[]
+  >([]);
 
   const refreshResumes = useCallback(async () => {
     setIsLoadingLibrary(true);
@@ -197,6 +205,17 @@ export default function DashboardPage() {
       );
     } finally {
       setIsLoadingLibrary(false);
+    }
+  }, []);
+
+  const refreshTailoringSessions = useCallback(async () => {
+    setTailoringError(null);
+    try {
+      setTailoringSessions(await listTailoringSessions());
+    } catch {
+      setTailoringError(
+        "We could not load tailored-version activity. Your resume library is still available.",
+      );
     }
   }, []);
 
@@ -223,6 +242,17 @@ export default function DashboardPage() {
       })
       .finally(() => {
         if (!cancelled) setIsLoadingLibrary(false);
+      });
+
+    void listTailoringSessions()
+      .then((nextTailoringSessions) => {
+        if (!cancelled) setTailoringSessions(nextTailoringSessions);
+      })
+      .catch(() => {
+        if (!cancelled)
+          setTailoringError(
+            "We could not load tailored-version activity. Your resume library is still available.",
+          );
       });
 
     return () => {
@@ -288,6 +318,10 @@ export default function DashboardPage() {
       resume.importStatus === "uploaded" &&
       resume.compatibilityStatus === "supported",
   );
+  const completedTailoringSessions = tailoringSessions.filter(
+    (session) => session.status === "completed",
+  );
+  const usedCredits = Math.min(completedTailoringSessions.length, 2);
 
   return (
     <div className={styles.page}>
@@ -311,7 +345,7 @@ export default function DashboardPage() {
 
           <div className={styles.accountArea}>
             <span className={styles.usageBadge}>
-              <i /> 0 / 2 tailored
+              <i /> {usedCredits} / 2 tailored
             </span>
             <button
               aria-label="Notifications — none unread"
@@ -396,7 +430,7 @@ export default function DashboardPage() {
           <article>
             <span>Tailored drafts</span>
             <div>
-              <strong>0</strong>
+              <strong>{completedTailoringSessions.length}</strong>
               <small>Applications</small>
             </div>
           </article>
@@ -415,13 +449,13 @@ export default function DashboardPage() {
           </article>
           <article>
             <span className={styles.creditLabel}>
-              Credits <b>0 / 2</b>
+              Credits <b>{usedCredits} / 2</b>
             </span>
             <div
               className={styles.creditTrack}
-              aria-label="0 of 2 credits used"
+              aria-label={`${usedCredits} of 2 credits used`}
             >
-              <i />
+              <i style={{ width: `${usedCredits * 50}%` }} />
             </div>
           </article>
         </section>
@@ -440,6 +474,17 @@ export default function DashboardPage() {
               <span>{libraryError}</span>
               <button onClick={() => void refreshResumes()} type="button">
                 Try again
+              </button>
+            </div>
+          )}
+          {tailoringError && (
+            <div className={styles.libraryError} role="status">
+              <span>{tailoringError}</span>
+              <button
+                onClick={() => void refreshTailoringSessions()}
+                type="button"
+              >
+                Try tailored activity again
               </button>
             </div>
           )}
@@ -550,11 +595,35 @@ export default function DashboardPage() {
             <div className={styles.cardHeading}>
               <h2>Recent Activity</h2>
               <span>
-                {resumes.length > 0 ? "Latest imports" : "All caught up"}
+                {resumes.length > 0 || tailoringSessions.length > 0
+                  ? "Latest work"
+                  : "All caught up"}
               </span>
             </div>
-            {resumes.length > 0 ? (
+            {resumes.length > 0 || tailoringSessions.length > 0 ? (
               <ol className={styles.activityList}>
+                {tailoringSessions.slice(0, 2).map((session) => (
+                  <li key={session.id}>
+                    <i
+                      data-status={
+                        session.status === "completed"
+                          ? "uploaded"
+                          : "verifying"
+                      }
+                    />
+                    <span>
+                      <strong>
+                        {session.company || session.role || "Tailored resume"}
+                      </strong>
+                      {session.status === "completed"
+                        ? " tailored version ready"
+                        : session.status === "review"
+                          ? " suggestions ready to review"
+                          : " tailoring in progress"}
+                    </span>
+                    <Link href={`/tailoring/${session.id}`}>Open</Link>
+                  </li>
+                ))}
                 {resumes.slice(0, 3).map((resume) => (
                   <li key={resume.importId}>
                     <i data-status={resume.importStatus} />

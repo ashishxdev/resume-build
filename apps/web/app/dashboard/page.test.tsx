@@ -16,6 +16,7 @@ import DashboardPage from "./page";
 
 const mocks = vi.hoisted(() => ({
   listResumes: vi.fn(),
+  listTailoringSessions: vi.fn(),
   replace: vi.fn(),
   signOut: vi.fn(),
   useSession: vi.fn(),
@@ -36,6 +37,10 @@ vi.mock("@/lib/resume/import-client", () => ({
   listResumes: mocks.listResumes,
 }));
 
+vi.mock("@/lib/tailoring/client", () => ({
+  listTailoringSessions: mocks.listTailoringSessions,
+}));
+
 vi.mock("@/components/dashboard/resume-upload-dialog", () => ({
   ResumeUploadDialog: ({ onClose }: { onClose: () => void }) => (
     <div role="dialog">
@@ -52,7 +57,9 @@ describe("DashboardPage", () => {
     mocks.replace.mockReset();
     mocks.signOut.mockReset();
     mocks.listResumes.mockReset();
+    mocks.listTailoringSessions.mockReset();
     mocks.listResumes.mockResolvedValue([]);
+    mocks.listTailoringSessions.mockResolvedValue([]);
     mocks.useSession.mockReturnValue({
       data: {
         user: {
@@ -86,6 +93,53 @@ describe("DashboardPage", () => {
 
     expect(screen.getByRole("dialog")).toBeTruthy();
     expect(screen.getByText("Resume upload dialog")).toBeTruthy();
+  });
+
+  it("shows completed tailored versions and lets users reopen them", async () => {
+    mocks.listTailoringSessions.mockResolvedValue([
+      {
+        id: "tailor_1",
+        status: "completed",
+        company: "Acme",
+        role: "Product Designer",
+        updatedAt: "2026-10-03T10:00:00.000Z",
+      },
+    ]);
+    render(React.createElement(DashboardPage));
+
+    expect((await screen.findAllByText("1 / 2")).length).toBeGreaterThan(0);
+    expect(screen.getByText("Acme")).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Open" })).toHaveProperty(
+      "href",
+      "http://localhost:3000/tailoring/tailor_1",
+    );
+  });
+
+  it("keeps resumes visible when tailoring activity fails", async () => {
+    mocks.listResumes.mockResolvedValue([
+      {
+        id: "resume_1",
+        name: "Product Designer",
+        originalFileName: "resume.pdf",
+        importId: "import_1",
+        importStatus: "uploaded",
+        extractionStatus: "verified",
+        compatibilityStatus: "supported",
+        updatedAt: "2026-10-03T10:00:00.000Z",
+      },
+    ]);
+    mocks.listTailoringSessions.mockRejectedValue(new Error("Unavailable"));
+    render(React.createElement(DashboardPage));
+
+    expect(
+      (await screen.findAllByText("Product Designer")).length,
+    ).toBeGreaterThan(0);
+    expect(
+      screen.getByText(/could not load tailored-version activity/i),
+    ).toBeTruthy();
+    expect(
+      screen.queryByText(/could not load your resume library/i),
+    ).toBeNull();
   });
 
   it("explains legacy image imports and offers a supported replacement", async () => {

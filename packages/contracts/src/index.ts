@@ -4,3 +4,4 @@ export * from "./resume/import.js";
 export * from "./resume/verification.js";
 export * from "./job-description/analysis.js";
 export * from "./suggestions/status.js";
+export * from "./tailoring/session.js";

@@ -14,6 +14,10 @@ import { createJobDescriptionAnalysisService } from "../modules/job-descriptions
 import { startJobDescriptionAnalysisLoop } from "../modules/job-descriptions/job-description-analysis-loop.js";
 import { startResumeExtractionLoop } from "../modules/resumes/resume-extraction-loop.js";
 import { createLogger } from "../shared/logging/logger.js";
+import { createTailoringGenerator } from "../infrastructure/ai/tailoring-generator.js";
+import { startTailoringLoop } from "../modules/tailoring/tailoring-loop.js";
+import { createTailoringRepositoryRuntime } from "../modules/tailoring/tailoring-repository.js";
+import { createTailoringService } from "../modules/tailoring/tailoring-service.js";
 
 loadLocalEnvironmentFiles();
 
@@ -27,6 +31,7 @@ const jobDescriptionRuntime =
   createJobDescriptionRepositoryRuntime(environment);
 const jobAnalysisRateLimitRuntime =
   createJobAnalysisRateLimiterRuntime(environment);
+const tailoringRuntime = createTailoringRepositoryRuntime(environment);
 const objectStorage = createR2ObjectStorage(environment);
 const stopExtractionLoop = startResumeExtractionLoop(
   createResumeExtractionService(
@@ -40,6 +45,13 @@ const stopJobAnalysisLoop = startJobDescriptionAnalysisLoop(
   createJobDescriptionAnalysisService(
     jobDescriptionRuntime.repository,
     createJobDescriptionAnalyzer(environment),
+    logger,
+  ),
+);
+const stopTailoringLoop = startTailoringLoop(
+  createTailoringService(
+    tailoringRuntime.repository,
+    createTailoringGenerator(environment),
     logger,
   ),
 );
@@ -57,6 +69,11 @@ const app = createApp(
     extractionRepository: resumeExtractionRuntime.repository,
     rateLimiter: jobAnalysisRateLimitRuntime.limiter,
   },
+  {
+    repository: tailoringRuntime.repository,
+    jobDescriptionRepository: jobDescriptionRuntime.repository,
+    rateLimiter: jobAnalysisRateLimitRuntime.limiter,
+  },
 );
 
 const server = app.listen(environment.PORT, () => {
@@ -70,6 +87,7 @@ function shutdown(signal: string) {
   server.close(async (error) => {
     stopExtractionLoop();
     stopJobAnalysisLoop();
+    stopTailoringLoop();
     if (error) {
       logger.error({ error }, "API shutdown failed");
       process.exitCode = 1;
@@ -79,6 +97,7 @@ function shutdown(signal: string) {
     await resumeExtractionRuntime.close();
     await jobDescriptionRuntime.close();
     await jobAnalysisRateLimitRuntime.close();
+    await tailoringRuntime.close();
   });
 }
 
