@@ -7,6 +7,7 @@ import { createAuthRuntime } from "../../infrastructure/auth/auth.js";
 import { createMemoryJobDescriptionRepository } from "../../modules/job-descriptions/job-description-repository.js";
 import { createMemoryTailoringRepository } from "../../modules/tailoring/tailoring-repository.js";
 import { createTailoringService } from "../../modules/tailoring/tailoring-service.js";
+import { createAtsAnalysisService } from "../../modules/tailoring/ats-analysis-service.js";
 import { createLogger } from "../../shared/logging/logger.js";
 
 const environment = {
@@ -183,6 +184,46 @@ describe("tailoring routes", () => {
       resumeVersionId: "version_base",
     });
     expect(completed.body.data.tailoredVersionId).toMatch(/^version_/);
+    await stranger
+      .get(`/api/v1/tailoring-sessions/${id}/export?format=pdf`)
+      .expect(404);
+    const pdf = await owner
+      .get(`/api/v1/tailoring-sessions/${id}/export?format=pdf&density=compact`)
+      .expect(200)
+      .expect("Content-Type", "application/pdf");
+    expect(pdf.headers["cache-control"]).toBe("private, no-store");
+    expect(pdf.headers["content-disposition"]).toContain(
+      'filename="acme-resume.pdf"',
+    );
+    expect(Buffer.isBuffer(pdf.body)).toBe(true);
+    expect(pdf.body.subarray(0, 4).toString()).toBe("%PDF");
+    const docx = await owner
+      .get(`/api/v1/tailoring-sessions/${id}/export?format=docx`)
+      .expect(200)
+      .expect(
+        "Content-Type",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      );
+    expect(Number(docx.headers["content-length"])).toBeGreaterThan(100);
+    await stranger
+      .post(`/api/v1/tailoring-sessions/${id}/ats-analysis`)
+      .expect(404);
+    const queuedAts = await owner
+      .post(`/api/v1/tailoring-sessions/${id}/ats-analysis`)
+      .expect(202);
+    expect(queuedAts.body.data.atsStatus).toBe("queued");
+    await createAtsAnalysisService(
+      tailoring,
+      createLogger(environment),
+    ).processNext();
+    const analyzed = await owner
+      .get(`/api/v1/tailoring-sessions/${id}`)
+      .expect(200);
+    expect(analyzed.body.data.atsStatus).toBe("completed");
+    expect(analyzed.body.data.atsSnapshot.tailoredVersionId).toBe(
+      completed.body.data.tailoredVersionId,
+    );
+    expect(analyzed.body.data.atsSnapshot.categories).toHaveLength(6);
     await authRuntime.close();
   });
 });

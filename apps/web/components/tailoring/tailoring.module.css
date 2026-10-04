@@ -166,6 +166,263 @@
   font-size: 12px;
 }
 
+.primaryLink {
+  display: block;
+  padding: 0.9rem 1rem;
+  border-radius: 4px;
+  background: var(--ink, #2a1744);
+  color: white !important;
+  text-align: center;
+  text-decoration: none;
+  font-weight: 700;
+}
+
+.atsPage,
+.atsLoading {
+  width: min(1120px, calc(100% - 2rem));
+  margin: 0 auto;
+  padding: 2rem 0 5rem;
+}
+
+.atsHero {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 3rem;
+  padding: 2.6rem 3rem;
+  margin-top: 1.25rem;
+  border: 1px solid #ded7e5;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #fff 55%, #f1ebf8);
+  box-shadow: 0 18px 45px rgb(42 23 68 / 8%);
+}
+
+.atsHero h1 {
+  margin: 0.6rem 0;
+  color: #241438;
+  font-family: Georgia, serif;
+  font-size: clamp(2rem, 5vw, 3.7rem);
+  line-height: 1.04;
+}
+
+.atsHero h1 em {
+  color: #6543b5;
+  font-weight: 400;
+}
+.atsHero p {
+  max-width: 620px;
+  color: #625b68;
+  line-height: 1.65;
+}
+
+.atsScore {
+  display: grid;
+  grid-template-columns: auto auto;
+  place-content: center;
+  min-width: 180px;
+  min-height: 180px;
+  border: 12px solid #d8ccef;
+  border-top-color: #5f3cb5;
+  border-radius: 50%;
+  background: #fff;
+  color: #27163e;
+}
+
+.atsScore strong {
+  font:
+    700 3.6rem/1 Georgia,
+    serif;
+}
+.atsScore span {
+  align-self: end;
+  margin-bottom: 0.45rem;
+  color: #756c7c;
+}
+.atsScore small {
+  grid-column: 1 / -1;
+  text-align: center;
+  margin-top: 0.35rem;
+}
+
+.atsCategories {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+  margin: 1.5rem 0;
+}
+
+.atsCategories article,
+.atsFindingGroup,
+.atsMethod {
+  border: 1px solid #e4dee9;
+  border-radius: 10px;
+  background: white;
+  padding: 1.25rem;
+}
+
+.atsCategories header {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.atsCategories header b {
+  color: #543395;
+}
+.atsCategories article > div {
+  height: 6px;
+  margin: 0.85rem 0;
+  overflow: hidden;
+  border-radius: 99px;
+  background: #ece8ef;
+}
+.atsCategories article > div span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #4b2c72;
+}
+.atsCategories p {
+  margin: 0;
+  color: #6a6370;
+  font-size: 0.83rem;
+  line-height: 1.5;
+}
+
+.atsFindingsGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+  align-items: start;
+}
+.atsFindingGroup > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid #eee9f0;
+}
+.atsFindingGroup h2 {
+  margin: 0;
+  font:
+    700 1.25rem Georgia,
+    serif;
+}
+.atsFindingGroup header span {
+  min-width: 28px;
+  padding: 0.3rem;
+  border-radius: 99px;
+  background: #eee8f5;
+  text-align: center;
+}
+.atsFindingGroup article {
+  padding: 1rem 0;
+  border-bottom: 1px solid #eee9f0;
+}
+.atsFindingGroup article:last-child {
+  border-bottom: 0;
+}
+.atsFindingGroup h3 {
+  margin: 0 0 0.45rem;
+  font-size: 0.98rem;
+}
+.atsFindingGroup p {
+  margin: 0 0 0.65rem;
+  color: #625b68;
+  font-size: 0.86rem;
+  line-height: 1.5;
+}
+.atsFindingGroup small {
+  color: #4e826d;
+}
+.atsFindingGroup[data-type="missing"] small {
+  color: #9a5c22;
+}
+.atsEmpty {
+  color: #77707d;
+  font-size: 0.9rem;
+}
+
+.atsMethod {
+  display: grid;
+  grid-template-columns: 1fr 1.4fr;
+  gap: 2rem;
+  margin-top: 1.5rem;
+  padding: 2rem;
+  background: #2a1744;
+  color: white;
+}
+.atsMethod h2 {
+  margin: 0.45rem 0 0;
+  font:
+    700 1.8rem Georgia,
+    serif;
+}
+.atsMethod p {
+  margin: 0;
+  color: #ddd3e8;
+  line-height: 1.7;
+}
+
+.atsLoading {
+  min-height: 70vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+.atsLoading h1 {
+  margin: 1rem 0 0.5rem;
+  font:
+    700 clamp(2rem, 6vw, 3.5rem) Georgia,
+    serif;
+  color: #291841;
+}
+.atsLoading p {
+  max-width: 540px;
+  color: #6a6370;
+  line-height: 1.6;
+}
+
+@media (max-width: 760px) {
+  .atsPage,
+  .atsLoading {
+    width: min(100% - 1.5rem, 1120px);
+    padding-top: 1.25rem;
+  }
+  .atsHero {
+    align-items: flex-start;
+    padding: 1.5rem;
+    gap: 1.25rem;
+  }
+  .atsScore {
+    min-width: 112px;
+    min-height: 112px;
+    border-width: 8px;
+  }
+  .atsScore strong {
+    font-size: 2.2rem;
+  }
+  .atsCategories,
+  .atsFindingsGrid {
+    grid-template-columns: 1fr;
+  }
+  .atsMethod {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+    padding: 1.5rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .atsHero {
+    flex-direction: column;
+  }
+  .atsScore {
+    align-self: center;
+  }
+}
+
 .reviewHero,
 .completedHero {
   display: flex;
@@ -1486,5 +1743,307 @@
   .descriptionLabel small {
     gap: 10px;
     font-size: 10px;
+  }
+}
+
+.documentPage {
+  width: min(1280px, calc(100% - 48px));
+  margin: 0 auto;
+  padding: 38px 0 100px;
+}
+.documentBreadcrumbs {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 34px;
+  color: #766e7a;
+  font-size: 12px;
+}
+.documentBreadcrumbs a {
+  color: #3a2650;
+  text-decoration: none;
+}
+.documentHero {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 30px;
+  margin-bottom: 32px;
+}
+.documentHero h1 {
+  margin: 8px 0 10px;
+  color: #241737;
+  font-family: Georgia, serif;
+  font-size: clamp(38px, 5vw, 58px);
+  line-height: 1.02;
+  letter-spacing: -0.04em;
+}
+.documentHero p {
+  max-width: 660px;
+  margin: 0;
+  color: #706777;
+  line-height: 1.65;
+}
+.versionBadge {
+  min-width: 235px;
+  padding: 16px 18px;
+  border: 1px solid #d7e8df;
+  border-radius: 8px;
+  background: #f4faf7;
+  color: #32634f;
+}
+.versionBadge strong,
+.versionBadge span {
+  display: block;
+}
+.versionBadge span {
+  margin-top: 4px;
+  font-size: 11px;
+}
+.documentWorkspace {
+  display: grid;
+  grid-template-columns: 285px minmax(0, 1fr);
+  gap: 22px;
+  align-items: start;
+}
+.exportControls {
+  position: sticky;
+  top: 82px;
+  padding: 24px;
+  border: 1px solid #e2dce5;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 12px 32px rgba(40, 22, 57, 0.06);
+}
+.exportControls h2 {
+  margin: 7px 0;
+  color: #291840;
+  font-family: Georgia, serif;
+  font-size: 27px;
+}
+.exportControls > div > p,
+.exportPrivacy {
+  color: #756d79;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.exportControls fieldset {
+  display: grid;
+  gap: 8px;
+  margin: 24px 0;
+  padding: 0;
+  border: 0;
+}
+.exportControls legend {
+  margin-bottom: 10px;
+  color: #4f4654;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+.exportControls label {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 12px;
+  border: 1px solid #e5dfe8;
+  border-radius: 7px;
+  cursor: pointer;
+}
+.exportControls label:has(input:checked) {
+  border-color: #6c4d8b;
+  background: #f7f3fa;
+}
+.exportControls input {
+  accent-color: #38204e;
+}
+.exportControls label strong,
+.exportControls label small {
+  display: block;
+}
+.exportControls label strong {
+  color: #2c2037;
+  font-size: 12px;
+}
+.exportControls label small {
+  margin-top: 2px;
+  color: #827988;
+  font-size: 10px;
+}
+.exportActions {
+  display: grid;
+  gap: 9px;
+}
+.exportActions button {
+  min-height: 44px;
+  border: 1px solid #2c1742;
+  border-radius: 5px;
+  background: #2c1742;
+  color: #fff;
+  cursor: pointer;
+  font-weight: 700;
+}
+.exportActions button + button {
+  background: #fff;
+  color: #2c1742;
+}
+.exportActions button:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+.exportPrivacy {
+  overflow-wrap: anywhere;
+}
+.paperStage {
+  overflow: hidden;
+  padding: 34px;
+  border: 1px solid #ddd4e3;
+  border-radius: 12px;
+  background: #eee9f1;
+}
+.paperStage :global(.professional-resume) {
+  width: min(100%, 816px);
+  min-height: 1056px;
+  box-sizing: border-box;
+  margin: 0 auto;
+  padding: 58px 62px;
+  background: #fff;
+  box-shadow: 0 18px 45px rgba(41, 25, 54, 0.13);
+  color: #222027;
+  font-family: Arial, Helvetica, sans-serif;
+}
+.paperStage :global(.professional-resume[data-density="compact"]) {
+  padding-top: 48px;
+  padding-bottom: 48px;
+}
+.paperStage :global(.professional-resume__header) {
+  margin-bottom: 32px;
+  text-align: center;
+}
+.paperStage
+  :global(
+    .professional-resume[data-density="compact"] .professional-resume__header
+  ) {
+  margin-bottom: 24px;
+}
+.paperStage :global(.professional-resume__header h1) {
+  margin: 0;
+  color: #211535;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 34px;
+  line-height: 1.05;
+  letter-spacing: -0.025em;
+}
+.paperStage :global(.professional-resume__header p) {
+  margin: 8px 0 0;
+  color: #4d4652;
+  font-size: 13px;
+}
+.paperStage :global(.professional-resume__header ul) {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px 18px;
+  margin: 10px 0 0;
+  padding: 0;
+  color: #67606b;
+  font-size: 10px;
+  list-style: none;
+}
+.paperStage :global(.professional-resume__section) {
+  margin-top: 24px;
+}
+.paperStage
+  :global(
+    .professional-resume[data-density="compact"] .professional-resume__section
+  ) {
+  margin-top: 17px;
+}
+.paperStage :global(.professional-resume__section h2) {
+  margin: 0 0 11px;
+  color: #211535;
+  font-size: 11px;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+}
+.paperStage :global(.professional-resume__items) {
+  display: grid;
+  gap: 14px;
+}
+.paperStage
+  :global(
+    .professional-resume[data-density="compact"] .professional-resume__items
+  ) {
+  gap: 9px;
+}
+.paperStage :global(.professional-resume__item h3) {
+  margin: 0 0 4px;
+  color: #27232b;
+  font-size: 12px;
+  line-height: 1.35;
+}
+.paperStage :global(.professional-resume__item p) {
+  margin: 0;
+  color: #343039;
+  font-size: 11px;
+  line-height: 1.55;
+  white-space: pre-line;
+}
+.paperStage
+  :global(
+    .professional-resume[data-density="compact"] .professional-resume__item p
+  ) {
+  font-size: 10.4px;
+  line-height: 1.43;
+}
+
+@media (max-width: 820px) {
+  .documentPage {
+    width: calc(100% - 28px);
+    padding-top: 24px;
+  }
+  .documentBreadcrumbs span {
+    display: none;
+  }
+  .documentHero {
+    display: block;
+  }
+  .documentHero h1 {
+    font-size: 39px;
+  }
+  .versionBadge {
+    margin-top: 20px;
+  }
+  .documentWorkspace {
+    grid-template-columns: 1fr;
+  }
+  .exportControls {
+    position: static;
+  }
+  .exportControls fieldset {
+    grid-template-columns: 1fr 1fr;
+  }
+  .paperStage {
+    padding: 10px;
+  }
+  .paperStage :global(.professional-resume) {
+    min-height: 0;
+    padding: 34px 25px;
+  }
+  .paperStage :global(.professional-resume__header h1) {
+    font-size: 28px;
+  }
+  .paperStage :global(.professional-resume__header ul) {
+    gap: 4px 10px;
+    overflow-wrap: anywhere;
+  }
+}
+
+@media (max-width: 480px) {
+  .exportControls fieldset {
+    grid-template-columns: 1fr;
+  }
+  .paperStage :global(.professional-resume) {
+    padding: 30px 20px;
   }
 }

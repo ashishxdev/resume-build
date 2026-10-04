@@ -1,6 +1,6 @@
 # Make My Resume — Project Status
 
-Last updated: 2026-10-03
+Last updated: 2026-10-04
 
 ## Purpose
 
@@ -16,8 +16,8 @@ Update this file whenever a major feature is started, completed, materially rede
 | Marketing homepage | Complete | Responsive Stitch-inspired homepage implementing the Atelier Digital visual system and core product messaging. |
 | Authentication | In progress | Email/password authentication now includes Resend-backed, rate-limited password recovery with single-use tokens and session revocation. Google OAuth still requires configuration and end-to-end verification. |
 | Dashboard workspace | Complete | Responsive authenticated dashboard implements the approved desktop and mobile Stitch designs with truthful empty, loading, navigation, account, plan, activity, and trust states. |
-| Resume workflows | In progress | PDF/DOCX import, Gemini-assisted extraction, verified base versions, grounded job matching, evidence-backed suggestion review, and immutable tailored versions are complete. ATS analysis, export, and sharing remain future milestones. |
-| Backend business modules | In progress | Owned imports, private R2 originals, recoverable AI queues, grounded parsing and matching, explicit suggestion decisions, and transactional tailored-version persistence are complete. ATS analysis remains future work. |
+| Resume workflows | In progress | PDF/DOCX import, Gemini-assisted extraction, verified base versions, grounded job matching, evidence-backed suggestion review, immutable tailored versions, transparent ATS compatibility analysis, and Professional ATS PDF/DOCX export are complete. ATS improvement suggestions, additional templates, and sharing remain future milestones. |
+| Backend business modules | In progress | Owned imports, private R2 originals, recoverable queues, grounded parsing and matching, explicit suggestion decisions, transactional tailored-version persistence, saved ATS snapshots, and authenticated deterministic document export are complete. ATS improvement actions remain future work. |
 
 ## Milestones
 
@@ -240,7 +240,7 @@ Update this file whenever a major feature is started, completed, materially rede
   - Create a separate immutable tailored resume version only after all decisions are complete. The version records its base version, job analysis, tailoring session, and final claims without changing the verified base pointer.
   - Surface completed and in-progress tailoring sessions on the dashboard, update tailored-version and free-credit counts, and allow users to reopen saved work.
 - **Verification:** 71 API tests and 39 web tests pass. Coverage includes evidence and requirement binding, invented-number rejection for both provider output and manual edits, queue processing, owner isolation, quota-safe idempotent session reopening, transient polling recovery, pending-decision enforcement, optimistic decision persistence, preservation of manually edited accepted wording, separate tailored-version creation, workflow navigation, truthful dashboard counts, independent resume and tailoring failure states, reopen links, and disabled completion until every decision is made. Workspace type checking, linting, Prettier validation, and the production build pass. A disposable live MongoDB smoke test passed queue claiming, persisted decisions, transactional tailored-version creation, and base-version preservation; the test database was dropped afterward. A live `gemini-3.1-flash-lite` smoke test returned one grounded suggestion for synthetic evidence with the expected source-claim binding. The responsive implementation follows the six approved Stitch desktop/mobile screens; authenticated live visual inspection remains part of final user acceptance.
-- **Important limitations:** Gemini availability and latency remain external dependencies; failed sessions can be retried without losing their bound analysis. The lexical safety layer rejects new numeric facts while the provider prompt and evidence links constrain other factual wording; user review remains mandatory. ATS compatibility analysis, document rendering/export, sharing, billing enforcement, and manual editing outside suggested claims remain future milestones.
+- **Important limitations:** Gemini availability and latency remain external dependencies; failed sessions can be retried without losing their bound analysis. The lexical safety layer rejects new numeric facts while the provider prompt and evidence links constrain other factual wording; user review remains mandatory. ATS improvement actions, additional export templates, sharing, billing enforcement, and manual editing outside suggested claims remain future milestones.
 - **Primary files:**
   - `apps/api/src/infrastructure/ai/gemini-tailoring-generator.ts`
   - `apps/api/src/modules/tailoring/tailoring-repository.ts`
@@ -250,9 +250,53 @@ Update this file whenever a major feature is started, completed, materially rede
   - `apps/web/components/tailoring/tailoring.module.css`
   - `packages/contracts/src/tailoring/session.ts`
 
+### 12. Transparent ATS Compatibility Analysis
+
+- **Date:** 2026-10-03
+- **Status:** Complete
+- **Scope delivered:**
+  - Analyze the immutable tailored version against its bound job analysis and verified evidence without claiming to reproduce an employer's proprietary ATS.
+  - Save a version-bound snapshot with an overall compatibility indicator and six explainable category scores: keyword coverage, skill alignment, experience relevance, section completeness, structure/readability, and formatting compatibility.
+  - Separate findings into strengths, evidence-safe improvement opportunities, and genuinely missing requirements that the product will not invent.
+  - Match keyword coverage using normalized whole tokens instead of substrings, with explicit canonical handling for C#, C++, and .NET, so terms such as Java/JavaScript and SQL/NoSQL do not produce false positives.
+  - Present strong, moderate, or weak alignment language from the actual compatibility score instead of showing an unconditional positive headline.
+  - Run analysis through a durable queue with processing leases, stale-work reclamation, bounded attempts, saved failure states, owner-only access, retry handling, and idempotent reopen behavior.
+  - Add responsive loading, failure, and results experiences linked directly from the completed tailored version.
+- **Verification:** 76 API tests, 42 web tests, and 4 resume-engine tests pass. Coverage includes version binding, six-category output, unsupported-requirement handling, ownership, queued route behavior, transparent results rendering, exact-token protection for Java/JavaScript and SQL/NoSQL, special-token handling for C#/C++/.NET, and all three alignment-headline score bands. Workspace type checking, linting, Prettier validation, and production builds pass.
+- **Important limitations:** This is an internal compatibility methodology, not a prediction of a specific employer's ATS score. Professional ATS document rendering and layout validation are now delivered by milestone 13. Applying ATS improvements remains the next increment.
+- **Primary files:**
+  - `apps/api/src/modules/tailoring/ats-analysis-service.ts`
+  - `apps/api/src/modules/tailoring/ats-analysis-loop.ts`
+  - `apps/api/src/modules/tailoring/tailoring-repository.ts`
+  - `apps/api/src/http/routes/tailoring.ts`
+  - `apps/web/components/tailoring/ats-analysis-page.tsx`
+  - `packages/contracts/src/ats/analysis.ts`
+
+### 13. Professional ATS Resume Preview and Export
+
+- **Date:** 2026-10-04
+- **Status:** Complete
+- **Scope delivered:**
+  - Added a canonical professional-resume document model that deterministically transforms the immutable tailored claim set into identity, contact, and ordered resume sections without introducing new facts.
+  - Added one polished, single-column Professional ATS template shared by the responsive browser preview, searchable PDF renderer, and editable DOCX renderer.
+  - Added comfortable and compact spacing modes for normal and content-heavy resumes while keeping the original uploaded file and verified base version unchanged.
+  - Added an authenticated export studio linked from completed tailoring sessions, with explicit original-protection messaging and private, no-store PDF and DOCX download responses.
+  - Bound every export to the completed tailored version and preserved accepted wording, section order, contact details, and source-derived headings across both file formats.
+  - Preserve source PDF contact and project hyperlink destinations in regenerated PDF output, restore the PDF cursor after manually positioned contact rows, and normalize grouped skills, projects, experience, and education into readable resume lines without repeating headings.
+- **Verification:** 76 API tests, 42 web tests, and 4 resume-engine tests pass. Coverage includes canonical document construction, rejected-claim omission, contact parsing, searchable PDF text, editable DOCX text, authenticated ownership, private cache headers, output filenames, preview rendering, layout-density selection, both download actions, and compile-safe pdf.js text-item narrowing. Workspace type checking, linting, Prettier validation, and production builds pass. Representative one-page and two-page PDF and DOCX files were previously rendered to PNG and visually inspected at full-page resolution; both formats had clean typography, intact headings, correct Letter sizing, readable contact information, stable page breaks, and no clipping, overlap, or missing glyphs. The subsequent hyperlink and grouped-content corrections have automated and compile verification but still require a fresh visual PDF inspection.
+- **Important limitations:** The first release includes one template and two density settings. Browser preview and exported files use the same content hierarchy and design intent, but pagination can differ because browsers, PDFKit, Microsoft Word, and LibreOffice use different text-layout engines. Export quality depends on the verified structured claims; correcting missing or incorrectly grouped source information still belongs in the verification workflow.
+- **Primary files:**
+  - `packages/contracts/src/resume/document.ts`
+  - `packages/resume-engine/src/document/build-professional-resume.ts`
+  - `packages/resume-renderer/src/professional-resume.tsx`
+  - `apps/api/src/modules/tailoring/resume-export-service.ts`
+  - `apps/api/src/http/routes/tailoring.ts`
+  - `apps/web/components/tailoring/resume-document-page.tsx`
+  - `apps/web/app/tailoring/[tailoringSessionId]/resume/page.tsx`
+
 ## Next Major Milestone
 
-ATS compatibility analysis is next: evaluate the completed tailored version against its bound job description, explain category-level compatibility without claiming to reproduce an employer's ATS score, and identify only evidence-safe improvements.
+ATS improvement actions are next: turn eligible “can improve” findings into evidence-bound accept/reject suggestions while keeping genuinely missing skills informational and preserving the completed tailored version as immutable history. Additional resume templates, presentation controls, saved export artifacts, and sharing can build on the canonical document model after that workflow is stable.
 
 ## Status Definitions
 

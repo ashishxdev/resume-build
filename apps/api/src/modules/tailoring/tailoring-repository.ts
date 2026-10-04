@@ -1,4 +1,6 @@
 import type {
+  AtsAnalysisSnapshot,
+  AtsAnalysisStatus,
   JobDescriptionAnalysis,
   ResumeClaim,
   TailoringSessionStatus,
@@ -38,6 +40,12 @@ export interface TailoringSessionRecord {
   processingToken: string | null;
   processingLeaseExpiresAt: Date | null;
   revision: number;
+  atsStatus: AtsAnalysisStatus;
+  atsFailureMessage: string | null;
+  atsSnapshot: AtsAnalysisSnapshot | null;
+  atsAttempts: number;
+  atsProcessingToken: string | null;
+  atsLeaseExpiresAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -102,6 +110,19 @@ export interface TailoringRepository {
     id: string,
     expectedRevision: number,
   ): Promise<TailoringSessionRecord | null>;
+  queueAts(userId: string, id: string): Promise<TailoringSessionRecord | null>;
+  claimNextAts(): Promise<TailoringSessionRecord | null>;
+  completeAts(
+    id: string,
+    processingToken: string,
+    snapshot: AtsAnalysisSnapshot,
+  ): Promise<TailoringSessionRecord | null>;
+  failAts(
+    id: string,
+    processingToken: string,
+    message: string,
+  ): Promise<TailoringSessionRecord | null>;
+  retryAts(userId: string, id: string): Promise<TailoringSessionRecord | null>;
 }
 
 function clone(record: TailoringSessionRecord) {
@@ -150,6 +171,12 @@ function newRecord(
     processingToken: null,
     processingLeaseExpiresAt: null,
     revision: 0,
+    atsStatus: "not_started",
+    atsFailureMessage: null,
+    atsSnapshot: null,
+    atsAttempts: 0,
+    atsProcessingToken: null,
+    atsLeaseExpiresAt: null,
     createdAt: now,
     updatedAt: now,
   };
@@ -351,6 +378,91 @@ export function createMemoryTailoringRepository(): TailoringRepository {
       record.updatedAt = new Date();
       return clone(record);
     },
+    async queueAts(userId, id) {
+      const record = records.get(id);
+      if (!record || record.userId !== userId || record.status !== "completed")
+        return null;
+      if (record.atsStatus !== "not_started") return clone(record);
+      record.atsStatus = "queued";
+      record.atsFailureMessage = null;
+      record.updatedAt = new Date();
+      return clone(record);
+    },
+    async claimNextAts() {
+      const now = new Date();
+      for (const record of records.values()) {
+        if (
+          record.atsStatus === "analyzing" &&
+          record.atsLeaseExpiresAt &&
+          record.atsLeaseExpiresAt <= now &&
+          record.atsAttempts >= maximumAttempts
+        ) {
+          record.atsStatus = "failed";
+          record.atsFailureMessage =
+            "ATS analysis stopped unexpectedly. Please try again.";
+          record.atsProcessingToken = null;
+          record.atsLeaseExpiresAt = null;
+        }
+      }
+      const record = [...records.values()].find(
+        (candidate) =>
+          candidate.atsAttempts < maximumAttempts &&
+          (candidate.atsStatus === "queued" ||
+            (candidate.atsStatus === "analyzing" &&
+              candidate.atsLeaseExpiresAt !== null &&
+              candidate.atsLeaseExpiresAt <= now)),
+      );
+      if (!record) return null;
+      record.atsStatus = "analyzing";
+      record.atsAttempts += 1;
+      record.atsProcessingToken = createId("lease");
+      record.atsLeaseExpiresAt = new Date(
+        now.getTime() + tailoringLeaseMilliseconds,
+      );
+      record.updatedAt = now;
+      return clone(record);
+    },
+    async completeAts(id, token, snapshot) {
+      const record = records.get(id);
+      if (
+        !record ||
+        record.atsStatus !== "analyzing" ||
+        record.atsProcessingToken !== token
+      )
+        return null;
+      record.atsStatus = "completed";
+      record.atsSnapshot = structuredClone(snapshot);
+      record.atsFailureMessage = null;
+      record.atsProcessingToken = null;
+      record.atsLeaseExpiresAt = null;
+      record.updatedAt = new Date();
+      return clone(record);
+    },
+    async failAts(id, token, message) {
+      const record = records.get(id);
+      if (
+        !record ||
+        record.atsStatus !== "analyzing" ||
+        record.atsProcessingToken !== token
+      )
+        return null;
+      record.atsStatus = "failed";
+      record.atsFailureMessage = message;
+      record.atsProcessingToken = null;
+      record.atsLeaseExpiresAt = null;
+      record.updatedAt = new Date();
+      return clone(record);
+    },
+    async retryAts(userId, id) {
+      const record = records.get(id);
+      if (!record || record.userId !== userId || record.atsStatus !== "failed")
+        return null;
+      record.atsStatus = "queued";
+      record.atsFailureMessage = null;
+      record.atsAttempts = 0;
+      record.updatedAt = new Date();
+      return clone(record);
+    },
   };
 }
 
@@ -392,6 +504,7 @@ export function createMongoTailoringRepository(
         processingLeaseExpiresAt: 1,
         createdAt: 1,
       }),
+      records.createIndex({ atsStatus: 1, atsLeaseExpiresAt: 1, updatedAt: 1 }),
     ]));
   return {
     async create(input) {
@@ -611,6 +724,127 @@ export function createMongoTailoringRepository(
       } finally {
         await session.endSession();
       }
+    },
+    async queueAts(userId, id) {
+      const current = await records.findOne({
+        userId,
+        id,
+        status: "completed",
+      });
+      if (!current) return null;
+      if ((current.atsStatus ?? "not_started") !== "not_started")
+        return current;
+      return records.findOneAndUpdate(
+        {
+          userId,
+          id,
+          status: "completed",
+          $or: [
+            { atsStatus: "not_started" },
+            { atsStatus: { $exists: false } },
+          ],
+        },
+        {
+          $set: {
+            atsStatus: "queued",
+            atsFailureMessage: null,
+            atsAttempts: 0,
+            atsSnapshot: null,
+            atsProcessingToken: null,
+            atsLeaseExpiresAt: null,
+            updatedAt: new Date(),
+          },
+        },
+        { returnDocument: "after" },
+      );
+    },
+    async claimNextAts() {
+      await ensureIndexes();
+      const now = new Date();
+      const expired = { atsLeaseExpiresAt: { $lte: now } };
+      await records.updateMany(
+        {
+          atsStatus: "analyzing",
+          atsAttempts: { $gte: maximumAttempts },
+          ...expired,
+        },
+        {
+          $set: {
+            atsStatus: "failed",
+            atsFailureMessage:
+              "ATS analysis stopped unexpectedly. Please try again.",
+            atsProcessingToken: null,
+            atsLeaseExpiresAt: null,
+            updatedAt: now,
+          },
+        },
+      );
+      return records.findOneAndUpdate(
+        {
+          atsAttempts: { $lt: maximumAttempts },
+          $or: [
+            { atsStatus: "queued" },
+            { atsStatus: "analyzing", ...expired },
+          ],
+        },
+        {
+          $set: {
+            atsStatus: "analyzing",
+            atsProcessingToken: createId("lease"),
+            atsLeaseExpiresAt: new Date(
+              now.getTime() + tailoringLeaseMilliseconds,
+            ),
+            updatedAt: now,
+          },
+          $inc: { atsAttempts: 1 },
+        },
+        { returnDocument: "after", sort: { updatedAt: 1 } },
+      );
+    },
+    async completeAts(id, token, snapshot) {
+      return records.findOneAndUpdate(
+        { id, atsStatus: "analyzing", atsProcessingToken: token },
+        {
+          $set: {
+            atsStatus: "completed",
+            atsSnapshot: snapshot,
+            atsFailureMessage: null,
+            atsProcessingToken: null,
+            atsLeaseExpiresAt: null,
+            updatedAt: new Date(),
+          },
+        },
+        { returnDocument: "after" },
+      );
+    },
+    async failAts(id, token, message) {
+      return records.findOneAndUpdate(
+        { id, atsStatus: "analyzing", atsProcessingToken: token },
+        {
+          $set: {
+            atsStatus: "failed",
+            atsFailureMessage: message,
+            atsProcessingToken: null,
+            atsLeaseExpiresAt: null,
+            updatedAt: new Date(),
+          },
+        },
+        { returnDocument: "after" },
+      );
+    },
+    async retryAts(userId, id) {
+      return records.findOneAndUpdate(
+        { userId, id, atsStatus: "failed", status: "completed" },
+        {
+          $set: {
+            atsStatus: "queued",
+            atsFailureMessage: null,
+            atsAttempts: 0,
+            updatedAt: new Date(),
+          },
+        },
+        { returnDocument: "after" },
+      );
     },
   };
 }

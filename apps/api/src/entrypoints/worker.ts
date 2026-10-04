@@ -14,6 +14,8 @@ import { createTailoringGenerator } from "../infrastructure/ai/tailoring-generat
 import { startTailoringLoop } from "../modules/tailoring/tailoring-loop.js";
 import { createTailoringRepositoryRuntime } from "../modules/tailoring/tailoring-repository.js";
 import { createTailoringService } from "../modules/tailoring/tailoring-service.js";
+import { createAtsAnalysisService } from "../modules/tailoring/ats-analysis-service.js";
+import { startAtsAnalysisLoop } from "../modules/tailoring/ats-analysis-loop.js";
 
 loadLocalEnvironmentFiles();
 
@@ -48,12 +50,16 @@ const stopTailoringLoop = startTailoringLoop(
     logger,
   ),
 );
+const stopAtsAnalysisLoop = startAtsAnalysisLoop(
+  createAtsAnalysisService(tailoringRuntime.repository, logger),
+);
 
 function shutdown(signal: string) {
   logger.info({ signal }, "Worker shutting down");
   stopExtractionLoop();
   stopJobAnalysisLoop();
   stopTailoringLoop();
+  stopAtsAnalysisLoop();
   void extractionRuntime.close();
   void jobDescriptionRuntime.close();
   void tailoringRuntime.close();

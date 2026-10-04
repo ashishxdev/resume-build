@@ -1,24 +1,34 @@
 import {
   completeTailoringSessionRequestSchema,
+  resumeExportOptionsSchema,
   type TailoringSession,
   updateTailoringSuggestionRequestSchema,
 } from "@make-my-resume/contracts";
+import { buildProfessionalResumeDocument } from "@make-my-resume/resume-engine";
 import { fromNodeHeaders } from "better-auth/node";
 import { Router, type Request, type Response } from "express";
 
 import type { Auth } from "../../infrastructure/auth/auth.js";
 import type { JobAnalysisRateLimiter } from "../../modules/job-descriptions/job-analysis-rate-limiter.js";
 import type { JobDescriptionRepository } from "../../modules/job-descriptions/job-description-repository.js";
+import type { ResumeObjectStorage } from "../../infrastructure/storage/r2-object-storage.js";
+import type { ResumeImportRepository } from "../../modules/resumes/resume-import-repository.js";
 import {
   TailoringConcurrencyError,
   type TailoringRepository,
   type TailoringSessionRecord,
 } from "../../modules/tailoring/tailoring-repository.js";
+import {
+  extractPdfLiveLinks,
+  renderProfessionalResume,
+} from "../../modules/tailoring/resume-export-service.js";
 
 export interface TailoringRouteServices {
   repository: TailoringRepository;
   jobDescriptionRepository: JobDescriptionRepository;
   rateLimiter: JobAnalysisRateLimiter;
+  resumeImportRepository?: ResumeImportRepository;
+  objectStorage?: ResumeObjectStorage | null;
 }
 
 function sendError(
@@ -32,6 +42,17 @@ function sendError(
 
 function numericTokens(value: string) {
   return new Set(value.match(/\b\d+(?:[.,]\d+)?%?\b/g) ?? []);
+}
+
+function downloadName(record: TailoringSessionRecord, extension: string) {
+  const subject = record.company ?? record.role ?? "tailored-resume";
+  const normalized = subject
+    .normalize("NFKD")
+    .replace(/[^A-Za-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .toLocaleLowerCase("en")
+    .slice(0, 80);
+  return `${normalized || "tailored-resume"}-resume.${extension}`;
 }
 
 function serialize(record: TailoringSessionRecord): TailoringSession {
@@ -49,6 +70,9 @@ function serialize(record: TailoringSessionRecord): TailoringSession {
     analysis: record.analysis,
     tailoredVersionId: record.tailoredVersionId,
     finalClaims: record.finalClaims,
+    atsStatus: record.atsStatus ?? "not_started",
+    atsFailureMessage: record.atsFailureMessage ?? null,
+    atsSnapshot: record.atsSnapshot ?? null,
     revision: record.revision,
     createdAt: record.createdAt.toISOString(),
     updatedAt: record.updatedAt.toISOString(),
@@ -164,6 +188,89 @@ export function createTailoringRouter(
     },
   );
 
+  router.get(
+    "/api/v1/tailoring-sessions/:id/export",
+    async (request, response, next) => {
+      try {
+        const ownerId = await requireUser(request, response);
+        if (!ownerId) return;
+        const parsed = resumeExportOptionsSchema.safeParse({
+          format: request.query.format,
+          density: request.query.density ?? "comfortable",
+        });
+        if (!parsed.success)
+          return sendError(
+            response,
+            400,
+            "INVALID_EXPORT_OPTIONS",
+            "Choose PDF or DOCX and a supported layout density.",
+          );
+        const record = await services.repository.findOwned(
+          ownerId,
+          request.params.id,
+        );
+        if (!record)
+          return sendError(
+            response,
+            404,
+            "TAILORING_SESSION_NOT_FOUND",
+            "Tailoring session was not found.",
+          );
+        if (
+          record.status !== "completed" ||
+          !record.tailoredVersionId ||
+          !record.finalClaims
+        )
+          return sendError(
+            response,
+            409,
+            "TAILORED_VERSION_REQUIRED",
+            "Complete the tailored version before exporting it.",
+          );
+        const tailoredClaimIds = record.suggestions
+          .filter((suggestion) => suggestion.status === "accepted")
+          .map((suggestion) => suggestion.sourceClaimId);
+        const document = buildProfessionalResumeDocument(record.finalClaims, {
+          tailoredClaimIds,
+        });
+        let sourceProjectLinks: string[] = [];
+        if (
+          parsed.data.format === "pdf" &&
+          services.resumeImportRepository &&
+          services.objectStorage
+        ) {
+          const sourceImport =
+            await services.resumeImportRepository.findOwnedByResumeId(
+              ownerId,
+              record.resumeId,
+            );
+          if (sourceImport?.mimeType === "application/pdf") {
+            const sourceBytes = await services.objectStorage.readObject(
+              sourceImport.objectKey,
+            );
+            sourceProjectLinks = await extractPdfLiveLinks(sourceBytes);
+          }
+        }
+        const exported = await renderProfessionalResume(
+          document,
+          parsed.data.format,
+          parsed.data.density,
+          sourceProjectLinks,
+        );
+        response.setHeader("Cache-Control", "private, no-store");
+        response.setHeader("Content-Type", exported.contentType);
+        response.setHeader(
+          "Content-Disposition",
+          `attachment; filename="${downloadName(record, exported.extension)}"`,
+        );
+        response.setHeader("Content-Length", String(exported.bytes.length));
+        response.send(exported.bytes);
+      } catch (error) {
+        next(error);
+      }
+    },
+  );
+
   router.get("/api/v1/tailoring-sessions", async (request, response, next) => {
     try {
       const ownerId = await requireUser(request, response);
@@ -174,6 +281,71 @@ export function createTailoringRouter(
       next(error);
     }
   });
+
+  router.post(
+    "/api/v1/tailoring-sessions/:id/ats-analysis",
+    async (request, response, next) => {
+      try {
+        const ownerId = await requireUser(request, response);
+        if (!ownerId) return;
+        const current = await services.repository.findOwned(
+          ownerId,
+          request.params.id,
+        );
+        if (!current)
+          return sendError(
+            response,
+            404,
+            "TAILORING_SESSION_NOT_FOUND",
+            "Tailoring session was not found.",
+          );
+        if (current.status !== "completed" || !current.tailoredVersionId)
+          return sendError(
+            response,
+            409,
+            "TAILORED_VERSION_REQUIRED",
+            "Complete the tailored version before running ATS analysis.",
+          );
+        const record = await services.repository.queueAts(ownerId, current.id);
+        if (!record)
+          return sendError(
+            response,
+            409,
+            "ATS_STATE_CHANGED",
+            "The ATS analysis state changed. Please try again.",
+          );
+        response
+          .status(record.atsStatus === "completed" ? 200 : 202)
+          .json({ data: serialize(record) });
+      } catch (error) {
+        next(error);
+      }
+    },
+  );
+
+  router.post(
+    "/api/v1/tailoring-sessions/:id/ats-analysis/retry",
+    async (request, response, next) => {
+      try {
+        const ownerId = await requireUser(request, response);
+        if (!ownerId) return;
+        const record = await services.repository.retryAts(
+          ownerId,
+          request.params.id,
+        );
+        if (!record)
+          return sendError(
+            response,
+            409,
+            "ATS_NOT_RETRYABLE",
+            "This ATS analysis cannot be retried.",
+          );
+        response.status(202).json({ data: serialize(record) });
+      } catch (error) {
+        next(error);
+      }
+    },
+  );
 
   router.post(
     "/api/v1/tailoring-sessions/:id/retry",

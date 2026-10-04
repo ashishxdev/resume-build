@@ -1,4 +1,6 @@
 import {
+  type ResumeExportFormat,
+  type ResumeTemplateDensity,
   tailoringSessionSchema,
   type TailoringSession,
 } from "@make-my-resume/contracts";
@@ -72,6 +74,24 @@ export function retryTailoringSession(id: string) {
   });
 }
 
+export function startAtsAnalysis(id: string) {
+  return request(
+    `/api/v1/tailoring-sessions/${encodeURIComponent(id)}/ats-analysis`,
+    {
+      method: "POST",
+    },
+  );
+}
+
+export function retryAtsAnalysis(id: string) {
+  return request(
+    `/api/v1/tailoring-sessions/${encodeURIComponent(id)}/ats-analysis/retry`,
+    {
+      method: "POST",
+    },
+  );
+}
+
 export function decideSuggestion(
   session: TailoringSession,
   suggestionId: string,
@@ -105,4 +125,30 @@ export function completeTailoringSession(session: TailoringSession) {
       body: JSON.stringify({ revision: session.revision }),
     },
   );
+}
+
+export async function downloadTailoredResume(
+  id: string,
+  format: ResumeExportFormat,
+  density: ResumeTemplateDensity,
+) {
+  const parameters = new URLSearchParams({ format, density });
+  const response = await fetch(
+    `${clientEnvironment.NEXT_PUBLIC_API_URL}/api/v1/tailoring-sessions/${encodeURIComponent(id)}/export?${parameters}`,
+    { credentials: "include" },
+  );
+  if (!response.ok) {
+    const parsed = errorEnvelope.safeParse(
+      await response.json().catch(() => null),
+    );
+    throw new Error(
+      parsed.success
+        ? (parsed.data.error.message ?? "The resume could not be exported.")
+        : "The resume could not be exported.",
+    );
+  }
+  const disposition = response.headers.get("Content-Disposition") ?? "";
+  const filename =
+    disposition.match(/filename="([^"]+)"/)?.[1] ?? `tailored-resume.${format}`;
+  return { blob: await response.blob(), filename };
 }

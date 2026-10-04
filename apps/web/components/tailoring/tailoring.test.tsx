@@ -14,6 +14,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { JobDescriptionWorkflow } from "./job-description-workflow";
 import { MatchOverview } from "./match-overview";
 import { TailoringSessionPage } from "./tailoring-session-page";
+import { AtsAnalysisPage, atsAlignmentHeadline } from "./ats-analysis-page";
+import { ResumeDocumentPage } from "./resume-document-page";
 
 const mocks = vi.hoisted(() => ({
   create: vi.fn(),
@@ -34,6 +36,9 @@ const mocks = vi.hoisted(() => ({
   decideAll: vi.fn(),
   completeTailoring: vi.fn(),
   retryTailoring: vi.fn(),
+  startAts: vi.fn(),
+  retryAts: vi.fn(),
+  downloadResume: vi.fn(),
   useSession: vi.fn(),
 }));
 
@@ -67,6 +72,9 @@ vi.mock("@/lib/tailoring/client", () => ({
   decideAll: mocks.decideAll,
   completeTailoringSession: mocks.completeTailoring,
   retryTailoringSession: mocks.retryTailoring,
+  startAtsAnalysis: mocks.startAts,
+  retryAtsAnalysis: mocks.retryAts,
+  downloadTailoredResume: mocks.downloadResume,
 }));
 
 const verification = {
@@ -107,6 +115,13 @@ describe("tailoring workflow", () => {
   afterEach(() => {
     cleanup();
     vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  it("uses evidence-aware ATS alignment headlines", () => {
+    expect(atsAlignmentHeadline(85)).toBe("strong alignment");
+    expect(atsAlignmentHeadline(65)).toBe("moderate alignment");
+    expect(atsAlignmentHeadline(35)).toBe("weak alignment");
   });
 
   it("navigates to the durable analysis record as soon as it is queued", async () => {
@@ -124,6 +139,65 @@ describe("tailoring workflow", () => {
     await waitFor(() =>
       expect(mocks.push).toHaveBeenCalledWith("/job-descriptions/jd_queued"),
     );
+  });
+
+  it("renders a saved ATS snapshot with transparent missing evidence", async () => {
+    mocks.getTailoring.mockResolvedValue({
+      id: "tailor_1",
+      jobDescriptionId: "jd_1",
+      resumeId: "resume_1",
+      resumeVersionId: "version_1",
+      role: "Engineer",
+      company: "Acme",
+      status: "completed",
+      failureMessage: null,
+      suggestions: [],
+      evidenceClaims: [],
+      analysis: { summary: "One", requirements: [], matches: [] },
+      tailoredVersionId: "version_tailored",
+      finalClaims: [],
+      revision: 1,
+      atsStatus: "completed",
+      atsFailureMessage: null,
+      atsSnapshot: {
+        tailoredVersionId: "version_tailored",
+        overallScore: 82,
+        categories: [
+          ["keyword_coverage", "Keyword coverage"],
+          ["skill_alignment", "Skill alignment"],
+          ["experience_relevance", "Experience relevance"],
+          ["section_completeness", "Section completeness"],
+          ["structure_readability", "Structure & readability"],
+          ["formatting_compatibility", "Formatting compatibility"],
+        ].map(([category, label]) => ({
+          category,
+          label,
+          score: 82,
+          explanation: "Transparent explanation.",
+        })),
+        findings: [
+          {
+            id: "ats_1",
+            type: "missing",
+            title: "Mentoring",
+            explanation: "No verified evidence supports this requirement.",
+            requirementIds: ["req_1"],
+            resumeClaimIds: [],
+          },
+        ],
+        analyzedAt: "2026-10-03T00:00:00.000Z",
+        methodologyVersion: "transparent-ats-v1",
+      },
+      createdAt: "2026-10-03T00:00:00.000Z",
+      updatedAt: "2026-10-03T00:00:00.000Z",
+    });
+    render(<AtsAnalysisPage />);
+    expect(
+      await screen.findByLabelText("Compatibility score 82 out of 100"),
+    ).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Mentoring" })).toBeTruthy();
+    expect(screen.getByText(/nothing will be invented/i)).toBeTruthy();
+    expect(mocks.startAts).not.toHaveBeenCalled();
   });
 
   it("filters the match overview while preserving grounded evidence", async () => {
@@ -471,5 +545,95 @@ describe("tailoring workflow", () => {
     expect(
       screen.getByText("Led accessible design systems across products."),
     ).toBeTruthy();
+  });
+
+  it("previews the professional template and exports the selected density", async () => {
+    const session = {
+      id: "tailor_1",
+      jobDescriptionId: "jd_1",
+      resumeId: "resume_1",
+      resumeVersionId: "version_1",
+      role: "Product Designer",
+      company: "Acme",
+      status: "completed",
+      failureMessage: null,
+      evidenceClaims: verification.claims,
+      analysis: { summary: "One.", requirements: [], matches: [] },
+      suggestions: [
+        {
+          id: "suggestion_1",
+          sourceClaimId: "claim_experience",
+          requirementIds: ["req_1"],
+          section: "experience",
+          originalText: "Led design-system work.",
+          suggestedText: "Led accessible design systems.",
+          reason: "Relevant.",
+          status: "accepted",
+          editedText: null,
+        },
+      ],
+      tailoredVersionId: "version_tailored",
+      finalClaims: [
+        {
+          id: "claim_personal",
+          category: "personal_info",
+          label: "Contact information",
+          value: "Alex Mercer | alex@example.com",
+          sourceText: null,
+          pageNumber: 1,
+          status: "confirmed",
+          userAdded: false,
+          order: 0,
+        },
+        {
+          id: "claim_experience",
+          category: "experience",
+          label: "Lead Product Designer at Northstar",
+          value: "Led accessible design systems.",
+          sourceText: null,
+          pageNumber: 1,
+          status: "edited",
+          userAdded: false,
+          order: 1,
+        },
+      ],
+      revision: 4,
+      atsStatus: "not_started",
+      atsFailureMessage: null,
+      atsSnapshot: null,
+      createdAt: "2026-10-03T00:00:00.000Z",
+      updatedAt: "2026-10-03T00:00:00.000Z",
+    };
+    mocks.getTailoring.mockResolvedValue(session);
+    mocks.downloadResume.mockResolvedValue({
+      blob: new Blob(["resume"]),
+      filename: "acme-resume.docx",
+    });
+    const createObjectUrl = vi
+      .spyOn(URL, "createObjectURL")
+      .mockReturnValue("blob:resume");
+    vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => undefined);
+    const clickDownload = vi
+      .spyOn(HTMLAnchorElement.prototype, "click")
+      .mockImplementation(() => undefined);
+    render(<ResumeDocumentPage />);
+
+    expect(
+      await screen.findByRole("heading", { name: "Alex Mercer" }),
+    ).toBeTruthy();
+    expect(screen.getByText("Led accessible design systems.")).toBeTruthy();
+    fireEvent.click(screen.getByLabelText(/Compact/));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Download editable DOCX" }),
+    );
+    await waitFor(() =>
+      expect(mocks.downloadResume).toHaveBeenCalledWith(
+        "tailor_1",
+        "docx",
+        "compact",
+      ),
+    );
+    expect(createObjectUrl).toHaveBeenCalled();
+    expect(clickDownload).toHaveBeenCalled();
   });
 });

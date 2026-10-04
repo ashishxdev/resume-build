@@ -388,15 +388,15 @@ export function TailoringSessionPage() {
                   <dd>{matchScore(session)}%</dd>
                 </div>
               </dl>
-              <button
-                onClick={() =>
-                  setError(
-                    "ATS review is the next milestone. Your tailored version is safely saved.",
-                  )
-                }
+              <Link
+                className={styles.primaryLink}
+                href={`/tailoring/${session.id}/resume`}
               >
+                Preview and download resume
+              </Link>
+              <Link href={`/tailoring/${session.id}/ats`}>
                 Continue to ATS review
-              </button>
+              </Link>
               <Link href={`/job-descriptions/${session.jobDescriptionId}`}>
                 Compare with match overview
               </Link>

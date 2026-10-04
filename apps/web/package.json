@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@make-my-resume/contracts": "workspace:*",
+    "@make-my-resume/resume-engine": "workspace:*",
     "@make-my-resume/resume-renderer": "workspace:*",
     "better-auth": "^1.7.6",
     "next": "^16.3.7",

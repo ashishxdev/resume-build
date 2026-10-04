@@ -37,6 +37,10 @@ export interface ResumeImportRepository {
     userId: string,
     importId: string,
   ): Promise<ResumeImportRecord | null>;
+  findOwnedByResumeId(
+    userId: string,
+    resumeId: string,
+  ): Promise<ResumeImportRecord | null>;
   listResumes(userId: string): Promise<ResumeSummary[]>;
   markFailed(
     userId: string,
@@ -108,6 +112,16 @@ export function createMemoryResumeImportRepository(): ResumeImportRepository {
     async findOwned(userId, importId) {
       const record = records.get(importId);
       return record?.userId === userId ? structuredClone(record) : null;
+    },
+
+    async findOwnedByResumeId(userId, resumeId) {
+      const record = [...records.values()].find(
+        (candidate) =>
+          candidate.userId === userId &&
+          candidate.resumeId === resumeId &&
+          candidate.status === "uploaded",
+      );
+      return record ? structuredClone(record) : null;
     },
 
     async listResumes(userId) {
@@ -232,6 +246,13 @@ function createMongoResumeImportRepository(
 
     async findOwned(userId, importId) {
       return imports.findOne({ id: importId, userId });
+    },
+
+    async findOwnedByResumeId(userId, resumeId) {
+      return imports.findOne(
+        { userId, resumeId, status: "uploaded" },
+        { sort: { updatedAt: -1 } },
+      );
     },
 
     async listResumes(userId) {

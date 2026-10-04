@@ -3,6 +3,10 @@ import { z } from "zod";
 import { jobDescriptionAnalysisSchema } from "../job-description/analysis.js";
 import { resumeClaimSchema } from "../resume/verification.js";
 import { suggestionStatusSchema } from "../suggestions/status.js";
+import {
+  atsAnalysisSnapshotSchema,
+  atsAnalysisStatusSchema,
+} from "../ats/analysis.js";
 
 export const tailoringSessionStatusSchema = z.enum([
   "queued",
@@ -38,6 +42,9 @@ export const tailoringSessionSchema = z.object({
   analysis: jobDescriptionAnalysisSchema,
   tailoredVersionId: z.string().nullable(),
   finalClaims: z.array(resumeClaimSchema).nullable(),
+  atsStatus: atsAnalysisStatusSchema,
+  atsFailureMessage: z.string().nullable(),
+  atsSnapshot: atsAnalysisSnapshotSchema.nullable(),
   revision: z.number().int().nonnegative(),
   createdAt: z.string(),
   updatedAt: z.string(),

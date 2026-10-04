@@ -18,6 +18,8 @@ import { createTailoringGenerator } from "../infrastructure/ai/tailoring-generat
 import { startTailoringLoop } from "../modules/tailoring/tailoring-loop.js";
 import { createTailoringRepositoryRuntime } from "../modules/tailoring/tailoring-repository.js";
 import { createTailoringService } from "../modules/tailoring/tailoring-service.js";
+import { createAtsAnalysisService } from "../modules/tailoring/ats-analysis-service.js";
+import { startAtsAnalysisLoop } from "../modules/tailoring/ats-analysis-loop.js";
 
 loadLocalEnvironmentFiles();
 
@@ -55,6 +57,9 @@ const stopTailoringLoop = startTailoringLoop(
     logger,
   ),
 );
+const stopAtsAnalysisLoop = startAtsAnalysisLoop(
+  createAtsAnalysisService(tailoringRuntime.repository, logger),
+);
 const app = createApp(
   environment,
   authRuntime.auth,
@@ -73,6 +78,8 @@ const app = createApp(
     repository: tailoringRuntime.repository,
     jobDescriptionRepository: jobDescriptionRuntime.repository,
     rateLimiter: jobAnalysisRateLimitRuntime.limiter,
+    resumeImportRepository: resumeImportRuntime.repository,
+    objectStorage,
   },
 );
 
@@ -88,6 +95,7 @@ function shutdown(signal: string) {
     stopExtractionLoop();
     stopJobAnalysisLoop();
     stopTailoringLoop();
+    stopAtsAnalysisLoop();
     if (error) {
       logger.error({ error }, "API shutdown failed");
       process.exitCode = 1;
