@@ -8,6 +8,15 @@ export const atsAnalysisStatusSchema = z.enum([
   "failed",
 ]);
 
+export const atsImprovementStatusSchema = z.enum([
+  "not_started",
+  "queued",
+  "generating",
+  "review",
+  "completed",
+  "failed",
+]);
+
 export const atsCategorySchema = z.enum([
   "keyword_coverage",
   "skill_alignment",
@@ -49,4 +58,5 @@ export const atsAnalysisStateSchema = z.object({
 });
 
 export type AtsAnalysisStatus = z.infer<typeof atsAnalysisStatusSchema>;
+export type AtsImprovementStatus = z.infer<typeof atsImprovementStatusSchema>;
 export type AtsAnalysisSnapshot = z.infer<typeof atsAnalysisSnapshotSchema>;

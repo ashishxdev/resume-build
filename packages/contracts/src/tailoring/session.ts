@@ -6,6 +6,7 @@ import { suggestionStatusSchema } from "../suggestions/status.js";
 import {
   atsAnalysisSnapshotSchema,
   atsAnalysisStatusSchema,
+  atsImprovementStatusSchema,
 } from "../ats/analysis.js";
 
 export const tailoringSessionStatusSchema = z.enum([
@@ -45,6 +46,13 @@ export const tailoringSessionSchema = z.object({
   atsStatus: atsAnalysisStatusSchema,
   atsFailureMessage: z.string().nullable(),
   atsSnapshot: atsAnalysisSnapshotSchema.nullable(),
+  atsImprovementStatus: atsImprovementStatusSchema,
+  atsImprovementFailureMessage: z.string().nullable(),
+  atsImprovementSuggestions: z.array(tailoringSuggestionSchema).max(100),
+  atsImprovedVersionId: z.string().nullable(),
+  atsImprovedClaims: z.array(resumeClaimSchema).nullable(),
+  atsImprovedSnapshot: atsAnalysisSnapshotSchema.nullable(),
+  atsImprovementActive: z.boolean(),
   revision: z.number().int().nonnegative(),
   createdAt: z.string(),
   updatedAt: z.string(),

@@ -294,9 +294,32 @@ Update this file whenever a major feature is started, completed, materially rede
   - `apps/web/components/tailoring/resume-document-page.tsx`
   - `apps/web/app/tailoring/[tailoringSessionId]/resume/page.tsx`
 
+### 14. Evidence-Backed ATS Improvement Actions
+
+- **Date:** 2026-10-05
+- **Status:** Complete
+- **Scope delivered:**
+  - Added a second durable, lease-backed Gemini generation workflow that targets only `can_improve` ATS findings connected to verified resume claims and excludes genuinely missing requirements.
+  - Added evidence-bound improvement review with original/proposed wording, requirement rationale, manual editing, accept/reject decisions, optimistic revisions, numeric-claim protection, retry handling, and shared AI quota enforcement.
+  - Create each approved improvement set as a new immutable `ats_improved` resume version in the same MongoDB transaction that completes the review, leaving the original tailored version unchanged.
+  - Re-run transparent ATS analysis for the revised version, retain both snapshots, display the before/after compatibility score, and upgrade only accepted partial requirement matches in the new snapshot.
+  - Added original/improved version switching as a reversible rollback control; preview and PDF/DOCX export resolve the currently active version.
+  - Added responsive queued, generating, failed, review, completed-comparison, and no-eligible-improvement states to the existing ATS experience.
+- **Verification:** 78 API tests, 43 web tests, and 4 resume-engine tests pass. Coverage includes owner-only durable workflow creation, operation-keyed quota idempotency, evidence-filtered generation, edited acceptance and reload restoration, deterministic prevention of score increases for unchanged wording, immutable revised-version creation, legitimate score improvement, revised snapshot binding, rollback state, and frontend review interaction. Workspace type checking, linting, Prettier validation, production builds, and `git diff --check` pass.
+- **Important limitations:** Live Gemini output was not invoked during automated verification, and the completed responsive workflow has not yet received a fresh manual browser/visual QA pass. Version history is persisted in `resume_versions`, but a full user-facing history timeline and retention/deletion management remain the next milestone.
+- **Primary files:**
+  - `packages/contracts/src/ats/analysis.ts`
+  - `packages/contracts/src/tailoring/session.ts`
+  - `apps/api/src/modules/tailoring/tailoring-repository.ts`
+  - `apps/api/src/modules/tailoring/tailoring-service.ts`
+  - `apps/api/src/http/routes/tailoring.ts`
+  - `apps/web/components/tailoring/ats-analysis-page.tsx`
+  - `apps/web/components/tailoring/resume-document-page.tsx`
+  - `apps/web/lib/tailoring/client.ts`
+
 ## Next Major Milestone
 
-ATS improvement actions are next: turn eligible “can improve” findings into evidence-bound accept/reject suggestions while keeping genuinely missing skills informational and preserving the completed tailored version as immutable history. Additional resume templates, presentation controls, saved export artifacts, and sharing can build on the canonical document model after that workflow is stable.
+Resume version history and management are next: expose the immutable baseline, tailored, and ATS-improved versions in a user-facing timeline with names, timestamps, comparison, restore controls, and deletion/retention rules. Additional resume templates, presentation controls, saved export artifacts, and sharing can build on the canonical document model after version management is stable.
 
 ## Status Definitions
 

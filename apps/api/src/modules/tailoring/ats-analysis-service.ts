@@ -59,6 +59,23 @@ function tokens(value: string) {
   return [...normalized];
 }
 
+export function hasImprovedRequirementCoverage(
+  requirement: JobRequirement,
+  originalText: string,
+  finalText: string,
+) {
+  if (originalText.trim() === finalText.trim()) return false;
+  const requirementTokens = tokens(
+    `${requirement.label} ${requirement.sourceQuote}`,
+  );
+  if (!requirementTokens.length) return false;
+  const originalTokens = new Set(tokens(originalText));
+  const finalTokens = new Set(tokens(finalText));
+  const count = (values: Set<string>) =>
+    requirementTokens.filter((token) => values.has(token)).length;
+  return count(finalTokens) > count(originalTokens);
+}
+
 function clamp(value: number) {
   return Math.max(0, Math.min(100, Math.round(value)));
 }

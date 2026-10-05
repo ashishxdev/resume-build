@@ -14,6 +14,11 @@ import type { JobDescriptionRepository } from "../../modules/job-descriptions/jo
 import type { ResumeObjectStorage } from "../../infrastructure/storage/r2-object-storage.js";
 import type { ResumeImportRepository } from "../../modules/resumes/resume-import-repository.js";
 import {
+  analyzeAts,
+  hasImprovedRequirementCoverage,
+} from "../../modules/tailoring/ats-analysis-service.js";
+import {
+  applySuggestionDecisions,
   TailoringConcurrencyError,
   type TailoringRepository,
   type TailoringSessionRecord,
@@ -22,6 +27,7 @@ import {
   extractPdfLiveLinks,
   renderProfessionalResume,
 } from "../../modules/tailoring/resume-export-service.js";
+import { createId } from "../../shared/ids/create-id.js";
 
 export interface TailoringRouteServices {
   repository: TailoringRepository;
@@ -73,6 +79,13 @@ function serialize(record: TailoringSessionRecord): TailoringSession {
     atsStatus: record.atsStatus ?? "not_started",
     atsFailureMessage: record.atsFailureMessage ?? null,
     atsSnapshot: record.atsSnapshot ?? null,
+    atsImprovementStatus: record.atsImprovementStatus ?? "not_started",
+    atsImprovementFailureMessage: record.atsImprovementFailureMessage ?? null,
+    atsImprovementSuggestions: record.atsImprovementSuggestions ?? [],
+    atsImprovedVersionId: record.atsImprovedVersionId ?? null,
+    atsImprovedClaims: record.atsImprovedClaims ?? null,
+    atsImprovedSnapshot: record.atsImprovedSnapshot ?? null,
+    atsImprovementActive: record.atsImprovementActive ?? false,
     revision: record.revision,
     createdAt: record.createdAt.toISOString(),
     updatedAt: record.updatedAt.toISOString(),
@@ -127,7 +140,11 @@ export function createTailoringRouter(
         );
         if (existing)
           return response.status(200).json({ data: serialize(existing) });
-        const quota = await services.rateLimiter.consume(ownerId);
+        const quota = await services.rateLimiter.consume(
+          ownerId,
+          undefined,
+          `tailoring:${job.id}`,
+        );
         if (!quota.allowed) {
           response.setHeader("Retry-After", String(quota.retryAfterSeconds));
           return sendError(
@@ -227,10 +244,14 @@ export function createTailoringRouter(
             "TAILORED_VERSION_REQUIRED",
             "Complete the tailored version before exporting it.",
           );
+        const exportClaims =
+          record.atsImprovementActive && record.atsImprovedClaims
+            ? record.atsImprovedClaims
+            : record.finalClaims;
         const tailoredClaimIds = record.suggestions
           .filter((suggestion) => suggestion.status === "accepted")
           .map((suggestion) => suggestion.sourceClaimId);
-        const document = buildProfessionalResumeDocument(record.finalClaims, {
+        const document = buildProfessionalResumeDocument(exportClaims, {
           tailoredClaimIds,
         });
         let sourceProjectLinks: string[] = [];
@@ -341,6 +362,331 @@ export function createTailoringRouter(
             "This ATS analysis cannot be retried.",
           );
         response.status(202).json({ data: serialize(record) });
+      } catch (error) {
+        next(error);
+      }
+    },
+  );
+
+  router.post(
+    "/api/v1/tailoring-sessions/:id/ats-improvements",
+    async (request, response, next) => {
+      try {
+        const ownerId = await requireUser(request, response);
+        if (!ownerId) return;
+        const current = await services.repository.findOwned(
+          ownerId,
+          request.params.id,
+        );
+        if (!current)
+          return sendError(
+            response,
+            404,
+            "TAILORING_SESSION_NOT_FOUND",
+            "Tailoring session was not found.",
+          );
+        if ((current.atsImprovementStatus ?? "not_started") !== "not_started")
+          return response.status(200).json({ data: serialize(current) });
+        const eligible = current.atsSnapshot?.findings.some(
+          (finding) =>
+            finding.type === "can_improve" && finding.resumeClaimIds.length > 0,
+        );
+        if (!eligible)
+          return sendError(
+            response,
+            409,
+            "NO_ELIGIBLE_ATS_IMPROVEMENTS",
+            "No evidence-backed ATS improvements are available. Missing requirements remain informational.",
+          );
+        const quota = await services.rateLimiter.consume(
+          ownerId,
+          undefined,
+          `ats-improvement:${current.id}`,
+        );
+        if (!quota.allowed) {
+          response.setHeader("Retry-After", String(quota.retryAfterSeconds));
+          return sendError(
+            response,
+            429,
+            "AI_TAILORING_RATE_LIMITED",
+            "You have reached the hourly AI limit. Try again later.",
+          );
+        }
+        const updated = await services.repository.queueAtsImprovement(
+          ownerId,
+          current.id,
+        );
+        if (!updated)
+          return sendError(
+            response,
+            409,
+            "ATS_IMPROVEMENT_STATE_CHANGED",
+            "The ATS improvement state changed. Refresh and try again.",
+          );
+        response.status(202).json({ data: serialize(updated) });
+      } catch (error) {
+        next(error);
+      }
+    },
+  );
+
+  router.post(
+    "/api/v1/tailoring-sessions/:id/ats-improvements/retry",
+    async (request, response, next) => {
+      try {
+        const ownerId = await requireUser(request, response);
+        if (!ownerId) return;
+        const current = await services.repository.findOwned(
+          ownerId,
+          request.params.id,
+        );
+        if (!current || current.atsImprovementStatus !== "failed")
+          return sendError(
+            response,
+            409,
+            "ATS_IMPROVEMENT_NOT_RETRYABLE",
+            "These ATS improvements cannot be retried.",
+          );
+        const quota = await services.rateLimiter.consume(
+          ownerId,
+          undefined,
+          `ats-improvement-retry:${current.id}:${current.revision}`,
+        );
+        if (!quota.allowed) {
+          response.setHeader("Retry-After", String(quota.retryAfterSeconds));
+          return sendError(
+            response,
+            429,
+            "AI_TAILORING_RATE_LIMITED",
+            "You have reached the hourly AI limit. Try again later.",
+          );
+        }
+        const updated = await services.repository.retryAtsImprovement(
+          ownerId,
+          current.id,
+        );
+        if (!updated)
+          return sendError(
+            response,
+            409,
+            "ATS_IMPROVEMENT_NOT_RETRYABLE",
+            "These ATS improvements cannot be retried.",
+          );
+        response.status(202).json({ data: serialize(updated) });
+      } catch (error) {
+        next(error);
+      }
+    },
+  );
+
+  router.patch(
+    "/api/v1/tailoring-sessions/:id/ats-improvements/active",
+    async (request, response, next) => {
+      try {
+        const ownerId = await requireUser(request, response);
+        if (!ownerId) return;
+        if (typeof request.body?.active !== "boolean")
+          return sendError(
+            response,
+            400,
+            "INVALID_ACTIVE_VERSION",
+            "Choose whether to use the original or improved version.",
+          );
+        const updated = await services.repository.setAtsImprovementActive(
+          ownerId,
+          request.params.id,
+          request.body.active,
+        );
+        if (!updated)
+          return sendError(
+            response,
+            409,
+            "ATS_IMPROVEMENT_STATE_CHANGED",
+            "The improved version is unavailable.",
+          );
+        response.json({ data: serialize(updated) });
+      } catch (error) {
+        next(error);
+      }
+    },
+  );
+
+  router.post(
+    "/api/v1/tailoring-sessions/:id/ats-improvements/complete",
+    async (request, response, next) => {
+      try {
+        const ownerId = await requireUser(request, response);
+        if (!ownerId) return;
+        const parsed = completeTailoringSessionRequestSchema.safeParse(
+          request.body,
+        );
+        if (!parsed.success)
+          return sendError(
+            response,
+            400,
+            "INVALID_REVISION",
+            "A current revision is required.",
+          );
+        const current = await services.repository.findOwned(
+          ownerId,
+          request.params.id,
+        );
+        if (!current)
+          return sendError(
+            response,
+            404,
+            "TAILORING_SESSION_NOT_FOUND",
+            "Tailoring session was not found.",
+          );
+        if (
+          !current.finalClaims ||
+          current.atsImprovementStatus !== "review" ||
+          current.atsImprovementSuggestions.some(
+            (suggestion) => suggestion.status === "pending",
+          )
+        )
+          return sendError(
+            response,
+            409,
+            "PENDING_ATS_IMPROVEMENT_DECISIONS",
+            "Accept or reject every improvement before creating a revised version.",
+          );
+        if (
+          !current.atsImprovementSuggestions.some(
+            (suggestion) => suggestion.status === "accepted",
+          )
+        )
+          return sendError(
+            response,
+            409,
+            "NO_ACCEPTED_ATS_IMPROVEMENTS",
+            "Accept at least one evidence-backed improvement first.",
+          );
+        const claims = applySuggestionDecisions(
+          current.finalClaims,
+          current.atsImprovementSuggestions,
+        );
+        const finalClaimsById = new Map(
+          claims.map((claim) => [claim.id, claim]),
+        );
+        const requirementsById = new Map(
+          current.analysis.requirements.map((requirement) => [
+            requirement.id,
+            requirement,
+          ]),
+        );
+        const improvedRequirementIds = new Set<string>();
+        for (const suggestion of current.atsImprovementSuggestions) {
+          if (suggestion.status !== "accepted") continue;
+          const finalClaim = finalClaimsById.get(suggestion.sourceClaimId);
+          if (!finalClaim) continue;
+          for (const requirementId of suggestion.requirementIds) {
+            const requirement = requirementsById.get(requirementId);
+            if (
+              requirement &&
+              hasImprovedRequirementCoverage(
+                requirement,
+                suggestion.originalText,
+                finalClaim.value,
+              )
+            ) {
+              improvedRequirementIds.add(requirementId);
+            }
+          }
+        }
+        const versionId = createId("version");
+        const snapshot = analyzeAts({
+          ...current,
+          finalClaims: claims,
+          tailoredVersionId: versionId,
+          analysis: {
+            ...current.analysis,
+            matches: current.analysis.matches.map((match) =>
+              match.status === "partial" &&
+              improvedRequirementIds.has(match.requirementId)
+                ? { ...match, status: "strong" as const }
+                : match,
+            ),
+          },
+        });
+        const updated = await services.repository.completeAtsImprovement(
+          ownerId,
+          current.id,
+          parsed.data.revision,
+          { claims, versionId, snapshot },
+        );
+        if (!updated)
+          return sendError(
+            response,
+            409,
+            "ATS_IMPROVEMENT_STATE_CHANGED",
+            "The improvement review changed. Refresh and try again.",
+          );
+        response.json({ data: serialize(updated) });
+      } catch (error) {
+        next(error);
+      }
+    },
+  );
+
+  router.patch(
+    "/api/v1/tailoring-sessions/:id/ats-improvements/:suggestionId",
+    async (request, response, next) => {
+      try {
+        const ownerId = await requireUser(request, response);
+        if (!ownerId) return;
+        const parsed = updateTailoringSuggestionRequestSchema.safeParse(
+          request.body,
+        );
+        if (!parsed.success)
+          return sendError(
+            response,
+            400,
+            "INVALID_ATS_IMPROVEMENT_DECISION",
+            parsed.error.issues[0]?.message ?? "Enter a valid decision.",
+          );
+        const current = await services.repository.findOwned(
+          ownerId,
+          request.params.id,
+        );
+        const suggestion = current?.atsImprovementSuggestions?.find(
+          (candidate) => candidate.id === request.params.suggestionId,
+        );
+        if (!current || !suggestion)
+          return sendError(
+            response,
+            404,
+            "ATS_IMPROVEMENT_NOT_FOUND",
+            "ATS improvement was not found.",
+          );
+        if (parsed.data.editedText) {
+          const originalNumbers = numericTokens(suggestion.originalText);
+          const introducesNumber = [
+            ...numericTokens(parsed.data.editedText),
+          ].some((token) => !originalNumbers.has(token));
+          if (introducesNumber)
+            return sendError(
+              response,
+              400,
+              "UNSUPPORTED_NUMERIC_CLAIM",
+              "Edited wording cannot introduce a number that is absent from the verified source.",
+            );
+        }
+        const updated = await services.repository.decideAtsImprovement(
+          ownerId,
+          current.id,
+          suggestion.id,
+          parsed.data.revision,
+          parsed.data,
+        );
+        if (!updated)
+          return sendError(
+            response,
+            409,
+            "ATS_IMPROVEMENT_STATE_CHANGED",
+            "The improvement review changed. Refresh and try again.",
+          );
+        response.json({ data: serialize(updated) });
       } catch (error) {
         next(error);
       }

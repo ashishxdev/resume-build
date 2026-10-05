@@ -92,6 +92,52 @@ export function retryAtsAnalysis(id: string) {
   );
 }
 
+export function startAtsImprovements(id: string) {
+  return request(
+    `/api/v1/tailoring-sessions/${encodeURIComponent(id)}/ats-improvements`,
+    { method: "POST" },
+  );
+}
+
+export function retryAtsImprovements(id: string) {
+  return request(
+    `/api/v1/tailoring-sessions/${encodeURIComponent(id)}/ats-improvements/retry`,
+    { method: "POST" },
+  );
+}
+
+export function decideAtsImprovement(
+  session: TailoringSession,
+  suggestionId: string,
+  status: "accepted" | "rejected",
+  editedText?: string | null,
+) {
+  return request(
+    `/api/v1/tailoring-sessions/${encodeURIComponent(session.id)}/ats-improvements/${encodeURIComponent(suggestionId)}`,
+    {
+      method: "PATCH",
+      body: JSON.stringify({ revision: session.revision, status, editedText }),
+    },
+  );
+}
+
+export function completeAtsImprovements(session: TailoringSession) {
+  return request(
+    `/api/v1/tailoring-sessions/${encodeURIComponent(session.id)}/ats-improvements/complete`,
+    {
+      method: "POST",
+      body: JSON.stringify({ revision: session.revision }),
+    },
+  );
+}
+
+export function setAtsImprovedVersionActive(id: string, active: boolean) {
+  return request(
+    `/api/v1/tailoring-sessions/${encodeURIComponent(id)}/ats-improvements/active`,
+    { method: "PATCH", body: JSON.stringify({ active }) },
+  );
+}
+
 export function decideSuggestion(
   session: TailoringSession,
   suggestionId: string,

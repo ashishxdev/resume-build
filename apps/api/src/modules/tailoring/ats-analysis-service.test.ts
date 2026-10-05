@@ -1,7 +1,10 @@
 import type { TailoringSessionRecord } from "./tailoring-repository.js";
 import { describe, expect, it } from "vitest";
 
-import { analyzeAts } from "./ats-analysis-service.js";
+import {
+  analyzeAts,
+  hasImprovedRequirementCoverage,
+} from "./ats-analysis-service.js";
 
 const record = {
   id: "tailor_1",
@@ -98,11 +101,39 @@ const record = {
   atsAttempts: 1,
   atsProcessingToken: "lease_1",
   atsLeaseExpiresAt: new Date(),
+  atsImprovementStatus: "not_started",
+  atsImprovementFailureMessage: null,
+  atsImprovementSuggestions: [],
+  atsImprovedVersionId: null,
+  atsImprovedClaims: null,
+  atsImprovedSnapshot: null,
+  atsImprovementActive: false,
+  atsImprovementAttempts: 0,
+  atsImprovementProcessingToken: null,
+  atsImprovementLeaseExpiresAt: null,
   createdAt: new Date(),
   updatedAt: new Date(),
 } satisfies TailoringSessionRecord;
 
 describe("ATS analysis", () => {
+  it("upgrades a requirement only when finalized text improves token coverage", () => {
+    const requirement = record.analysis.requirements[0]!;
+    expect(
+      hasImprovedRequirementCoverage(
+        requirement,
+        "Built APIs with Node.js.",
+        "Built APIs with Node.js.",
+      ),
+    ).toBe(false);
+    expect(
+      hasImprovedRequirementCoverage(
+        requirement,
+        "Built APIs with Node.js.",
+        "Built TypeScript APIs with Node.js.",
+      ),
+    ).toBe(true);
+  });
+
   it("scores the bound tailored version and keeps unsupported requirements missing", () => {
     const snapshot = analyzeAts(record);
     expect(snapshot.tailoredVersionId).toBe("version_tailored");

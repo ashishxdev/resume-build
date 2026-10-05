@@ -363,6 +363,49 @@
   line-height: 1.7;
 }
 
+.atsImprovementCta,
+.atsVersionCompare {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 2rem;
+  margin-top: 1.5rem;
+  padding: 2rem;
+  border: 1px solid #dcd3e3;
+  background: white;
+}
+.atsImprovementCta h2,
+.atsVersionCompare h2 {
+  margin: 0.45rem 0 0.6rem;
+  font:
+    700 1.65rem Georgia,
+    serif;
+  color: #291841;
+}
+.atsImprovementCta p,
+.atsVersionCompare p {
+  max-width: 680px;
+  margin: 0;
+  color: #665d6b;
+  line-height: 1.6;
+}
+.atsImprovementCta button,
+.atsVersionCompare button {
+  flex: 0 0 auto;
+  border: 1px solid #2b1742;
+  border-radius: 4px;
+  padding: 0.85rem 1.2rem;
+  background: #2b1742;
+  color: white;
+  font-weight: 700;
+  cursor: pointer;
+}
+.atsImprovementCta button:disabled,
+.atsVersionCompare button:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+
 .atsLoading {
   min-height: 70vh;
   display: flex;
@@ -410,6 +453,12 @@
   .atsMethod {
     grid-template-columns: 1fr;
     gap: 1rem;
+    padding: 1.5rem;
+  }
+  .atsImprovementCta,
+  .atsVersionCompare {
+    align-items: stretch;
+    flex-direction: column;
     padding: 1.5rem;
   }
 }

@@ -63,7 +63,11 @@ export function ResumeDocumentPage() {
 
   const document = useMemo(() => {
     if (!session?.finalClaims) return null;
-    return buildProfessionalResumeDocument(session.finalClaims, {
+    const claims =
+      session.atsImprovementActive && session.atsImprovedClaims
+        ? session.atsImprovedClaims
+        : session.finalClaims;
+    return buildProfessionalResumeDocument(claims, {
       tailoredClaimIds: session.suggestions
         .filter((suggestion) => suggestion.status === "accepted")
         .map((suggestion) => suggestion.sourceClaimId),

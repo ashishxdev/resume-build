@@ -13,10 +13,83 @@ export function createTailoringService(
   generator: TailoringGenerator | null,
   logger: Logger,
 ) {
+  async function processImprovement() {
+    const record = await repository.claimNextAtsImprovement();
+    if (!record?.atsImprovementProcessingToken) return false;
+    if (!generator || !record.atsSnapshot || !record.finalClaims) {
+      await repository.failAtsImprovement(
+        record.id,
+        record.atsImprovementProcessingToken,
+        generator
+          ? "The saved ATS analysis is unavailable. Run it again before improving this version."
+          : "AI tailoring is not configured. Add the Gemini provider settings and try again.",
+      );
+      return true;
+    }
+    const eligibleFindings = record.atsSnapshot.findings.filter(
+      (finding) =>
+        finding.type === "can_improve" && finding.resumeClaimIds.length > 0,
+    );
+    const requirementIds = new Set(
+      eligibleFindings.flatMap((finding) => finding.requirementIds),
+    );
+    const claimIds = new Set(
+      eligibleFindings.flatMap((finding) => finding.resumeClaimIds),
+    );
+    try {
+      const output = await generator.generate({
+        rawJobDescription: record.rawJobDescription,
+        analysis: {
+          ...record.analysis,
+          requirements: record.analysis.requirements.filter((requirement) =>
+            requirementIds.has(requirement.id),
+          ),
+          matches: record.analysis.matches.filter(
+            (match) =>
+              requirementIds.has(match.requirementId) &&
+              match.status !== "missing",
+          ),
+        },
+        evidenceClaims: record.finalClaims.filter((claim) =>
+          claimIds.has(claim.id),
+        ),
+      });
+      const updated = await repository.generatedAtsImprovement(
+        record.id,
+        record.atsImprovementProcessingToken,
+        output.suggestions,
+      );
+      if (!updated)
+        logger.warn(
+          { tailoringSessionId: record.id },
+          "ATS improvement completion lost its processing lease",
+        );
+    } catch (error) {
+      const status =
+        typeof error === "object" && error !== null && "status" in error
+          ? Number(error.status)
+          : null;
+      const message = error instanceof Error ? error.message : "";
+      const unavailable =
+        [429, 503, 504].includes(status ?? 0) ||
+        /timeout|high demand|temporarily unavailable/i.test(message);
+      await repository.failAtsImprovement(
+        record.id,
+        record.atsImprovementProcessingToken,
+        unavailable ? busyFailure : genericFailure,
+      );
+      logger.warn(
+        { tailoringSessionId: record.id, providerStatus: status },
+        "ATS improvement provider request failed",
+      );
+    }
+    return true;
+  }
+
   return {
     async processNext() {
       const record = await repository.claimNext();
-      if (!record?.processingToken) return false;
+      if (!record?.processingToken) return processImprovement();
       if (!generator) {
         await repository.fail(
           record.id,

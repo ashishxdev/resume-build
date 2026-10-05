@@ -1,6 +1,7 @@
 import type {
   AtsAnalysisSnapshot,
   AtsAnalysisStatus,
+  AtsImprovementStatus,
   JobDescriptionAnalysis,
   ResumeClaim,
   TailoringSessionStatus,
@@ -46,6 +47,16 @@ export interface TailoringSessionRecord {
   atsAttempts: number;
   atsProcessingToken: string | null;
   atsLeaseExpiresAt: Date | null;
+  atsImprovementStatus: AtsImprovementStatus;
+  atsImprovementFailureMessage: string | null;
+  atsImprovementSuggestions: TailoringSuggestion[];
+  atsImprovedVersionId: string | null;
+  atsImprovedClaims: ResumeClaim[] | null;
+  atsImprovedSnapshot: AtsAnalysisSnapshot | null;
+  atsImprovementActive: boolean;
+  atsImprovementAttempts: number;
+  atsImprovementProcessingToken: string | null;
+  atsImprovementLeaseExpiresAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -123,6 +134,50 @@ export interface TailoringRepository {
     message: string,
   ): Promise<TailoringSessionRecord | null>;
   retryAts(userId: string, id: string): Promise<TailoringSessionRecord | null>;
+  queueAtsImprovement(
+    userId: string,
+    id: string,
+  ): Promise<TailoringSessionRecord | null>;
+  claimNextAtsImprovement(): Promise<TailoringSessionRecord | null>;
+  generatedAtsImprovement(
+    id: string,
+    processingToken: string,
+    suggestions: TailoringSuggestion[],
+  ): Promise<TailoringSessionRecord | null>;
+  failAtsImprovement(
+    id: string,
+    processingToken: string,
+    message: string,
+  ): Promise<TailoringSessionRecord | null>;
+  retryAtsImprovement(
+    userId: string,
+    id: string,
+  ): Promise<TailoringSessionRecord | null>;
+  decideAtsImprovement(
+    userId: string,
+    id: string,
+    suggestionId: string,
+    expectedRevision: number,
+    decision: {
+      status: "accepted" | "rejected";
+      editedText?: string | null;
+    },
+  ): Promise<TailoringSessionRecord | null>;
+  completeAtsImprovement(
+    userId: string,
+    id: string,
+    expectedRevision: number,
+    output: {
+      claims: ResumeClaim[];
+      versionId: string;
+      snapshot: AtsAnalysisSnapshot;
+    },
+  ): Promise<TailoringSessionRecord | null>;
+  setAtsImprovementActive(
+    userId: string,
+    id: string,
+    active: boolean,
+  ): Promise<TailoringSessionRecord | null>;
 }
 
 function clone(record: TailoringSessionRecord) {
@@ -137,6 +192,25 @@ function buildFinalClaims(record: TailoringSessionRecord) {
     ]),
   );
   return record.evidenceClaims.map((claim) => {
+    const suggestion = decisions.get(claim.id);
+    if (!suggestion || suggestion.status !== "accepted")
+      return cloneClaim(claim);
+    return {
+      ...cloneClaim(claim),
+      value: suggestion.editedText ?? suggestion.suggestedText,
+      status: "edited" as const,
+    };
+  });
+}
+
+export function applySuggestionDecisions(
+  claims: ResumeClaim[],
+  suggestions: TailoringSuggestion[],
+) {
+  const decisions = new Map(
+    suggestions.map((suggestion) => [suggestion.sourceClaimId, suggestion]),
+  );
+  return claims.map((claim) => {
     const suggestion = decisions.get(claim.id);
     if (!suggestion || suggestion.status !== "accepted")
       return cloneClaim(claim);
@@ -177,6 +251,16 @@ function newRecord(
     atsAttempts: 0,
     atsProcessingToken: null,
     atsLeaseExpiresAt: null,
+    atsImprovementStatus: "not_started",
+    atsImprovementFailureMessage: null,
+    atsImprovementSuggestions: [],
+    atsImprovedVersionId: null,
+    atsImprovedClaims: null,
+    atsImprovedSnapshot: null,
+    atsImprovementActive: false,
+    atsImprovementAttempts: 0,
+    atsImprovementProcessingToken: null,
+    atsImprovementLeaseExpiresAt: null,
     createdAt: now,
     updatedAt: now,
   };
@@ -463,6 +547,163 @@ export function createMemoryTailoringRepository(): TailoringRepository {
       record.updatedAt = new Date();
       return clone(record);
     },
+    async queueAtsImprovement(userId, id) {
+      const record = records.get(id);
+      if (
+        !record ||
+        record.userId !== userId ||
+        record.atsStatus !== "completed" ||
+        !record.atsSnapshot ||
+        !record.finalClaims
+      )
+        return null;
+      if (record.atsImprovementStatus !== "not_started") return clone(record);
+      const eligible = record.atsSnapshot.findings.some(
+        (finding) =>
+          finding.type === "can_improve" && finding.resumeClaimIds.length > 0,
+      );
+      if (!eligible) return null;
+      record.atsImprovementStatus = "queued";
+      record.atsImprovementFailureMessage = null;
+      record.atsImprovementAttempts = 0;
+      record.updatedAt = new Date();
+      return clone(record);
+    },
+    async claimNextAtsImprovement() {
+      const now = new Date();
+      for (const record of records.values()) {
+        if (
+          record.atsImprovementStatus === "generating" &&
+          record.atsImprovementLeaseExpiresAt &&
+          record.atsImprovementLeaseExpiresAt <= now &&
+          record.atsImprovementAttempts >= maximumAttempts
+        ) {
+          record.atsImprovementStatus = "failed";
+          record.atsImprovementFailureMessage =
+            "Improvement generation stopped unexpectedly. Please try again.";
+          record.atsImprovementProcessingToken = null;
+          record.atsImprovementLeaseExpiresAt = null;
+        }
+      }
+      const record = [...records.values()].find(
+        (candidate) =>
+          candidate.atsImprovementAttempts < maximumAttempts &&
+          (candidate.atsImprovementStatus === "queued" ||
+            (candidate.atsImprovementStatus === "generating" &&
+              candidate.atsImprovementLeaseExpiresAt !== null &&
+              candidate.atsImprovementLeaseExpiresAt <= now)),
+      );
+      if (!record) return null;
+      record.atsImprovementStatus = "generating";
+      record.atsImprovementAttempts += 1;
+      record.atsImprovementProcessingToken = createId("lease");
+      record.atsImprovementLeaseExpiresAt = new Date(
+        now.getTime() + tailoringLeaseMilliseconds,
+      );
+      record.updatedAt = now;
+      return clone(record);
+    },
+    async generatedAtsImprovement(id, token, suggestions) {
+      const record = records.get(id);
+      if (
+        !record ||
+        record.atsImprovementStatus !== "generating" ||
+        record.atsImprovementProcessingToken !== token
+      )
+        return null;
+      record.atsImprovementStatus = "review";
+      record.atsImprovementSuggestions = structuredClone(suggestions);
+      record.atsImprovementFailureMessage = null;
+      record.atsImprovementProcessingToken = null;
+      record.atsImprovementLeaseExpiresAt = null;
+      record.revision += 1;
+      record.updatedAt = new Date();
+      return clone(record);
+    },
+    async failAtsImprovement(id, token, message) {
+      const record = records.get(id);
+      if (
+        !record ||
+        record.atsImprovementStatus !== "generating" ||
+        record.atsImprovementProcessingToken !== token
+      )
+        return null;
+      record.atsImprovementStatus = "failed";
+      record.atsImprovementFailureMessage = message;
+      record.atsImprovementProcessingToken = null;
+      record.atsImprovementLeaseExpiresAt = null;
+      record.updatedAt = new Date();
+      return clone(record);
+    },
+    async retryAtsImprovement(userId, id) {
+      const record = records.get(id);
+      if (
+        !record ||
+        record.userId !== userId ||
+        record.atsImprovementStatus !== "failed"
+      )
+        return null;
+      record.atsImprovementStatus = "queued";
+      record.atsImprovementFailureMessage = null;
+      record.atsImprovementAttempts = 0;
+      record.updatedAt = new Date();
+      return clone(record);
+    },
+    async decideAtsImprovement(userId, id, suggestionId, revision, decision) {
+      const record = records.get(id);
+      const suggestion = record?.atsImprovementSuggestions.find(
+        (candidate) => candidate.id === suggestionId,
+      );
+      if (
+        !record ||
+        !suggestion ||
+        record.userId !== userId ||
+        record.atsImprovementStatus !== "review" ||
+        record.revision !== revision
+      )
+        return null;
+      suggestion.status = decision.status;
+      suggestion.editedText =
+        decision.status === "accepted" ? (decision.editedText ?? null) : null;
+      record.revision += 1;
+      record.updatedAt = new Date();
+      return clone(record);
+    },
+    async completeAtsImprovement(userId, id, revision, output) {
+      const record = records.get(id);
+      if (
+        !record ||
+        record.userId !== userId ||
+        record.atsImprovementStatus !== "review" ||
+        record.revision !== revision ||
+        record.atsImprovementSuggestions.some(
+          (suggestion) => suggestion.status === "pending",
+        )
+      )
+        return null;
+      record.atsImprovementStatus = "completed";
+      record.atsImprovedClaims = structuredClone(output.claims);
+      record.atsImprovedVersionId = output.versionId;
+      record.atsImprovedSnapshot = structuredClone(output.snapshot);
+      record.atsImprovementActive = true;
+      record.revision += 1;
+      record.updatedAt = new Date();
+      return clone(record);
+    },
+    async setAtsImprovementActive(userId, id, active) {
+      const record = records.get(id);
+      if (
+        !record ||
+        record.userId !== userId ||
+        record.atsImprovementStatus !== "completed" ||
+        !record.atsImprovedVersionId
+      )
+        return null;
+      record.atsImprovementActive = active;
+      record.revision += 1;
+      record.updatedAt = new Date();
+      return clone(record);
+    },
   };
 }
 
@@ -505,6 +746,11 @@ export function createMongoTailoringRepository(
         createdAt: 1,
       }),
       records.createIndex({ atsStatus: 1, atsLeaseExpiresAt: 1, updatedAt: 1 }),
+      records.createIndex({
+        atsImprovementStatus: 1,
+        atsImprovementLeaseExpiresAt: 1,
+        updatedAt: 1,
+      }),
     ]));
   return {
     async create(input) {
@@ -842,6 +1088,238 @@ export function createMongoTailoringRepository(
             atsAttempts: 0,
             updatedAt: new Date(),
           },
+        },
+        { returnDocument: "after" },
+      );
+    },
+    async queueAtsImprovement(userId, id) {
+      const current = await records.findOne({
+        userId,
+        id,
+        status: "completed",
+        atsStatus: "completed",
+      });
+      if (!current?.atsSnapshot || !current.finalClaims) return null;
+      if ((current.atsImprovementStatus ?? "not_started") !== "not_started")
+        return current;
+      const eligible = current.atsSnapshot.findings.some(
+        (finding) =>
+          finding.type === "can_improve" && finding.resumeClaimIds.length > 0,
+      );
+      if (!eligible) return null;
+      return records.findOneAndUpdate(
+        {
+          userId,
+          id,
+          $or: [
+            { atsImprovementStatus: "not_started" },
+            { atsImprovementStatus: { $exists: false } },
+          ],
+        },
+        {
+          $set: {
+            atsImprovementStatus: "queued",
+            atsImprovementFailureMessage: null,
+            atsImprovementSuggestions: [],
+            atsImprovementAttempts: 0,
+            atsImprovementProcessingToken: null,
+            atsImprovementLeaseExpiresAt: null,
+            updatedAt: new Date(),
+          },
+        },
+        { returnDocument: "after" },
+      );
+    },
+    async claimNextAtsImprovement() {
+      await ensureIndexes();
+      const now = new Date();
+      const expired = { atsImprovementLeaseExpiresAt: { $lte: now } };
+      await records.updateMany(
+        {
+          atsImprovementStatus: "generating",
+          atsImprovementAttempts: { $gte: maximumAttempts },
+          ...expired,
+        },
+        {
+          $set: {
+            atsImprovementStatus: "failed",
+            atsImprovementFailureMessage:
+              "Improvement generation stopped unexpectedly. Please try again.",
+            atsImprovementProcessingToken: null,
+            atsImprovementLeaseExpiresAt: null,
+            updatedAt: now,
+          },
+        },
+      );
+      return records.findOneAndUpdate(
+        {
+          atsImprovementAttempts: { $lt: maximumAttempts },
+          $or: [
+            { atsImprovementStatus: "queued" },
+            { atsImprovementStatus: "generating", ...expired },
+          ],
+        },
+        {
+          $set: {
+            atsImprovementStatus: "generating",
+            atsImprovementProcessingToken: createId("lease"),
+            atsImprovementLeaseExpiresAt: new Date(
+              now.getTime() + tailoringLeaseMilliseconds,
+            ),
+            updatedAt: now,
+          },
+          $inc: { atsImprovementAttempts: 1 },
+        },
+        { returnDocument: "after", sort: { updatedAt: 1 } },
+      );
+    },
+    async generatedAtsImprovement(id, token, suggestions) {
+      return records.findOneAndUpdate(
+        {
+          id,
+          atsImprovementStatus: "generating",
+          atsImprovementProcessingToken: token,
+        },
+        {
+          $set: {
+            atsImprovementStatus: "review",
+            atsImprovementSuggestions: suggestions,
+            atsImprovementFailureMessage: null,
+            atsImprovementProcessingToken: null,
+            atsImprovementLeaseExpiresAt: null,
+            updatedAt: new Date(),
+          },
+          $inc: { revision: 1 },
+        },
+        { returnDocument: "after" },
+      );
+    },
+    async failAtsImprovement(id, token, message) {
+      return records.findOneAndUpdate(
+        {
+          id,
+          atsImprovementStatus: "generating",
+          atsImprovementProcessingToken: token,
+        },
+        {
+          $set: {
+            atsImprovementStatus: "failed",
+            atsImprovementFailureMessage: message,
+            atsImprovementProcessingToken: null,
+            atsImprovementLeaseExpiresAt: null,
+            updatedAt: new Date(),
+          },
+        },
+        { returnDocument: "after" },
+      );
+    },
+    async retryAtsImprovement(userId, id) {
+      return records.findOneAndUpdate(
+        { userId, id, atsImprovementStatus: "failed" },
+        {
+          $set: {
+            atsImprovementStatus: "queued",
+            atsImprovementFailureMessage: null,
+            atsImprovementAttempts: 0,
+            updatedAt: new Date(),
+          },
+        },
+        { returnDocument: "after" },
+      );
+    },
+    async decideAtsImprovement(userId, id, suggestionId, revision, decision) {
+      return records.findOneAndUpdate(
+        {
+          userId,
+          id,
+          atsImprovementStatus: "review",
+          revision,
+          "atsImprovementSuggestions.id": suggestionId,
+        },
+        {
+          $set: {
+            "atsImprovementSuggestions.$.status": decision.status,
+            "atsImprovementSuggestions.$.editedText":
+              decision.status === "accepted"
+                ? (decision.editedText ?? null)
+                : null,
+            updatedAt: new Date(),
+          },
+          $inc: { revision: 1 },
+        },
+        { returnDocument: "after" },
+      );
+    },
+    async completeAtsImprovement(userId, id, revision, output) {
+      const session = client.startSession();
+      let result: TailoringSessionRecord | null = null;
+      try {
+        await session.withTransaction(async () => {
+          const current = await records.findOne(
+            { userId, id, atsImprovementStatus: "review", revision },
+            { session },
+          );
+          if (
+            !current ||
+            current.atsImprovementSuggestions.some(
+              (suggestion) => suggestion.status === "pending",
+            )
+          )
+            return;
+          const now = new Date();
+          await versions.insertOne(
+            {
+              _id: output.versionId,
+              resumeId: current.resumeId,
+              userId,
+              type: "ats_improved",
+              baseVersionId: current.tailoredVersionId,
+              jobDescriptionId: current.jobDescriptionId,
+              tailoringSessionId: current.id,
+              schemaVersion: 1,
+              content: { claims: output.claims },
+              verificationStatus: "verified",
+              createdAt: now,
+              updatedAt: now,
+            },
+            { session },
+          );
+          result = await records.findOneAndUpdate(
+            { userId, id, atsImprovementStatus: "review", revision },
+            {
+              $set: {
+                atsImprovementStatus: "completed",
+                atsImprovedClaims: output.claims,
+                atsImprovedVersionId: output.versionId,
+                atsImprovedSnapshot: output.snapshot,
+                atsImprovementActive: true,
+                updatedAt: now,
+              },
+              $inc: { revision: 1 },
+            },
+            { returnDocument: "after", session },
+          );
+          if (!result) throw new TailoringStateConflict();
+        });
+        return result;
+      } catch (error) {
+        if (error instanceof TailoringStateConflict) return null;
+        throw error;
+      } finally {
+        await session.endSession();
+      }
+    },
+    async setAtsImprovementActive(userId, id, active) {
+      return records.findOneAndUpdate(
+        {
+          userId,
+          id,
+          atsImprovementStatus: "completed",
+          atsImprovedVersionId: { $ne: null },
+        },
+        {
+          $set: { atsImprovementActive: active, updatedAt: new Date() },
+          $inc: { revision: 1 },
         },
         { returnDocument: "after" },
       );

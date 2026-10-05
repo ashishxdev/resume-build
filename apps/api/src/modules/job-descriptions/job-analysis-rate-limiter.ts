@@ -11,7 +11,11 @@ export interface JobAnalysisRateLimitResult {
 }
 
 export interface JobAnalysisRateLimiter {
-  consume(userId: string, now?: Date): Promise<JobAnalysisRateLimitResult>;
+  consume(
+    userId: string,
+    now?: Date,
+    operationId?: string,
+  ): Promise<JobAnalysisRateLimitResult>;
 }
 
 function windowStart(now: Date) {
@@ -30,13 +34,23 @@ function retryAfter(now: Date, startedAt: Date) {
 }
 
 export function createMemoryJobAnalysisRateLimiter(): JobAnalysisRateLimiter {
-  const buckets = new Map<string, { count: number; startedAt: Date }>();
+  const buckets = new Map<
+    string,
+    { count: number; operationIds: Set<string>; startedAt: Date }
+  >();
   return {
-    async consume(userId, now = new Date()) {
+    async consume(userId, now = new Date(), operationId) {
       const startedAt = windowStart(now);
       const key = `${userId}:${startedAt.toISOString()}`;
-      const bucket = buckets.get(key) ?? { count: 0, startedAt };
-      bucket.count += 1;
+      const bucket = buckets.get(key) ?? {
+        count: 0,
+        operationIds: new Set<string>(),
+        startedAt,
+      };
+      if (!operationId || !bucket.operationIds.has(operationId)) {
+        bucket.count += 1;
+        if (operationId) bucket.operationIds.add(operationId);
+      }
       buckets.set(key, bucket);
       return {
         allowed: bucket.count <= jobAnalysisRequestsPerHour,
@@ -49,6 +63,7 @@ export function createMemoryJobAnalysisRateLimiter(): JobAnalysisRateLimiter {
 interface RateLimitBucket {
   _id: string;
   count: number;
+  operationIds?: string[];
   createdAt: Date;
 }
 
@@ -64,17 +79,52 @@ export function createMongoJobAnalysisRateLimiter(
     ));
 
   return {
-    async consume(userId, now = new Date()) {
+    async consume(userId, now = new Date(), operationId) {
       await ensureIndex();
       const startedAt = windowStart(now);
-      const bucket = await buckets.findOneAndUpdate(
-        { _id: `${userId}:${startedAt.toISOString()}` },
-        {
-          $inc: { count: 1 },
-          $setOnInsert: { createdAt: startedAt },
-        },
-        { upsert: true, returnDocument: "after" },
-      );
+      const bucket = operationId
+        ? await buckets.findOneAndUpdate(
+            { _id: `${userId}:${startedAt.toISOString()}` },
+            [
+              {
+                $set: {
+                  createdAt: { $ifNull: ["$createdAt", startedAt] },
+                  count: {
+                    $cond: [
+                      {
+                        $in: [operationId, { $ifNull: ["$operationIds", []] }],
+                      },
+                      { $ifNull: ["$count", 0] },
+                      { $add: [{ $ifNull: ["$count", 0] }, 1] },
+                    ],
+                  },
+                  operationIds: {
+                    $cond: [
+                      {
+                        $in: [operationId, { $ifNull: ["$operationIds", []] }],
+                      },
+                      { $ifNull: ["$operationIds", []] },
+                      {
+                        $concatArrays: [
+                          { $ifNull: ["$operationIds", []] },
+                          [operationId],
+                        ],
+                      },
+                    ],
+                  },
+                },
+              },
+            ],
+            { upsert: true, returnDocument: "after" },
+          )
+        : await buckets.findOneAndUpdate(
+            { _id: `${userId}:${startedAt.toISOString()}` },
+            {
+              $inc: { count: 1 },
+              $setOnInsert: { createdAt: startedAt },
+            },
+            { upsert: true, returnDocument: "after" },
+          );
       return {
         allowed:
           (bucket?.count ?? jobAnalysisRequestsPerHour + 1) <=

@@ -104,14 +104,14 @@ describe("tailoring routes", () => {
             id: "req_1",
             category: "responsibility",
             priority: "required",
-            label: "REST APIs",
-            sourceQuote: "Build REST APIs",
+            label: "Customer-facing REST APIs",
+            sourceQuote: "Build customer-facing REST APIs",
           },
         ],
         matches: [
           {
             requirementId: "req_1",
-            status: "strong",
+            status: "partial",
             resumeClaimIds: [claim.id],
             explanation: "Direct.",
           },
@@ -131,15 +131,17 @@ describe("tailoring routes", () => {
     expect(reopened.body.data.id).toBe(id);
     expect(rateLimiter.consume).toHaveBeenCalledTimes(1);
     const generator = {
-      generate: vi.fn(async () => ({
+      generate: vi.fn(async (input: { evidenceClaims: ResumeClaim[] }) => ({
         suggestions: [
           {
             id: "suggestion_1",
             sourceClaimId: claim.id,
             requirementIds: ["req_1"],
             section: "experience",
-            originalText: claim.value,
-            suggestedText: "Built REST APIs with Node.js.",
+            originalText: input.evidenceClaims[0]!.value,
+            suggestedText: input.evidenceClaims[0]!.value.includes("REST")
+              ? "Built customer-facing REST APIs with Node.js."
+              : "Built REST APIs with Node.js.",
             reason: "Relevant wording.",
             status: "pending" as const,
             editedText: null,
@@ -224,6 +226,56 @@ describe("tailoring routes", () => {
       completed.body.data.tailoredVersionId,
     );
     expect(analyzed.body.data.atsSnapshot.categories).toHaveLength(6);
+    const queuedImprovements = await owner
+      .post(`/api/v1/tailoring-sessions/${id}/ats-improvements`)
+      .expect(202);
+    expect(queuedImprovements.body.data.atsImprovementStatus).toBe("queued");
+    expect(rateLimiter.consume).toHaveBeenCalledTimes(2);
+    await owner
+      .post(`/api/v1/tailoring-sessions/${id}/ats-improvements`)
+      .expect(200);
+    expect(rateLimiter.consume).toHaveBeenCalledTimes(2);
+    await createTailoringService(
+      tailoring,
+      generator,
+      createLogger(environment),
+    ).processNext();
+    const improvementReview = await owner
+      .get(`/api/v1/tailoring-sessions/${id}`)
+      .expect(200);
+    expect(improvementReview.body.data.atsImprovementStatus).toBe("review");
+    const improvement =
+      improvementReview.body.data.atsImprovementSuggestions[0];
+    const acceptedImprovement = await owner
+      .patch(
+        `/api/v1/tailoring-sessions/${id}/ats-improvements/${improvement.id}`,
+      )
+      .send({
+        revision: improvementReview.body.data.revision,
+        status: "accepted",
+      })
+      .expect(200);
+    const improved = await owner
+      .post(`/api/v1/tailoring-sessions/${id}/ats-improvements/complete`)
+      .send({ revision: acceptedImprovement.body.data.revision })
+      .expect(200);
+    expect(improved.body.data.atsImprovementStatus).toBe("completed");
+    expect(improved.body.data.atsImprovedVersionId).toMatch(/^version_/);
+    expect(improved.body.data.atsImprovedSnapshot.tailoredVersionId).toBe(
+      improved.body.data.atsImprovedVersionId,
+    );
+    expect(improved.body.data.atsImprovedSnapshot.overallScore).toBeGreaterThan(
+      analyzed.body.data.atsSnapshot.overallScore,
+    );
+    expect(improved.body.data.atsImprovedSnapshot.findings[0].type).toBe(
+      "strength",
+    );
+    expect(improved.body.data.atsImprovementActive).toBe(true);
+    const rolledBack = await owner
+      .patch(`/api/v1/tailoring-sessions/${id}/ats-improvements/active`)
+      .send({ active: false })
+      .expect(200);
+    expect(rolledBack.body.data.atsImprovementActive).toBe(false);
     await authRuntime.close();
   });
 });

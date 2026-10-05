@@ -38,6 +38,11 @@ const mocks = vi.hoisted(() => ({
   retryTailoring: vi.fn(),
   startAts: vi.fn(),
   retryAts: vi.fn(),
+  startAtsImprovements: vi.fn(),
+  retryAtsImprovements: vi.fn(),
+  decideAtsImprovement: vi.fn(),
+  completeAtsImprovements: vi.fn(),
+  setAtsImprovedVersionActive: vi.fn(),
   downloadResume: vi.fn(),
   useSession: vi.fn(),
 }));
@@ -74,6 +79,11 @@ vi.mock("@/lib/tailoring/client", () => ({
   retryTailoringSession: mocks.retryTailoring,
   startAtsAnalysis: mocks.startAts,
   retryAtsAnalysis: mocks.retryAts,
+  startAtsImprovements: mocks.startAtsImprovements,
+  retryAtsImprovements: mocks.retryAtsImprovements,
+  decideAtsImprovement: mocks.decideAtsImprovement,
+  completeAtsImprovements: mocks.completeAtsImprovements,
+  setAtsImprovedVersionActive: mocks.setAtsImprovedVersionActive,
   downloadTailoredResume: mocks.downloadResume,
 }));
 
@@ -188,6 +198,13 @@ describe("tailoring workflow", () => {
         analyzedAt: "2026-10-03T00:00:00.000Z",
         methodologyVersion: "transparent-ats-v1",
       },
+      atsImprovementStatus: "not_started",
+      atsImprovementFailureMessage: null,
+      atsImprovementSuggestions: [],
+      atsImprovedVersionId: null,
+      atsImprovedClaims: null,
+      atsImprovedSnapshot: null,
+      atsImprovementActive: false,
       createdAt: "2026-10-03T00:00:00.000Z",
       updatedAt: "2026-10-03T00:00:00.000Z",
     });
@@ -198,6 +215,96 @@ describe("tailoring workflow", () => {
     expect(screen.getByRole("heading", { name: "Mentoring" })).toBeTruthy();
     expect(screen.getByText(/nothing will be invented/i)).toBeTruthy();
     expect(mocks.startAts).not.toHaveBeenCalled();
+  });
+
+  it("restores saved custom ATS wording before accepting again", async () => {
+    const session = {
+      id: "tailor_1",
+      jobDescriptionId: "jd_1",
+      resumeId: "resume_1",
+      resumeVersionId: "version_1",
+      role: "Engineer",
+      company: "Acme",
+      status: "completed",
+      failureMessage: null,
+      suggestions: [],
+      evidenceClaims: verification.claims,
+      analysis: { summary: "One", requirements: [], matches: [] },
+      tailoredVersionId: "version_tailored",
+      finalClaims: verification.claims,
+      revision: 4,
+      atsStatus: "completed",
+      atsFailureMessage: null,
+      atsSnapshot: {
+        tailoredVersionId: "version_tailored",
+        overallScore: 68,
+        categories: [
+          "keyword_coverage",
+          "skill_alignment",
+          "experience_relevance",
+          "section_completeness",
+          "structure_readability",
+          "formatting_compatibility",
+        ].map((category) => ({
+          category,
+          label: category,
+          score: 68,
+          explanation: "Transparent explanation.",
+        })),
+        findings: [],
+        analyzedAt: "2026-10-05T00:00:00.000Z",
+        methodologyVersion: "transparent-ats-v1",
+      },
+      atsImprovementStatus: "review",
+      atsImprovementFailureMessage: null,
+      atsImprovementSuggestions: [
+        {
+          id: "suggestion_ats_1",
+          sourceClaimId: "claim_1",
+          requirementIds: ["req_1"],
+          section: "experience",
+          originalText: "Built APIs.",
+          suggestedText: "Built REST APIs.",
+          reason: "Uses the supported role language.",
+          status: "accepted",
+          editedText: "Built secure REST APIs.",
+        },
+      ],
+      atsImprovedVersionId: null,
+      atsImprovedClaims: null,
+      atsImprovedSnapshot: null,
+      atsImprovementActive: false,
+      createdAt: "2026-10-05T00:00:00.000Z",
+      updatedAt: "2026-10-05T00:00:00.000Z",
+    };
+    mocks.getTailoring.mockResolvedValue(session);
+    mocks.decideAtsImprovement.mockResolvedValue({
+      ...session,
+      revision: 5,
+      atsImprovementSuggestions: [
+        {
+          ...session.atsImprovementSuggestions[0],
+          status: "accepted",
+          editedText: "Built secure REST APIs.",
+        },
+      ],
+    });
+    render(<AtsAnalysisPage />);
+
+    const editor = await screen.findByLabelText("Edit experience improvement");
+    expect((editor as HTMLTextAreaElement).value).toBe(
+      "Built secure REST APIs.",
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Accept wording" }));
+
+    await waitFor(() =>
+      expect(mocks.decideAtsImprovement).toHaveBeenCalledWith(
+        session,
+        "suggestion_ats_1",
+        "accepted",
+        "Built secure REST APIs.",
+      ),
+    );
   });
 
   it("filters the match overview while preserving grounded evidence", async () => {
