@@ -18,11 +18,7 @@ import { ResumeUploadDialog } from "@/components/dashboard/resume-upload-dialog"
 import { WorkspaceNavigation } from "@/components/dashboard/workspace-navigation";
 import { authClient } from "@/lib/auth/client";
 import { deleteResume, listResumes } from "@/lib/resume/import-client";
-import {
-  deleteTailoringSession,
-  downloadTailoredResume,
-  listTailoringSessions,
-} from "@/lib/tailoring/client";
+import { listTailoringSessions } from "@/lib/tailoring/client";
 
 import styles from "./dashboard.module.css";
 
@@ -204,11 +200,6 @@ export default function DashboardPage() {
   const [deleteResumeError, setDeleteResumeError] = useState<string | null>(
     null,
   );
-  const [draftPendingDeletion, setDraftPendingDeletion] =
-    useState<TailoringSession | null>(null);
-  const [isDeletingDraft, setIsDeletingDraft] = useState(false);
-  const [draftActionError, setDraftActionError] = useState<string | null>(null);
-  const [downloadingDraft, setDownloadingDraft] = useState<string | null>(null);
 
   const refreshResumes = useCallback(async () => {
     setIsLoadingLibrary(true);
@@ -326,57 +317,6 @@ export default function DashboardPage() {
     }
   }
 
-  async function confirmDraftDeletion() {
-    if (!draftPendingDeletion || isDeletingDraft) return;
-    const draft = draftPendingDeletion;
-    setDraftActionError(null);
-    setIsDeletingDraft(true);
-
-    try {
-      await deleteTailoringSession(draft.id);
-      setTailoringSessions((current) =>
-        current.filter((session) => session.id !== draft.id),
-      );
-      setDraftPendingDeletion(null);
-      setFeatureNotice("The tailored draft was permanently deleted.");
-    } catch {
-      setDraftActionError(
-        "We could not delete this tailored draft. Please try again.",
-      );
-    } finally {
-      setIsDeletingDraft(false);
-    }
-  }
-
-  async function downloadDraft(
-    draft: TailoringSession,
-    format: "pdf" | "docx",
-  ) {
-    const downloadKey = `${draft.id}:${format}`;
-    if (downloadingDraft) return;
-    setDraftActionError(null);
-    setDownloadingDraft(downloadKey);
-    try {
-      const exported = await downloadTailoredResume(
-        draft.id,
-        format,
-        "comfortable",
-      );
-      const url = URL.createObjectURL(exported.blob);
-      const anchor = document.createElement("a");
-      anchor.href = url;
-      anchor.download = exported.filename;
-      anchor.click();
-      URL.revokeObjectURL(url);
-    } catch {
-      setDraftActionError(
-        "We could not download this tailored draft. Please try again.",
-      );
-    } finally {
-      setDownloadingDraft(null);
-    }
-  }
-
   function announceCreateFeature() {
     setFeatureNotice(
       "Creating a resume from scratch will be added after resume import and verification.",
@@ -477,7 +417,7 @@ export default function DashboardPage() {
             </div>
           </article>
           <article>
-            <span>Tailored drafts</span>
+            <span>Tailored versions</span>
             <div>
               <strong>{completedTailoringSessions.length}</strong>
               <small>Applications</small>
@@ -635,102 +575,6 @@ export default function DashboardPage() {
           )}
         </section>
 
-        <section
-          aria-labelledby="tailored-drafts-title"
-          className={styles.tailoredDraftSection}
-        >
-          <div className={styles.sectionHeading}>
-            <div>
-              <h2 id="tailored-drafts-title">Tailored drafts</h2>
-              <span>{tailoringSessions.length} saved</span>
-            </div>
-          </div>
-          {draftActionError && !draftPendingDeletion && (
-            <div className={styles.libraryError} role="alert">
-              <span>{draftActionError}</span>
-              <button onClick={() => setDraftActionError(null)} type="button">
-                Dismiss
-              </button>
-            </div>
-          )}
-          {tailoringSessions.length > 0 ? (
-            <div className={styles.draftGrid}>
-              {tailoringSessions.map((draft) => {
-                const ready = draft.status === "completed";
-                const title = draft.role || draft.company || "Tailored resume";
-                return (
-                  <article className={styles.draftCard} key={draft.id}>
-                    <div>
-                      <span data-ready={ready}>
-                        {ready ? "Ready" : draft.status.replace("_", " ")}
-                      </span>
-                      <h3>{title}</h3>
-                      <p>
-                        {draft.company && draft.role
-                          ? `${draft.company} · ${draft.role}`
-                          : draft.company || "Saved tailoring workflow"}
-                      </p>
-                      <small>{formatUpdatedAt(draft.updatedAt)}</small>
-                    </div>
-                    <div className={styles.draftActions}>
-                      <Link
-                        href={
-                          ready
-                            ? `/tailoring/${draft.id}/resume`
-                            : `/tailoring/${draft.id}`
-                        }
-                      >
-                        {ready ? "View" : "Continue"}
-                      </Link>
-                      {ready && (
-                        <>
-                          <button
-                            disabled={downloadingDraft !== null}
-                            onClick={() => void downloadDraft(draft, "pdf")}
-                            type="button"
-                          >
-                            {downloadingDraft === `${draft.id}:pdf`
-                              ? "Creating…"
-                              : "PDF"}
-                          </button>
-                          <button
-                            disabled={downloadingDraft !== null}
-                            onClick={() => void downloadDraft(draft, "docx")}
-                            type="button"
-                          >
-                            {downloadingDraft === `${draft.id}:docx`
-                              ? "Creating…"
-                              : "DOCX"}
-                          </button>
-                        </>
-                      )}
-                      <button
-                        aria-label={`Delete tailored draft ${title}`}
-                        className={styles.deleteResumeButton}
-                        onClick={() => {
-                          setDraftActionError(null);
-                          setDraftPendingDeletion(draft);
-                        }}
-                        type="button"
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  </article>
-                );
-              })}
-            </div>
-          ) : (
-            <div className={styles.emptyDrafts}>
-              <strong>No tailored drafts yet</strong>
-              <p>
-                Tailor a verified resume to a job description and it will stay
-                available here for viewing and download.
-              </p>
-            </div>
-          )}
-        </section>
-
         <section className={styles.lowerGrid}>
           <article className={styles.activityCard} id="activity">
             <div className={styles.cardHeading}>
@@ -762,7 +606,15 @@ export default function DashboardPage() {
                           ? " suggestions ready to review"
                           : " tailoring in progress"}
                     </span>
-                    <Link href={`/tailoring/${session.id}`}>Open</Link>
+                    <Link
+                      href={
+                        session.status === "completed"
+                          ? `/resumes#tailored-${session.id}`
+                          : `/tailoring/${session.id}`
+                      }
+                    >
+                      Open
+                    </Link>
                   </li>
                 ))}
                 {resumes.slice(0, 3).map((resume) => (
@@ -792,8 +644,8 @@ export default function DashboardPage() {
                 <div>
                   <strong>No activity yet</strong>
                   <p>
-                    Your resume imports, verifications, and tailored drafts will
-                    appear here.
+                    Your resume imports, verifications, and tailored versions
+                    will appear here.
                   </p>
                 </div>
               </div>
@@ -865,45 +717,6 @@ export default function DashboardPage() {
                 type="button"
               >
                 {isDeletingResume ? "Deleting…" : "Delete permanently"}
-              </button>
-            </footer>
-          </section>
-        </div>
-      )}
-
-      {draftPendingDeletion && (
-        <div className={styles.deleteDialogBackdrop}>
-          <section
-            aria-labelledby="delete-draft-title"
-            aria-modal="true"
-            className={styles.deleteDialog}
-            role="dialog"
-          >
-            <span>Permanent deletion</span>
-            <h2 id="delete-draft-title">Delete this tailored draft?</h2>
-            <p>
-              This removes the saved tailoring session and its generated
-              versions. Your verified base resume remains unchanged. This action
-              cannot be undone.
-            </p>
-            {draftActionError && <div role="alert">{draftActionError}</div>}
-            <footer>
-              <button
-                disabled={isDeletingDraft}
-                onClick={() => {
-                  setDraftActionError(null);
-                  setDraftPendingDeletion(null);
-                }}
-                type="button"
-              >
-                Keep draft
-              </button>
-              <button
-                disabled={isDeletingDraft}
-                onClick={() => void confirmDraftDeletion()}
-                type="button"
-              >
-                {isDeletingDraft ? "Deleting…" : "Delete permanently"}
               </button>
             </footer>
           </section>

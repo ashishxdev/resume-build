@@ -830,8 +830,58 @@
   margin: 0;
   font-weight: 800;
 }
-.versionSummary button {
+.completedDownloadActions button {
   width: 100%;
+}
+.completedDownloadActions {
+  display: grid;
+  gap: 9px;
+}
+.completedDownloadActions button + button {
+  border-color: #2b1742;
+  background: #fff;
+  color: #2b1742;
+}
+.completedDownloadActions button:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+.completedDensityControls {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin: 0 0 18px;
+  padding: 0;
+  border: 0;
+}
+.completedDensityControls legend {
+  grid-column: 1 / -1;
+  margin-bottom: 2px;
+  color: #665c6b;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.completedDensityControls label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 10px;
+  border: 1px solid #e4dce7;
+  border-radius: 5px;
+  color: #4d4254;
+  cursor: pointer;
+  font-size: 11px;
+}
+.completedDensityControls label:has(input:checked) {
+  border-color: #6c4d8b;
+  background: #f7f3fa;
+  color: #2c2037;
+}
+.completedDensityControls input {
+  margin: 0;
+  accent-color: #38204e;
 }
 .versionSummary > a {
   display: block;
@@ -1939,6 +1989,23 @@
   border: 1px solid #ddd4e3;
   border-radius: 12px;
   background: #eee9f1;
+}
+.completedPaperStage {
+  padding: 24px;
+}
+.previewUnavailable {
+  display: grid;
+  min-height: 360px;
+  place-content: center;
+  gap: 8px;
+  padding: 28px;
+  background: #fff;
+  color: #30213d;
+  text-align: center;
+}
+.previewUnavailable span {
+  color: #756d79;
+  font-size: 12px;
 }
 .paperStage :global(.professional-resume) {
   width: min(100%, 816px);

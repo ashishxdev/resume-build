@@ -360,21 +360,25 @@ Update this file whenever a major feature is started, completed, materially rede
   - `apps/web/lib/resume/import-client.ts`
   - `docs/Resume Tailoring SaaS API Design.md`
 
-### 17. Dashboard Tailored-Draft Library
+### 17. Tailored-Version Library and Inline Preview
 
 - **Date:** 2026-10-08
 - **Status:** Complete
 - **Scope delivered:**
-  - Added a dedicated responsive dashboard library for completed and in-progress tailoring sessions.
-  - Added direct view/continue actions plus one-click PDF and DOCX downloads for completed versions.
+  - Group completed and in-progress tailoring sessions beneath their source resume in the dedicated `/resumes` library instead of duplicating them in a separate dashboard section.
+  - Open completed versions in a responsive inline professional-resume preview with comfortable and compact density controls, direct PDF and DOCX downloads, and a link back to the tailoring editor.
+  - Replace the completed tailoring screen's raw claim-by-claim summary with the same canonical Professional ATS document, including in-place spacing controls and direct PDF/DOCX exports.
+  - Route completed dashboard and activity entries to the associated grouped version while retaining the standalone preview route as a direct-link fallback.
   - Added owner-only permanent draft deletion with explicit confirmation and recoverable error handling.
   - Delete only the tailored and ATS-improved versions created by the selected session, preserving the verified base resume and reusable job analysis.
-- **Verification:** 81 API tests and 46 web tests pass, including owner-only session deletion, completed-version view routing, direct PDF download, permanent-delete confirmation, immediate dashboard removal, and preservation messaging for the verified base resume. Workspace type checking, linting, Prettier validation, the full production build, and `git diff --check` pass.
+- **Verification:** 81 API tests and 55 web tests pass, including owner-only session deletion, grouped-version rendering, canonical completed-page and inline previews, density-aware PDF/DOCX downloads, permanent-delete confirmation, immediate library removal, completed-activity routing, and preservation messaging for the verified base resume. Workspace type checking, linting, Prettier validation, the full production build, and `git diff --check` pass.
 - **Primary files:**
   - `apps/api/src/http/routes/tailoring.ts`
   - `apps/api/src/modules/tailoring/tailoring-repository.ts`
   - `apps/web/app/dashboard/page.tsx`
   - `apps/web/app/dashboard/dashboard.module.css`
+  - `apps/web/components/dashboard/workspace-collection-page.tsx`
+  - `apps/web/components/tailoring/tailoring-session-page.tsx`
   - `apps/web/lib/tailoring/client.ts`
 
 ### 18. Dedicated Resume and Activity Workspaces
@@ -385,6 +389,7 @@ Update this file whenever a major feature is started, completed, materially rede
   - Replaced the dashboard's resume and activity hash links with first-class `/resumes` and `/activity` routes.
   - Centralized desktop and mobile workspace navigation so only the current route receives the active underline or active mobile state.
   - Added a complete owned-resume library with upload, verification, tailoring, replacement, and permanent Cloudflare-backed deletion actions.
+  - Grouped every tailored version beneath its source resume with an in-place preview, download, editor, and deletion workflow.
   - Added a complete chronological activity view that combines every available resume and tailoring workflow instead of truncating the dashboard's recent-activity preview.
   - Preserved authenticated redirects, account controls, recoverable loading/error states, responsive layouts, and mobile bottom navigation on both routes.
 - **Verification:** 54 web tests pass across 11 files, including dedicated-route navigation, active-route semantics, complete untruncated resume/activity rendering, permanent deletion, and signed-out redirects. Web type checking, linting, the Next.js production build, and `git diff --check` pass.

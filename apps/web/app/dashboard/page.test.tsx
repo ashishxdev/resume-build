@@ -16,8 +16,6 @@ import DashboardPage from "./page";
 
 const mocks = vi.hoisted(() => ({
   deleteResume: vi.fn(),
-  deleteTailoringSession: vi.fn(),
-  downloadTailoredResume: vi.fn(),
   listResumes: vi.fn(),
   listTailoringSessions: vi.fn(),
   replace: vi.fn(),
@@ -42,8 +40,6 @@ vi.mock("@/lib/resume/import-client", () => ({
 }));
 
 vi.mock("@/lib/tailoring/client", () => ({
-  deleteTailoringSession: mocks.deleteTailoringSession,
-  downloadTailoredResume: mocks.downloadTailoredResume,
   listTailoringSessions: mocks.listTailoringSessions,
 }));
 
@@ -63,18 +59,11 @@ describe("DashboardPage", () => {
     mocks.replace.mockReset();
     mocks.signOut.mockReset();
     mocks.deleteResume.mockReset();
-    mocks.deleteTailoringSession.mockReset();
-    mocks.downloadTailoredResume.mockReset();
     mocks.listResumes.mockReset();
     mocks.listTailoringSessions.mockReset();
     mocks.listResumes.mockResolvedValue([]);
     mocks.listTailoringSessions.mockResolvedValue([]);
     mocks.deleteResume.mockResolvedValue(undefined);
-    mocks.deleteTailoringSession.mockResolvedValue(undefined);
-    mocks.downloadTailoredResume.mockResolvedValue({
-      blob: new Blob(["resume"]),
-      filename: "acme-resume.pdf",
-    });
     mocks.useSession.mockReturnValue({
       data: {
         user: {
@@ -118,7 +107,7 @@ describe("DashboardPage", () => {
     expect(screen.getByText("Resume upload dialog")).toBeTruthy();
   });
 
-  it("shows completed tailored versions and lets users reopen them", async () => {
+  it("keeps tailored activity summarized without a separate draft library", async () => {
     mocks.listTailoringSessions.mockResolvedValue([
       {
         id: "tailor_1",
@@ -132,68 +121,12 @@ describe("DashboardPage", () => {
 
     expect(await screen.findByText("Acme")).toBeTruthy();
     expect(
-      screen.getAllByText("Tailored drafts")[0]?.parentElement?.textContent,
-    ).toContain("1Applications");
+      screen.queryByRole("heading", { name: "Tailored drafts" }),
+    ).toBeNull();
     expect(screen.getByRole("link", { name: "Open" })).toHaveProperty(
       "href",
-      "http://localhost:3000/tailoring/tailor_1",
+      "http://localhost:3000/resumes#tailored-tailor_1",
     );
-  });
-
-  it("shows, downloads, views, and deletes a saved tailored draft", async () => {
-    const createObjectUrl = vi.fn(() => "blob:tailored-resume");
-    const revokeObjectUrl = vi.fn();
-    Object.defineProperty(URL, "createObjectURL", {
-      configurable: true,
-      value: createObjectUrl,
-    });
-    Object.defineProperty(URL, "revokeObjectURL", {
-      configurable: true,
-      value: revokeObjectUrl,
-    });
-    const anchorClick = vi
-      .spyOn(HTMLAnchorElement.prototype, "click")
-      .mockImplementation(() => {});
-    mocks.listTailoringSessions.mockResolvedValue([
-      {
-        id: "tailor_saved",
-        resumeId: "resume_1",
-        status: "completed",
-        company: "Acme",
-        role: "Product Designer",
-        updatedAt: "2026-10-03T10:00:00.000Z",
-      },
-    ]);
-    render(React.createElement(DashboardPage));
-
-    expect(await screen.findByText("1 saved")).toBeTruthy();
-    expect(screen.getByRole("link", { name: "View" })).toHaveProperty(
-      "href",
-      "http://localhost:3000/tailoring/tailor_saved/resume",
-    );
-    fireEvent.click(screen.getByRole("button", { name: "PDF" }));
-    await act(async () => {});
-    expect(mocks.downloadTailoredResume).toHaveBeenCalledWith(
-      "tailor_saved",
-      "pdf",
-      "comfortable",
-    );
-    expect(createObjectUrl).toHaveBeenCalled();
-    expect(anchorClick).toHaveBeenCalled();
-    expect(revokeObjectUrl).toHaveBeenCalledWith("blob:tailored-resume");
-
-    fireEvent.click(
-      screen.getByRole("button", {
-        name: "Delete tailored draft Product Designer",
-      }),
-    );
-    expect(
-      screen.getByRole("heading", { name: "Delete this tailored draft?" }),
-    ).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Delete permanently" }));
-    await screen.findByText("The tailored draft was permanently deleted.");
-    expect(mocks.deleteTailoringSession).toHaveBeenCalledWith("tailor_saved");
-    expect(screen.getByText("No tailored drafts yet")).toBeTruthy();
   });
 
   it("keeps resumes visible when tailoring activity fails", async () => {

@@ -654,6 +654,100 @@ describe("tailoring workflow", () => {
     ).toBeTruthy();
   });
 
+  it("shows and downloads the professional resume on the completed tailoring page", async () => {
+    const session = {
+      id: "tailor_1",
+      jobDescriptionId: "jd_1",
+      resumeId: "resume_1",
+      resumeVersionId: "version_1",
+      role: "Product Designer",
+      company: "Acme",
+      status: "completed",
+      failureMessage: null,
+      evidenceClaims: verification.claims,
+      analysis: { summary: "One.", requirements: [], matches: [] },
+      suggestions: [
+        {
+          id: "suggestion_1",
+          sourceClaimId: "claim_experience",
+          requirementIds: ["req_1"],
+          section: "experience",
+          originalText: "Led design-system work.",
+          suggestedText: "Led accessible design systems.",
+          reason: "Relevant.",
+          status: "accepted",
+          editedText: null,
+        },
+      ],
+      tailoredVersionId: "version_tailored",
+      finalClaims: [
+        {
+          id: "claim_personal",
+          category: "personal_info",
+          label: "Contact information",
+          value: "Alex Mercer | alex@example.com",
+          sourceText: null,
+          pageNumber: 1,
+          status: "confirmed",
+          userAdded: false,
+          order: 0,
+        },
+        {
+          id: "claim_experience",
+          category: "experience",
+          label: "Lead Product Designer at Northstar",
+          value: "Led accessible design systems.",
+          sourceText: null,
+          pageNumber: 1,
+          status: "edited",
+          userAdded: false,
+          order: 1,
+        },
+      ],
+      revision: 4,
+      atsStatus: "not_started",
+      atsFailureMessage: null,
+      atsSnapshot: null,
+      atsImprovementStatus: "not_started",
+      atsImprovementFailureMessage: null,
+      atsImprovementSuggestions: [],
+      atsImprovedVersionId: null,
+      atsImprovedClaims: null,
+      atsImprovedSnapshot: null,
+      atsImprovementActive: false,
+      createdAt: "2026-10-03T00:00:00.000Z",
+      updatedAt: "2026-10-03T00:00:00.000Z",
+    };
+    mocks.getTailoring.mockResolvedValue(session);
+    mocks.downloadResume.mockResolvedValue({
+      blob: new Blob(["resume"]),
+      filename: "acme-resume.pdf",
+    });
+    vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:resume");
+    vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => undefined);
+    vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(
+      () => undefined,
+    );
+
+    render(<TailoringSessionPage />);
+
+    expect(
+      await screen.findByRole("heading", { name: "Alex Mercer" }),
+    ).toBeTruthy();
+    expect(screen.getByText("Led accessible design systems.")).toBeTruthy();
+    expect(screen.queryByText("PERSONAL INFO")).toBeNull();
+
+    fireEvent.click(screen.getByLabelText("Compact"));
+    fireEvent.click(screen.getByRole("button", { name: "Download PDF" }));
+    await waitFor(() =>
+      expect(mocks.downloadResume).toHaveBeenCalledWith(
+        "tailor_1",
+        "pdf",
+        "compact",
+      ),
+    );
+  });
+
   it("previews the professional template and exports the selected density", async () => {
     const session = {
       id: "tailor_1",

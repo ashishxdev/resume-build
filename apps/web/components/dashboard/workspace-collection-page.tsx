@@ -1,9 +1,13 @@
 "use client";
 
 import type {
+  ResumeExportFormat,
   ResumeSummary,
+  ResumeTemplateDensity,
   TailoringSession,
 } from "@make-my-resume/contracts";
+import { buildProfessionalResumeDocument } from "@make-my-resume/resume-engine";
+import { ProfessionalResume } from "@make-my-resume/resume-renderer";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -16,9 +20,14 @@ import {
 } from "react";
 
 import styles from "@/app/dashboard/dashboard.module.css";
+import tailoringStyles from "@/components/tailoring/tailoring.module.css";
 import { authClient } from "@/lib/auth/client";
 import { deleteResume, listResumes } from "@/lib/resume/import-client";
-import { listTailoringSessions } from "@/lib/tailoring/client";
+import {
+  deleteTailoringSession,
+  downloadTailoredResume,
+  listTailoringSessions,
+} from "@/lib/tailoring/client";
 
 import { ResumeUploadDialog } from "./resume-upload-dialog";
 import { WorkspaceNavigation } from "./workspace-navigation";
@@ -162,7 +171,7 @@ function buildActivityItems(
     ...tailoringSessions.map((session) => ({
       href:
         session.status === "completed"
-          ? `/tailoring/${session.id}/resume`
+          ? `/resumes#tailored-${session.id}`
           : `/tailoring/${session.id}`,
       id: `tailoring:${session.id}`,
       message:
@@ -203,9 +212,7 @@ export function WorkspaceCollectionPage({ page }: { page: CollectionPage }) {
     TailoringSession[]
   >([]);
   const [isLoadingResumes, setIsLoadingResumes] = useState(true);
-  const [isLoadingTailoring, setIsLoadingTailoring] = useState(
-    page === "activity",
-  );
+  const [isLoadingTailoring, setIsLoadingTailoring] = useState(true);
   const [resumeError, setResumeError] = useState<string | null>(null);
   const [tailoringError, setTailoringError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -215,6 +222,16 @@ export function WorkspaceCollectionPage({ page }: { page: CollectionPage }) {
     useState<ResumeSummary | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [selectedDraft, setSelectedDraft] = useState<TailoringSession | null>(
+    null,
+  );
+  const [density, setDensity] = useState<ResumeTemplateDensity>("comfortable");
+  const [downloadingDraft, setDownloadingDraft] =
+    useState<ResumeExportFormat | null>(null);
+  const [draftPendingDeletion, setDraftPendingDeletion] =
+    useState<TailoringSession | null>(null);
+  const [isDeletingDraft, setIsDeletingDraft] = useState(false);
+  const [draftError, setDraftError] = useState<string | null>(null);
 
   const refreshResumes = useCallback(async () => {
     setIsLoadingResumes(true);
@@ -237,12 +254,14 @@ export function WorkspaceCollectionPage({ page }: { page: CollectionPage }) {
       setTailoringSessions(await listTailoringSessions());
     } catch {
       setTailoringError(
-        "We could not load your tailoring activity. Please try again.",
+        page === "resumes"
+          ? "We could not load tailored versions. Your base resumes are still available."
+          : "We could not load your tailoring activity. Please try again.",
       );
     } finally {
       setIsLoadingTailoring(false);
     }
-  }, []);
+  }, [page]);
 
   useEffect(() => {
     if (!isPending && !data) {
@@ -270,22 +289,22 @@ export function WorkspaceCollectionPage({ page }: { page: CollectionPage }) {
         if (!cancelled) setIsLoadingResumes(false);
       });
 
-    if (page === "activity") {
-      void listTailoringSessions()
-        .then((nextSessions) => {
-          if (!cancelled) setTailoringSessions(nextSessions);
-        })
-        .catch(() => {
-          if (!cancelled) {
-            setTailoringError(
-              "We could not load your tailoring activity. Please try again.",
-            );
-          }
-        })
-        .finally(() => {
-          if (!cancelled) setIsLoadingTailoring(false);
-        });
-    }
+    void listTailoringSessions()
+      .then((nextSessions) => {
+        if (!cancelled) setTailoringSessions(nextSessions);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setTailoringError(
+            page === "resumes"
+              ? "We could not load tailored versions. Your base resumes are still available."
+              : "We could not load your tailoring activity. Please try again.",
+          );
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoadingTailoring(false);
+      });
 
     return () => {
       cancelled = true;
@@ -296,6 +315,29 @@ export function WorkspaceCollectionPage({ page }: { page: CollectionPage }) {
     () => buildActivityItems(resumes, tailoringSessions),
     [resumes, tailoringSessions],
   );
+
+  const selectedDocument = useMemo(() => {
+    if (!selectedDraft?.finalClaims) return null;
+    const claims =
+      selectedDraft.atsImprovementActive && selectedDraft.atsImprovedClaims
+        ? selectedDraft.atsImprovedClaims
+        : selectedDraft.finalClaims;
+    return buildProfessionalResumeDocument(claims, {
+      tailoredClaimIds: selectedDraft.suggestions
+        .filter((suggestion) => suggestion.status === "accepted")
+        .map((suggestion) => suggestion.sourceClaimId),
+    });
+  }, [selectedDraft]);
+
+  const sessionsByResume = useMemo(() => {
+    const grouped = new Map<string, TailoringSession[]>();
+    for (const session of tailoringSessions) {
+      const current = grouped.get(session.resumeId) ?? [];
+      current.push(session);
+      grouped.set(session.resumeId, current);
+    }
+    return grouped;
+  }, [tailoringSessions]);
 
   async function signOut() {
     setNotice(null);
@@ -329,6 +371,9 @@ export function WorkspaceCollectionPage({ page }: { page: CollectionPage }) {
       setResumes((current) =>
         current.filter((candidate) => candidate.id !== resume.id),
       );
+      setTailoringSessions((current) =>
+        current.filter((session) => session.resumeId !== resume.id),
+      );
       setResumePendingDeletion(null);
       setNotice(`“${resume.name}” was permanently deleted.`);
     } catch {
@@ -337,6 +382,58 @@ export function WorkspaceCollectionPage({ page }: { page: CollectionPage }) {
       );
     } finally {
       setIsDeleting(false);
+    }
+  }
+
+  async function downloadDraft(format: ResumeExportFormat) {
+    if (!selectedDraft || downloadingDraft) return;
+    setDraftError(null);
+    setDownloadingDraft(format);
+    try {
+      const exported = await downloadTailoredResume(
+        selectedDraft.id,
+        format,
+        density,
+      );
+      const url = URL.createObjectURL(exported.blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = exported.filename;
+      anchor.hidden = true;
+      document.body.append(anchor);
+      anchor.click();
+      anchor.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1_000);
+    } catch (requestError) {
+      setDraftError(
+        requestError instanceof Error
+          ? requestError.message
+          : "The resume could not be downloaded.",
+      );
+    } finally {
+      setDownloadingDraft(null);
+    }
+  }
+
+  async function confirmDraftDeletion() {
+    if (!draftPendingDeletion || isDeletingDraft) return;
+    const draft = draftPendingDeletion;
+    setDraftError(null);
+    setIsDeletingDraft(true);
+    try {
+      await deleteTailoringSession(draft.id);
+      setTailoringSessions((current) =>
+        current.filter((session) => session.id !== draft.id),
+      );
+      if (selectedDraft?.id === draft.id) setSelectedDraft(null);
+      setDraftPendingDeletion(null);
+      setNotice("The tailored version was permanently deleted.");
+    } catch {
+      setDraftError(
+        "We could not delete this tailored version. Please try again.",
+      );
+    } finally {
+      setIsDeletingDraft(false);
     }
   }
 
@@ -350,8 +447,7 @@ export function WorkspaceCollectionPage({ page }: { page: CollectionPage }) {
   }
 
   const initials = getInitials(data.user.name);
-  const loading =
-    isLoadingResumes || (page === "activity" && isLoadingTailoring);
+  const loading = isLoadingResumes || isLoadingTailoring;
 
   return (
     <div className={styles.page}>
@@ -414,7 +510,7 @@ export function WorkspaceCollectionPage({ page }: { page: CollectionPage }) {
             </button>
           </div>
         )}
-        {page === "activity" && tailoringError && (
+        {tailoringError && (
           <div className={styles.libraryError} role="alert">
             <span>{tailoringError}</span>
             <button
@@ -522,6 +618,81 @@ export function WorkspaceCollectionPage({ page }: { page: CollectionPage }) {
                         </button>
                       </div>
                     </div>
+                    <div className={styles.resumeVersions}>
+                      <div className={styles.resumeVersionsHeading}>
+                        <strong>Tailored versions</strong>
+                        <span>
+                          {sessionsByResume.get(resume.id)?.length ?? 0} saved
+                        </span>
+                      </div>
+                      {(sessionsByResume.get(resume.id)?.length ?? 0) > 0 ? (
+                        <div className={styles.versionList}>
+                          {sessionsByResume.get(resume.id)?.map((draft) => {
+                            const ready =
+                              draft.status === "completed" &&
+                              Boolean(draft.finalClaims);
+                            const title =
+                              draft.role || draft.company || "Tailored resume";
+                            return (
+                              <div
+                                className={styles.versionCard}
+                                id={`tailored-${draft.id}`}
+                                key={draft.id}
+                              >
+                                <div>
+                                  <span data-ready={ready}>
+                                    {ready
+                                      ? "Ready"
+                                      : draft.status.replace("_", " ")}
+                                  </span>
+                                  <strong>{title}</strong>
+                                  <small>
+                                    {draft.company && draft.role
+                                      ? `${draft.company} · ${draft.role}`
+                                      : draft.company ||
+                                        formatUpdatedAt(draft.updatedAt)}
+                                  </small>
+                                </div>
+                                <div className={styles.versionActions}>
+                                  {ready ? (
+                                    <button
+                                      onClick={() => {
+                                        setDensity("comfortable");
+                                        setDraftError(null);
+                                        setSelectedDraft(draft);
+                                      }}
+                                      type="button"
+                                    >
+                                      Preview
+                                    </button>
+                                  ) : (
+                                    <Link href={`/tailoring/${draft.id}`}>
+                                      Continue
+                                    </Link>
+                                  )}
+                                  <button
+                                    aria-label={`Delete tailored version ${title}`}
+                                    className={styles.deleteVersionButton}
+                                    onClick={() => {
+                                      setDraftError(null);
+                                      setDraftPendingDeletion(draft);
+                                    }}
+                                    type="button"
+                                  >
+                                    Delete
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <p>
+                          No tailored versions yet. Use “Tailor to a job” to
+                          create one.
+                        </p>
+                      )}
+                    </div>
                   </article>
                 ))}
               </div>
@@ -613,6 +784,133 @@ export function WorkspaceCollectionPage({ page }: { page: CollectionPage }) {
         />
       )}
 
+      {selectedDraft && selectedDocument && (
+        <div
+          className={styles.versionPreviewBackdrop}
+          onClick={() => setSelectedDraft(null)}
+        >
+          <section
+            aria-labelledby="tailored-preview-title"
+            aria-modal="true"
+            className={styles.versionPreviewDialog}
+            onClick={(event) => event.stopPropagation()}
+            role="dialog"
+          >
+            <header className={styles.versionPreviewHeader}>
+              <div>
+                <span>Tailored resume preview</span>
+                <h2 id="tailored-preview-title">
+                  {selectedDraft.role ||
+                    selectedDraft.company ||
+                    "Tailored version"}
+                </h2>
+                <p>
+                  {[selectedDraft.company, selectedDraft.role]
+                    .filter(Boolean)
+                    .join(" · ") || "Professional ATS version"}
+                </p>
+              </div>
+              <button
+                aria-label="Close tailored resume preview"
+                className={styles.versionPreviewClose}
+                onClick={() => setSelectedDraft(null)}
+                type="button"
+              >
+                ×
+              </button>
+            </header>
+
+            <div className={styles.versionPreviewWorkspace}>
+              <aside className={tailoringStyles.exportControls}>
+                <div>
+                  <span className={tailoringStyles.eyebrow}>Template</span>
+                  <h2>Professional ATS</h2>
+                  <p>
+                    Preview and download this version without leaving your
+                    resume library.
+                  </p>
+                </div>
+                <fieldset>
+                  <legend>Section spacing</legend>
+                  <label>
+                    <input
+                      checked={density === "comfortable"}
+                      name="inline-density"
+                      onChange={() => setDensity("comfortable")}
+                      type="radio"
+                    />
+                    <span>
+                      <strong>Comfortable</strong>
+                      <small>More breathing room</small>
+                    </span>
+                  </label>
+                  <label>
+                    <input
+                      checked={density === "compact"}
+                      name="inline-density"
+                      onChange={() => setDensity("compact")}
+                      type="radio"
+                    />
+                    <span>
+                      <strong>Compact</strong>
+                      <small>Fits longer resumes</small>
+                    </span>
+                  </label>
+                </fieldset>
+                <div className={tailoringStyles.exportActions}>
+                  <button
+                    disabled={downloadingDraft !== null}
+                    onClick={() => void downloadDraft("pdf")}
+                    type="button"
+                  >
+                    {downloadingDraft === "pdf"
+                      ? "Creating PDF…"
+                      : "Download PDF"}
+                  </button>
+                  <button
+                    disabled={downloadingDraft !== null}
+                    onClick={() => void downloadDraft("docx")}
+                    type="button"
+                  >
+                    {downloadingDraft === "docx"
+                      ? "Creating DOCX…"
+                      : "Download editable DOCX"}
+                  </button>
+                </div>
+                <Link
+                  className={styles.previewEditorLink}
+                  href={`/tailoring/${selectedDraft.id}`}
+                >
+                  Open tailoring editor →
+                </Link>
+                <button
+                  className={styles.previewDeleteButton}
+                  onClick={() => setDraftPendingDeletion(selectedDraft)}
+                  type="button"
+                >
+                  Delete this version
+                </button>
+                {draftError && (
+                  <div className={tailoringStyles.error} role="alert">
+                    {draftError}
+                  </div>
+                )}
+              </aside>
+
+              <section
+                aria-label="Tailored resume document"
+                className={`${tailoringStyles.paperStage} ${styles.inlinePaperStage}`}
+              >
+                <ProfessionalResume
+                  density={density}
+                  document={selectedDocument}
+                />
+              </section>
+            </div>
+          </section>
+        </div>
+      )}
+
       {resumePendingDeletion && (
         <div className={styles.deleteDialogBackdrop}>
           <section
@@ -648,6 +946,45 @@ export function WorkspaceCollectionPage({ page }: { page: CollectionPage }) {
                 type="button"
               >
                 {isDeleting ? "Deleting…" : "Delete permanently"}
+              </button>
+            </footer>
+          </section>
+        </div>
+      )}
+
+      {draftPendingDeletion && (
+        <div className={styles.deleteDialogBackdrop}>
+          <section
+            aria-labelledby="delete-version-title"
+            aria-modal="true"
+            className={styles.deleteDialog}
+            role="dialog"
+          >
+            <span>Permanent deletion</span>
+            <h2 id="delete-version-title">Delete this tailored version?</h2>
+            <p>
+              This removes the saved tailoring session and its generated
+              versions. Your verified base resume remains unchanged. This action
+              cannot be undone.
+            </p>
+            {draftError && <div role="alert">{draftError}</div>}
+            <footer>
+              <button
+                disabled={isDeletingDraft}
+                onClick={() => {
+                  setDraftError(null);
+                  setDraftPendingDeletion(null);
+                }}
+                type="button"
+              >
+                Keep version
+              </button>
+              <button
+                disabled={isDeletingDraft}
+                onClick={() => void confirmDraftDeletion()}
+                type="button"
+              >
+                {isDeletingDraft ? "Deleting…" : "Delete permanently"}
               </button>
             </footer>
           </section>

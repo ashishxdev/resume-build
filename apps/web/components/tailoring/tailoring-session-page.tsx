@@ -1,10 +1,14 @@
 "use client";
 
 import type {
+  ResumeExportFormat,
   ResumeClaimCategory,
+  ResumeTemplateDensity,
   TailoringSession,
   TailoringSuggestion,
 } from "@make-my-resume/contracts";
+import { buildProfessionalResumeDocument } from "@make-my-resume/resume-engine";
+import { ProfessionalResume } from "@make-my-resume/resume-renderer";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
@@ -16,6 +20,7 @@ import {
   completeTailoringSession,
   decideAll,
   decideSuggestion,
+  downloadTailoredResume,
   getTailoringSession,
   retryTailoringSession,
 } from "@/lib/tailoring/client";
@@ -52,6 +57,10 @@ export function TailoringSessionPage() {
   const [editing, setEditing] = useState<string | null>(null);
   const [editText, setEditText] = useState("");
   const [refreshKey, setRefreshKey] = useState(0);
+  const [density, setDensity] = useState<ResumeTemplateDensity>("comfortable");
+  const [downloading, setDownloading] = useState<ResumeExportFormat | null>(
+    null,
+  );
 
   useEffect(() => {
     if (!isPending && !authSession)
@@ -119,6 +128,18 @@ export function TailoringSessionPage() {
   const visibleSuggestions = (session?.suggestions ?? []).filter(
     (suggestion) => filter === "all" || suggestion.section === filter,
   );
+  const resumeDocument = useMemo(() => {
+    if (!session?.finalClaims) return null;
+    const claims =
+      session.atsImprovementActive && session.atsImprovedClaims
+        ? session.atsImprovedClaims
+        : session.finalClaims;
+    return buildProfessionalResumeDocument(claims, {
+      tailoredClaimIds: session.suggestions
+        .filter((suggestion) => suggestion.status === "accepted")
+        .map((suggestion) => suggestion.sourceClaimId),
+    });
+  }, [session]);
 
   async function updateSuggestion(
     suggestion: TailoringSuggestion,
@@ -189,6 +210,36 @@ export function TailoringSessionPage() {
       );
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function download(format: ResumeExportFormat) {
+    if (!session || downloading) return;
+    setDownloading(format);
+    setError(null);
+    try {
+      const exported = await downloadTailoredResume(
+        session.id,
+        format,
+        density,
+      );
+      const url = URL.createObjectURL(exported.blob);
+      const anchor = window.document.createElement("a");
+      anchor.href = url;
+      anchor.download = exported.filename;
+      anchor.hidden = true;
+      window.document.body.append(anchor);
+      anchor.click();
+      anchor.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1_000);
+    } catch (requestError) {
+      setError(
+        requestError instanceof Error
+          ? requestError.message
+          : "The resume could not be downloaded.",
+      );
+    } finally {
+      setDownloading(null);
     }
   }
 
@@ -347,25 +398,21 @@ export function TailoringSessionPage() {
             </div>
           </section>
           <div className={styles.completedGrid}>
-            <section className={styles.resumePreview}>
-              <header>
-                <div>
-                  <span>Tailored resume</span>
-                  <h2>{session.role ?? "Professional resume"}</h2>
+            <section
+              aria-label="Tailored resume document"
+              className={`${styles.paperStage} ${styles.completedPaperStage}`}
+            >
+              {resumeDocument ? (
+                <ProfessionalResume
+                  density={density}
+                  document={resumeDocument}
+                />
+              ) : (
+                <div className={styles.previewUnavailable}>
+                  <strong>The formatted preview is not available yet.</strong>
+                  <span>Your saved tailoring decisions are still safe.</span>
                 </div>
-                <b>{session.company ?? "Custom version"}</b>
-              </header>
-              {(session.finalClaims ?? []).map((claim) => (
-                <article key={claim.id}>
-                  <span>{sectionLabel(claim.category)}</span>
-                  <p>{claim.value}</p>
-                  {session.suggestions.some(
-                    (item) =>
-                      item.sourceClaimId === claim.id &&
-                      item.status === "accepted",
-                  ) && <small>✦ Tailored from verified evidence</small>}
-                </article>
-              ))}
+              )}
             </section>
             <aside className={styles.versionSummary}>
               <span className={styles.eyebrow}>Version summary</span>
@@ -388,12 +435,46 @@ export function TailoringSessionPage() {
                   <dd>{matchScore(session)}%</dd>
                 </div>
               </dl>
-              <Link
-                className={styles.primaryLink}
-                href={`/tailoring/${session.id}/resume`}
-              >
-                Preview and download resume
-              </Link>
+              <fieldset className={styles.completedDensityControls}>
+                <legend>Resume spacing</legend>
+                <label>
+                  <input
+                    checked={density === "comfortable"}
+                    name="completed-density"
+                    onChange={() => setDensity("comfortable")}
+                    type="radio"
+                  />
+                  <span>Comfortable</span>
+                </label>
+                <label>
+                  <input
+                    checked={density === "compact"}
+                    name="completed-density"
+                    onChange={() => setDensity("compact")}
+                    type="radio"
+                  />
+                  <span>Compact</span>
+                </label>
+              </fieldset>
+              <div className={styles.completedDownloadActions}>
+                <button
+                  disabled={downloading !== null || !resumeDocument}
+                  onClick={() => void download("pdf")}
+                  type="button"
+                >
+                  {downloading === "pdf" ? "Creating PDF…" : "Download PDF"}
+                </button>
+                <button
+                  disabled={downloading !== null || !resumeDocument}
+                  onClick={() => void download("docx")}
+                  type="button"
+                >
+                  {downloading === "docx"
+                    ? "Creating DOCX…"
+                    : "Download editable DOCX"}
+                </button>
+              </div>
+              <Link href="/resumes">View all resumes</Link>
               <Link href={`/tailoring/${session.id}/ats`}>
                 Continue to ATS review
               </Link>
