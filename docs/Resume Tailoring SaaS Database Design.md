@@ -86,9 +86,8 @@ tailoring_sessions
 suggestions
 ats_analyses
 share_links
-usage_records
+rate_limit_windows
 processing_jobs
-subscriptions
 idempotency_records
 ```
 
@@ -119,9 +118,7 @@ User
 │    │
 │    └── Suggestions
 │
-├── Usage Records
-│
-├── Subscription
+├── Operational Rate-Limit Windows
 │
 └── Processing Jobs
 ```
@@ -154,7 +151,7 @@ Conceptually:
 }
 ```
 
-Application-specific plan information should ideally remain in the subscription/billing domain rather than turning the auth user document into the entire user profile.
+Product workflow state should remain in domain collections rather than turning the auth user document into the entire user profile.
 
 ---
 
@@ -999,150 +996,37 @@ The old share record can be disabled or replaced.
 
 ---
 
-# 36. Usage Records
+# 36. Operational Rate-Limit Windows
 
 ## Collection
 
 ```text
-usage_records
+rate_limit_windows
 ```
 
-This collection acts as the usage ledger.
+This collection coordinates short rolling limits for expensive AI operations.
 
 Example:
 
 ```json
 {
-  "_id": "usage_001",
+  "_id": "rate_limit_001",
   "userId": "user_123",
-  "type": "tailor_generation",
-
-  "quantity": 1,
-
-  "period": {
-    "start": "2026-09-01T00:00:00Z",
-    "end": "2026-10-01T00:00:00Z"
-  },
-
-  "referenceId": "tailor_001",
-
-  "status": "consumed",
-
-  "createdAt": "2026-09-27T10:22:00Z"
+  "windowStartedAt": "2026-09-27T10:00:00Z",
+  "count": 3,
+  "operationIds": ["tailor_001"],
+  "updatedAt": "2026-09-27T10:22:00Z",
+  "expiresAt": "2026-09-27T11:00:00Z"
 }
 ```
 
 ---
 
-# 37. Usage States
+# 37. Operational Limit Rules
 
-To handle concurrent generation requests safely:
-
-```text
-reserved
-consumed
-released
-```
-
-Flow:
-
-```text
-Request
- ↓
-Reserve quota
- ↓
-AI processing
- ↓
-Success → consumed
-Failure → released
-```
-
-This is safer than simply incrementing a counter at request time.
-
----
-
-# 38. Free and Pro Limits
-
-Plan configuration:
-
-```text
-Free:
-2 successful tailoring generations
-
-Pro:
-30 successful tailoring generations / billing period
-```
-
-The database should not hard-code these values into every usage record.
-
-Plan limits should come from a plan configuration/service.
-
----
-
-# 39. Subscription Collection
-
-## Collection
-
-```text
-subscriptions
-```
-
-Payment provider is not finalized, so the database should remain provider-neutral.
-
-Example:
-
-```json
-{
-  "_id": "subscription_001",
-
-  "userId": "user_123",
-
-  "plan": "pro",
-
-  "status": "active",
-
-  "provider": "stripe",
-
-  "providerCustomerId": "customer_123",
-  "providerSubscriptionId": "subscription_123",
-
-  "currentPeriodStart": "2026-09-01T00:00:00Z",
-  "currentPeriodEnd": "2026-10-01T00:00:00Z",
-
-  "cancelAtPeriodEnd": false,
-
-  "createdAt": "2026-09-01T00:00:00Z",
-  "updatedAt": "2026-09-27T10:00:00Z"
-}
-```
-
-The provider could later be:
-
-```text
-stripe
-dodo
-another_provider
-```
-
-without changing the domain model substantially.
-
----
-
-# 40. Subscription as Application Source of Truth
-
-The payment provider is an external system.
-
-Our database should maintain the application's canonical subscription state.
-
-```text
-Payment Provider
-      ↓ webhook
-Billing Service
-      ↓
-MongoDB Subscription
-```
-
-The frontend should read plan state from our application.
+The product is free. These records exist only to enforce reliability controls
+such as rolling request counts, idempotent operation keys, and one active AI
+workflow per user. A TTL index should remove expired windows automatically.
 
 ---
 
@@ -1289,10 +1173,8 @@ The application should use Better Auth APIs/services rather than directly manipu
 ```text
 users
  │
- ├──────────────┐
- │              │
- ▼              ▼
-resumes      subscriptions
+ ▼
+resumes
  │
  ├───────────────┐
  │               │
@@ -1312,7 +1194,7 @@ suggestions
 
 users
   │
-  ├── usage_records
+  ├── rate_limit_windows
   ├── processing_jobs
   └── idempotency_records
 ```
@@ -1534,13 +1416,12 @@ Index:
 
 ---
 
-# 55. Usage Query
+# 55. Operational Rate-Limit Query
 
 Common:
 
 ```text
-Find user tailoring usage
-for current billing period
+Find the active user request window
 ```
 
 Index:
@@ -1548,31 +1429,11 @@ Index:
 ```text
 {
   userId: 1,
-  type: 1,
-  "period.start": 1
+  windowStartedAt: 1
 }
 ```
 
-The exact usage query can later be optimized using a billing-period identifier.
-
----
-
-# 56. Subscription Query
-
-Common:
-
-```text
-Find active subscription for user
-```
-
-Index:
-
-```text
-{
-  userId: 1,
-  status: 1
-}
-```
+Use a TTL index on `expiresAt` to remove old windows.
 
 ---
 
@@ -1889,29 +1750,21 @@ apply changes
 update suggestion statuses
 ```
 
-### Usage reservation
+### Operation-key reservation
 
 ```text
-reserve quota
+reserve a rate-limit operation key
 +
 create generation record
-```
-
-### Billing transition
-
-```text
-subscription update
-+
-related billing state
 ```
 
 Avoid using transactions for every normal CRUD operation.
 
 ---
 
-# 72. Atomic Usage Protection
+# 72. Atomic Rate-Limit Protection
 
-The generation quota must be protected from concurrent requests.
+Operational AI request limits must be protected from concurrent requests.
 
 Example:
 
@@ -1982,16 +1835,10 @@ suggestions
 ats_analyses
 ```
 
-### User subscription
+### Operational request windows
 
 ```text
-subscriptions
-```
-
-### Usage
-
-```text
-usage_records
+rate_limit_windows
 ```
 
 ---
@@ -2083,7 +1930,7 @@ job_descriptions
 tailoring_sessions
 ats_analyses
 share_links
-usage_records
+rate_limit_windows
 processing_jobs
 ```
 
@@ -2126,9 +1973,7 @@ User: user_123
 │   │
 │   └── Version 3: Startup Tailored
 │
-├── Usage Records
-│
-├── Subscription
+├── Operational Rate-Limit Windows
 │
 └── Processing Jobs
 ```
@@ -2194,9 +2039,8 @@ AI-generated factual changes must have an evidence path where applicable.
 | `suggestions` | AI proposed changes |
 | `ats_analyses` | ATS compatibility results |
 | `share_links` | Private-by-link sharing |
-| `usage_records` | AI generation usage ledger |
+| `rate_limit_windows` | Operational AI request throttling and idempotency |
 | `processing_jobs` | Background processing |
-| `subscriptions` | Provider-neutral Pro subscription state |
 | `idempotency_records` | Duplicate-request protection |
 
 ---
@@ -2208,10 +2052,10 @@ The central design is:
 ```text
                            USER
                             │
-            ┌───────────────┼────────────────┐
-            │               │                │
-            ▼               ▼                ▼
-         RESUMES       SUBSCRIPTION      USAGE
+            ┌───────────────┴────────────────┐
+            │                                │
+            ▼                                ▼
+         RESUMES                    RATE-LIMIT WINDOWS
             │
             ▼
       RESUME VERSIONS
@@ -2243,7 +2087,7 @@ And externally:
        ┌─────────────────┼──────────────────┐
        │                 │                  │
        ▼                 ▼                  ▼
-  Domain Data      Processing Jobs      Usage/Billing
+  Domain Data      Processing Jobs      Rate Limits
        │
        │
        ├───────────────► Cloudflare R2
@@ -2253,7 +2097,7 @@ And externally:
        │
        ├───────────────► AI Provider Layer
        │
-       └───────────────► Resend / Payment Provider
+       └───────────────► Resend
 ```
 
 ---

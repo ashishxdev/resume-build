@@ -101,7 +101,6 @@ export default function HomePage() {
             <a href="#product">Product</a>
             <a href="#how-it-works">How it works</a>
             <a href="#match-and-ats">Match & ATS</a>
-            <a href="#pricing">Pricing</a>
             <a href="#faq">FAQ</a>
           </nav>
           <div className="header-actions">
@@ -117,7 +116,6 @@ export default function HomePage() {
                 <a href="#product">Product</a>
                 <a href="#how-it-works">How it works</a>
                 <a href="#match-and-ats">Match & ATS</a>
-                <a href="#pricing">Pricing</a>
                 <a href="#faq">FAQ</a>
               </nav>
             </details>
@@ -149,10 +147,10 @@ export default function HomePage() {
             </div>
             <div className="trust-row">
               <span>
-                <Check /> No credit card required
+                <Check /> Free to use
               </span>
               <span>
-                <Check /> 2 free resumes
+                <Check /> Evidence-backed tailoring
               </span>
               <span>
                 <Check /> 100% human-in-the-loop control
@@ -563,8 +561,8 @@ export default function HomePage() {
               <Link className="button" href="/signup">
                 Create my first version
               </Link>
-              <a className="watch-link" href="#pricing">
-                View plans
+              <a className="watch-link" href="#how-it-works">
+                Explore the workflow
               </a>
             </div>
           </div>
@@ -587,42 +585,6 @@ export default function HomePage() {
               </li>
             ))}
           </ol>
-        </div>
-      </section>
-
-      <section className="wash-section" id="pricing">
-        <div className="shell">
-          <header className="section-heading centered">
-            <p className="eyebrow">Invest in your trajectory</p>
-            <h2>Simple, ethical, transparent pricing.</h2>
-            <p>Start free. Upgrade when your search needs more momentum.</p>
-          </header>
-          <div className="pricing">
-            <PriceCard
-              name="Starter dossier"
-              title="Free forever"
-              price="$0"
-              items={[
-                "2 tailored resumes",
-                "Evidence-backed suggestions",
-                "ATS analysis",
-                "PDF export",
-              ]}
-            />
-            <PriceCard
-              featured
-              name="Pro career"
-              title="Active seekers"
-              price="$12"
-              items={[
-                "Unlimited tailored versions",
-                "Advanced ATS diagnostics",
-                "Version history & restore",
-                "Public resume sharing",
-                "Priority processing",
-              ]}
-            />
-          </div>
         </div>
       </section>
 
@@ -660,7 +622,7 @@ export default function HomePage() {
             <Link className="button light-button" href="/signup">
               Tailor my resume
             </Link>
-            <small>No credit card required · Two free resumes</small>
+            <small>Free to use · You approve every change</small>
           </div>
         </div>
       </section>
@@ -683,7 +645,6 @@ export default function HomePage() {
               ["Resume tailoring", "/#product"],
               ["ATS analysis", "/#match-and-ats"],
               ["How it works", "/#how-it-works"],
-              ["Pricing", "/#pricing"],
             ]}
           />
           <FooterLinks
@@ -865,47 +826,6 @@ function Version({
         </span>
       </div>
       <strong>{score}</strong>
-    </article>
-  );
-}
-
-function PriceCard({
-  name,
-  title,
-  price,
-  items,
-  featured = false,
-}: {
-  name: string;
-  title: string;
-  price: string;
-  items: string[];
-  featured?: boolean;
-}) {
-  return (
-    <article className={`price-card ${featured ? "featured" : ""}`}>
-      {featured && <span className="popular">Most popular</span>}
-      <span className="plan-name">{name}</span>
-      <h3>{title}</h3>
-      <p>
-        {featured
-          ? "For a focused job search across multiple roles."
-          : "For testing the workflow on your next opportunity."}
-      </p>
-      <div className="price">
-        <b>{price}</b>
-        <span>{featured ? "per month" : "forever"}</span>
-      </div>
-      <ul>
-        {items.map((item) => (
-          <li key={item}>
-            <Check /> {item}
-          </li>
-        ))}
-      </ul>
-      <Link className={featured ? "button" : "outline-button"} href="/signup">
-        {featured ? "Choose Pro" : "Start for free"}
-      </Link>
     </article>
   );
 }

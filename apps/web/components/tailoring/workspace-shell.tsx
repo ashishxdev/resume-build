@@ -22,7 +22,6 @@ export function WorkspaceShell({ children }: { children: ReactNode }) {
             <Link href="/dashboard#resumes">Resumes</Link>
             <Link href="/dashboard#activity">Activity</Link>
           </nav>
-          <span className={styles.creditPill}>0 / 2 tailored</span>
         </div>
       </header>
       {children}

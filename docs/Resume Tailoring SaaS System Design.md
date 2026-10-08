@@ -258,8 +258,7 @@ api/src/
 │   ├── ats/
 │   ├── version/
 │   ├── sharing/
-│   ├── usage/
-│   └── billing/
+│   └── rate-limit/
 │
 ├── infrastructure/
 │   ├── database/
@@ -290,7 +289,6 @@ Handles:
 
 - User profile
 - Account preferences
-- Plan information
 - Account state
 
 ## Resume
@@ -378,23 +376,14 @@ Handles:
 - Enable/disable
 - Regeneration
 
-## Usage
+## Operational limits
 
 Handles:
 
-- Generation count
-- Plan limits
-- Usage records
-- Quota enforcement
-
-## Billing
-
-Handles:
-
-- Subscription state
-- Payment provider abstraction
-- Plan changes
-- Webhook processing
+- Rolling AI request counts
+- Idempotent operation keys
+- Concurrent-operation protection
+- Abuse prevention
 
 ---
 
@@ -1238,16 +1227,14 @@ Do not repeatedly retry:
 
 ---
 
-# 40. Usage Enforcement
+# 40. Operational AI Limit Enforcement
 
-Before creating a billable generation:
+Before starting an expensive AI operation:
 
 ```text
 Authenticated User
        ↓
-Load Plan
-       ↓
-Check Usage
+Check Rolling Window
        ↓
 Within Limit?
    ┌───┴────┐
@@ -1257,7 +1244,7 @@ Within Limit?
 Create Job  Reject
 ```
 
-The quota must be reserved/consumed atomically to prevent concurrent requests from exceeding the limit.
+The operation key must be recorded atomically so concurrent duplicate requests do not consume the rolling allowance twice.
 
 Failed generations should release the reserved quota or otherwise be excluded from final usage.
 
@@ -1297,28 +1284,11 @@ without redesigning the usage system.
 
 ---
 
-# 42. Plans
+# 42. Free Product Access
 
-## Free
-
-```text
-2 successful AI-tailored resume generations
-```
-
-## Pro
-
-```text
-30 successful AI-tailored resume generations / billing month
-```
-
-The limits should be configuration-driven:
-
-```text
-PLAN_LIMITS = {
-  free: 2,
-  pro: 30
-}
-```
+The product has no paid tiers or purchasable generation allowances. Short
+rolling AI request limits are configuration-driven operational safeguards and
+must not be surfaced as product entitlements.
 
 ---
 
@@ -1548,50 +1518,11 @@ Future emails can be added without changing module consumers.
 
 ---
 
-# 52. Billing Architecture
+# 52. Monetization Boundary
 
-Payment provider is intentionally not finalized.
-
-The architecture should use:
-
-```text
-BillingService
-     ↓
-PaymentProvider
-     ├── Stripe
-     ├── Dodo
-     └── Future Provider
-```
-
-The application should store its own canonical subscription state.
-
-Payment-provider data should not be the only source of truth.
-
----
-
-# 53. Payment Webhook Flow
-
-Conceptually:
-
-```text
-Payment Provider
-      ↓
-Webhook
-      ↓
-Express
-      ↓
-Verify Signature
-      ↓
-Billing Module
-      ↓
-Update Subscription
-      ↓
-Update User Plan
-```
-
-Webhook handlers must be idempotent.
-
-Repeated webhook delivery should not create duplicate effects.
+No monetization module or payment integration belongs in the current product
+architecture. If that product decision changes later, it requires a new design
+review rather than dormant user-facing or domain concepts.
 
 ---
 
@@ -1721,22 +1652,6 @@ POST   /api/versions/:id/share
 PATCH  /api/share/:token
 DELETE /api/share/:token
 ```
-
-## Usage
-
-```text
-GET /api/usage
-```
-
-## Billing
-
-```text
-GET /api/billing
-POST /api/billing/checkout
-POST /api/billing/webhook
-```
-
----
 
 # 56. API Validation
 
@@ -2059,9 +1974,6 @@ Application
    ↓
 R2
 
-Application
-   ↓
-Payment provider
 ```
 
 Anything received from outside the application should be validated.
@@ -2644,8 +2556,7 @@ MongoDB transactions should be used only where a multi-document state change gen
 Examples:
 
 - Accept-all suggestions + session state
-- Quota reservation + generation record
-- Subscription state transitions
+- Rate-limit operation key + generation record
 
 Do not use transactions everywhere.
 
@@ -2658,10 +2569,9 @@ The application should favor simple document operations when possible.
 Strong consistency is required for:
 
 - Ownership
-- Usage limits
+- Operational rate limits
 - Version relationships
 - Share-link enabled state
-- Subscription state
 
 Eventual consistency is acceptable for:
 
@@ -2893,7 +2803,6 @@ components/
 ├── ats/
 ├── versions/
 ├── sharing/
-├── billing/
 └── common/
 ```
 
@@ -3031,7 +2940,7 @@ PDF
    ↓
 Sharing
    ↓
-Billing/Usage
+Operational safeguards
    ↓
 Production hardening
 ```
@@ -3232,7 +3141,6 @@ The current modular boundaries make this extraction possible.
 | Background jobs | MongoDB-backed initially |
 | Frontend hosting | Vercel |
 | Backend hosting | Render |
-| Payments | Provider abstraction; provider TBD |
 | Resume representation | Structured JSON |
 | Original resume | Preserved |
 | Design handling | Visual reference → own renderer |
@@ -3240,8 +3148,7 @@ The current modular boundaries make this extraction possible.
 | Sharing | Unlisted link |
 | ATS | Deterministic + AI |
 | AI changes | Suggestions → Accept/Reject |
-| Free limit | 2 successful AI-tailored generations |
-| Pro limit | 30 successful AI-tailored generations/month |
+| Product access | Free; no paid tiers or generation allowances |
 | Microservices | No for MVP |
 | Redis | No for MVP |
 
@@ -3304,11 +3211,6 @@ The complete MVP architecture can be summarized as:
                     │      Email      │
                     └─────────────────┘
 
-                    ┌─────────────────┐
-                    │ Payment Provider│
-                    │ Stripe / Dodo   │
-                    │ / Future        │
-                    └─────────────────┘
 ```
 
 ---

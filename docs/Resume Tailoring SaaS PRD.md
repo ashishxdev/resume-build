@@ -75,7 +75,7 @@ This product addresses both problems by combining AI optimization with user cont
 13. Maintain versions of tailored resumes.
 14. Export the final resume as PDF.
 15. Allow private/unlisted resume sharing through a link.
-16. Enforce free and Pro AI generation limits.
+16. Keep the product free while protecting AI endpoints with operational rate limits.
 
 ---
 
@@ -279,15 +279,10 @@ Highlight:
 
 Show the structured editor and live resume preview.
 
-### Pricing
+### Access
 
-Show:
-
-**Free**
-- 2 AI-tailored resume generations
-
-**Pro**
-- 30 AI-tailored resume generations/month
+State clearly that the product is free to use. Do not present paid tiers,
+payment flows, or purchasable generation allowances.
 
 ### FAQ
 
@@ -346,17 +341,7 @@ Display:
 
 - Number of resumes
 - Number of tailored versions
-- Current plan
-- AI generations used
-- AI generations remaining
-
-Example:
-
-```text
-Free Plan
-
-1 / 2 tailored resumes generated
-```
+- Number of in-progress workflows
 
 ### Resume list
 
@@ -1080,42 +1065,15 @@ Disabling a share link must immediately invalidate public access.
 
 ---
 
-# 8.22 Usage & Plans
+# 8.22 Free Access and Operational Limits
 
-## Free plan
+Make My Resume is free to use. The application has no paid tiers, payment
+flows, monetization accounts, or purchasable generation allowances.
 
-Users can generate:
-
-> **2 AI-tailored resumes**
-
-An AI-tailored resume means a completed resume generation based on a job description.
-
-Uploading/importing the original resume does not consume this allowance.
-
-## Pro plan
-
-Users can generate:
-
-> **30 AI-tailored resumes per month**
-
-## Usage display
-
-Dashboard should show:
-
-```text
-Pro Plan
-
-12 / 30 generations used
-18 remaining
-```
-
-## Important MVP rule
-
-The quota is tied to successful AI tailoring generations, not to the number of times a user manually edits the resume.
-
-ATS analysis and suggestion processing within the same tailoring workflow should not independently consume an additional resume-generation credit.
-
-A failed generation should not consume a credit.
+AI endpoints may enforce rolling per-user request limits and concurrency guards
+to protect service reliability and prevent abuse. These controls are operational,
+must not be presented as product entitlements, and must provide a clear retry time.
+Manual resume editing does not invoke or affect these safeguards.
 
 ---
 
@@ -1586,15 +1544,13 @@ Display:
 
 > We couldn't generate your tailored resume. Please try again.
 
-The failed operation must not consume a generation credit.
+The failed operation must remain retryable and must not count as a successful workflow.
 
 ## Rate limit
 
 Display:
 
-> You've reached your current AI generation limit.
-
-Provide an appropriate Pro upgrade path for Free users.
+> Too many AI requests were made in a short period. Please try again later.
 
 ## Share disabled
 
@@ -1743,9 +1699,7 @@ Disabling the link prevents further public access.
 
 ## Usage
 
-Free users cannot generate more than 2 successful AI-tailored resumes.
-
-Pro users cannot generate more than 30 successful AI-tailored resumes during a billing month.
+Operational AI throttles prevent abuse without creating a paid entitlement.
 
 ---
 
@@ -1852,12 +1806,10 @@ Free users upgrading to Pro.
 - PDF generation
 - Private share links
 
-## Phase 7 — SaaS controls
+## Phase 7 — Product controls
 
-- Free limits
-- Pro limits
-- Usage tracking
-- Upgrade UI
+- Operational AI rate limiting
+- Abuse prevention
 - Settings
 
 ## Phase 8 — Polish

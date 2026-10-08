@@ -1,6 +1,6 @@
 # Make My Resume — Project Status
 
-Last updated: 2026-10-04
+Last updated: 2026-10-08
 
 ## Purpose
 
@@ -15,9 +15,9 @@ Update this file whenever a major feature is started, completed, materially rede
 | Project foundation | Complete | pnpm/Turborepo monorepo with web, API, shared contracts, resume engine, renderer, linting, TypeScript, and test foundations. |
 | Marketing homepage | Complete | Responsive Stitch-inspired homepage implementing the Atelier Digital visual system and core product messaging. |
 | Authentication | In progress | Email/password authentication now includes Resend-backed, rate-limited password recovery with single-use tokens and session revocation. Google OAuth still requires configuration and end-to-end verification. |
-| Dashboard workspace | Complete | Responsive authenticated dashboard implements the approved desktop and mobile Stitch designs with truthful empty, loading, navigation, account, plan, activity, and trust states. |
-| Resume workflows | In progress | PDF/DOCX import, Gemini-assisted extraction, verified base versions, grounded job matching, evidence-backed suggestion review, immutable tailored versions, transparent ATS compatibility analysis, and Professional ATS PDF/DOCX export are complete. ATS improvement suggestions, additional templates, and sharing remain future milestones. |
-| Backend business modules | In progress | Owned imports, private R2 originals, recoverable queues, grounded parsing and matching, explicit suggestion decisions, transactional tailored-version persistence, saved ATS snapshots, and authenticated deterministic document export are complete. ATS improvement actions remain future work. |
+| Dashboard workspace | Complete | Responsive authenticated dashboard implements the approved desktop and mobile Stitch designs with truthful empty, loading, navigation, activity, and trust states. |
+| Resume workflows | In progress | PDF/DOCX import, Gemini-assisted extraction, verified base versions, grounded job matching, evidence-backed suggestion review, immutable tailored versions, transparent ATS compatibility analysis and improvement actions, and Professional ATS PDF/DOCX export are complete. Additional templates and sharing remain future milestones. |
+| Backend business modules | In progress | Owned imports, private R2 originals, recoverable queues, grounded parsing and matching, explicit suggestion decisions, transactional tailored-version persistence, ATS analysis and improvement workflows, saved ATS snapshots, and authenticated deterministic document export are complete. |
 
 ## Milestones
 
@@ -41,7 +41,7 @@ Update this file whenever a major feature is started, completed, materially rede
 - **Scope delivered:**
   - Built the public homepage in `apps/web` using the connected Stitch design as the visual reference.
   - Applied the Atelier Digital visual language: Playfair Display, Plus Jakarta Sans, deep plum accents, editorial spacing, restrained surfaces, and low-contrast elevation.
-  - Added the hero, interactive product preview, ethical-AI principles, resume comparison, job-match analysis, suggestion review, editor preview, ATS audit, versioning, workflow, pricing, FAQ, final CTA, and footer.
+  - Added the hero, interactive product preview, ethical-AI principles, resume comparison, job-match analysis, suggestion review, editor preview, ATS audit, versioning, workflow, FAQ, final CTA, and footer.
   - Added responsive desktop, tablet, and mobile layouts, including a stacked mobile product preview and corrected comparison flow.
   - Added semantic structure, reduced-motion support, page metadata, and a branded favicon.
   - Prepared homepage calls to action for the future `/login` and `/signup` routes.
@@ -133,11 +133,11 @@ Update this file whenever a major feature is started, completed, materially rede
 - **Status:** Complete
 - **Scope delivered:**
   - Rebuilt the protected dashboard from the approved Stitch desktop and mobile references using the Atelier Digital visual system.
-  - Added a responsive top navigation, mobile bottom navigation, plan and usage summary, authenticated account menu, recoverable sign-out feedback, resume-library empty state, recent-activity empty state, and zero-hallucination trust panel.
-  - Added explicit feedback for the notification and plan-upgrade controls so every interactive element communicates its current state.
+  - Added a responsive top navigation, mobile bottom navigation, product-usage summary, authenticated account menu, recoverable sign-out feedback, resume-library empty state, recent-activity empty state, and zero-hallucination trust panel.
+  - Added explicit feedback for the notification control so every interactive element communicates its current state.
   - Kept dashboard content truthful to the current product state: resume and tailored-draft counts are zero until the resume APIs exist, while upload and create actions explain their upcoming milestone instead of behaving like silent mock controls.
   - Preserved session restoration and signed-out redirection to the login flow.
-- **Verification:** 20 web tests pass across 5 files, including authenticated empty-state rendering, signed-out redirection, staged-feature feedback, hydration with different server/client time bands, homepage-anchor validity, and the zero-unread notification state. Web type checking, linting, Prettier validation, and the Next.js production build pass. The dashboard was visually verified at desktop and 390 × 844 mobile widths; the mobile page has no horizontal overflow. Live browser passes confirmed notification and upgrade feedback, account-menu sign-out, session rejection after sign-out, the protected dashboard redirect, hydration-localized greeting, `/#integrity` destinations, and the absence of an unread pseudo-element at zero notifications. Automatic font preloads were disabled after Chrome reported that the route did not consume them quickly enough; the clean follow-up browser sessions reported no application warnings or errors. Disposable QA accounts and their sessions were removed after testing.
+- **Verification:** 20 web tests pass across 5 files, including authenticated empty-state rendering, signed-out redirection, staged-feature feedback, hydration with different server/client time bands, homepage-anchor validity, and the zero-unread notification state. Web type checking, linting, Prettier validation, and the Next.js production build pass. The dashboard was visually verified at desktop and 390 × 844 mobile widths; the mobile page has no horizontal overflow. Live browser passes confirmed notification feedback, account-menu sign-out, session rejection after sign-out, the protected dashboard redirect, hydration-localized greeting, `/#integrity` destinations, and the absence of an unread pseudo-element at zero notifications. Automatic font preloads were disabled after Chrome reported that the route did not consume them quickly enough; the clean follow-up browser sessions reported no application warnings or errors. Disposable QA accounts and their sessions were removed after testing.
 - **Remaining work:** Resume statistics and activity must be connected to owned API resources when the resume import module is implemented. Upload, create, resume search, and populated resume cards belong to the next milestones.
 - **Primary files:**
   - `apps/web/app/dashboard/page.tsx`
@@ -238,9 +238,9 @@ Update this file whenever a major feature is started, completed, materially rede
   - Run generation through a durable queued workflow with processing leases, stale-worker reclamation, bounded retries, owner-only access, one active generation per user, shared hourly AI quotas, saved failure states, and explicit retry handling.
   - Require an explicit accept or reject decision for every suggestion, support accept-all, reject-all, and editable accepted wording, and persist each decision optimistically so refreshes preserve progress.
   - Create a separate immutable tailored resume version only after all decisions are complete. The version records its base version, job analysis, tailoring session, and final claims without changing the verified base pointer.
-  - Surface completed and in-progress tailoring sessions on the dashboard, update tailored-version and free-credit counts, and allow users to reopen saved work.
+  - Surface completed and in-progress tailoring sessions on the dashboard, update workflow counts, and allow users to reopen saved work.
 - **Verification:** 71 API tests and 39 web tests pass. Coverage includes evidence and requirement binding, invented-number rejection for both provider output and manual edits, queue processing, owner isolation, quota-safe idempotent session reopening, transient polling recovery, pending-decision enforcement, optimistic decision persistence, preservation of manually edited accepted wording, separate tailored-version creation, workflow navigation, truthful dashboard counts, independent resume and tailoring failure states, reopen links, and disabled completion until every decision is made. Workspace type checking, linting, Prettier validation, and the production build pass. A disposable live MongoDB smoke test passed queue claiming, persisted decisions, transactional tailored-version creation, and base-version preservation; the test database was dropped afterward. A live `gemini-3.1-flash-lite` smoke test returned one grounded suggestion for synthetic evidence with the expected source-claim binding. The responsive implementation follows the six approved Stitch desktop/mobile screens; authenticated live visual inspection remains part of final user acceptance.
-- **Important limitations:** Gemini availability and latency remain external dependencies; failed sessions can be retried without losing their bound analysis. The lexical safety layer rejects new numeric facts while the provider prompt and evidence links constrain other factual wording; user review remains mandatory. ATS improvement actions, additional export templates, sharing, billing enforcement, and manual editing outside suggested claims remain future milestones.
+- **Important limitations:** Gemini availability and latency remain external dependencies; failed sessions can be retried without losing their bound analysis. The lexical safety layer rejects new numeric facts while the provider prompt and evidence links constrain other factual wording; user review remains mandatory. ATS improvement actions, additional export templates, sharing, and manual editing outside suggested claims remain future milestones.
 - **Primary files:**
   - `apps/api/src/infrastructure/ai/gemini-tailoring-generator.ts`
   - `apps/api/src/modules/tailoring/tailoring-repository.ts`
@@ -316,6 +316,28 @@ Update this file whenever a major feature is started, completed, materially rede
   - `apps/web/components/tailoring/ats-analysis-page.tsx`
   - `apps/web/components/tailoring/resume-document-page.tsx`
   - `apps/web/lib/tailoring/client.ts`
+
+### 15. Free Product Model
+
+- **Date:** 2026-10-08
+- **Status:** Complete
+- **Scope delivered:**
+  - Made Make My Resume a free product with no paid tiers, subscriptions, checkout, upgrade paths, or generation-credit UI.
+  - Removed the homepage pricing section and all plan links, paid-tier messaging, credit-card language, and limited-free-resume claims.
+  - Replaced dashboard plan and credit cards with truthful resume, completed-tailoring, and in-progress workflow metrics.
+  - Removed credit counters from authenticated tailoring navigation and aligned the PRD, API, database, and system designs with the free-product decision.
+  - Retained per-user AI request throttles strictly as operational abuse and cost protection; they are not user-purchasable credits or product tiers.
+- **Verification:** All 43 web tests pass. Workspace type checking, linting, Prettier validation, and the complete production build pass.
+- **Primary files:**
+  - `apps/web/app/page.tsx`
+  - `apps/web/app/globals.css`
+  - `apps/web/app/dashboard/page.tsx`
+  - `apps/web/app/dashboard/dashboard.module.css`
+  - `apps/web/components/tailoring/workspace-shell.tsx`
+  - `docs/Resume Tailoring SaaS PRD.md`
+  - `docs/Resume Tailoring SaaS API Design.md`
+  - `docs/Resume Tailoring SaaS Database Design.md`
+  - `docs/Resume Tailoring SaaS System Design.md`
 
 ## Next Major Milestone
 

@@ -107,8 +107,10 @@ describe("DashboardPage", () => {
     ]);
     render(React.createElement(DashboardPage));
 
-    expect((await screen.findAllByText("1 / 2")).length).toBeGreaterThan(0);
-    expect(screen.getByText("Acme")).toBeTruthy();
+    expect(await screen.findByText("Acme")).toBeTruthy();
+    expect(
+      screen.getByText("Tailored drafts").parentElement?.textContent,
+    ).toContain("1Applications");
     expect(screen.getByRole("link", { name: "Open" })).toHaveProperty(
       "href",
       "http://localhost:3000/tailoring/tailor_1",
@@ -165,7 +167,7 @@ describe("DashboardPage", () => {
     expect(screen.getByRole("dialog")).toBeTruthy();
   });
 
-  it("gives feedback for notifications and plan upgrades", () => {
+  it("gives feedback for notifications", () => {
     render(React.createElement(DashboardPage));
 
     fireEvent.click(
@@ -173,13 +175,6 @@ describe("DashboardPage", () => {
     );
     expect(
       screen.getByText("You’re all caught up—there are no new notifications."),
-    ).toBeTruthy();
-
-    fireEvent.click(screen.getByRole("button", { name: "Upgrade" }));
-    expect(
-      screen.getByText(
-        "Plan upgrades will be available when billing is introduced. Your free plan includes 2 tailored resumes.",
-      ),
     ).toBeTruthy();
   });
 

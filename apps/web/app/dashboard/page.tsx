@@ -295,12 +295,6 @@ export default function DashboardPage() {
     setFeatureNotice("You’re all caught up—there are no new notifications.");
   }
 
-  function showUpgradeStatus() {
-    setFeatureNotice(
-      "Plan upgrades will be available when billing is introduced. Your free plan includes 2 tailored resumes.",
-    );
-  }
-
   if (isPending || !data) {
     return (
       <main className={styles.loading} aria-live="polite">
@@ -321,7 +315,9 @@ export default function DashboardPage() {
   const completedTailoringSessions = tailoringSessions.filter(
     (session) => session.status === "completed",
   );
-  const usedCredits = Math.min(completedTailoringSessions.length, 2);
+  const activeTailoringSessions = tailoringSessions.filter(
+    (session) => session.status !== "completed" && session.status !== "failed",
+  );
 
   return (
     <div className={styles.page}>
@@ -344,9 +340,6 @@ export default function DashboardPage() {
           </nav>
 
           <div className={styles.accountArea}>
-            <span className={styles.usageBadge}>
-              <i /> {usedCredits} / 2 tailored
-            </span>
             <button
               aria-label="Notifications — none unread"
               className={styles.iconButton}
@@ -435,27 +428,10 @@ export default function DashboardPage() {
             </div>
           </article>
           <article>
-            <span>Current plan</span>
+            <span>In progress</span>
             <div>
-              <strong>Free</strong>
-              <button
-                className={styles.upgradeButton}
-                onClick={showUpgradeStatus}
-                type="button"
-              >
-                Upgrade
-              </button>
-            </div>
-          </article>
-          <article>
-            <span className={styles.creditLabel}>
-              Credits <b>{usedCredits} / 2</b>
-            </span>
-            <div
-              className={styles.creditTrack}
-              aria-label={`${usedCredits} of 2 credits used`}
-            >
-              <i style={{ width: `${usedCredits * 50}%` }} />
+              <strong>{activeTailoringSessions.length}</strong>
+              <small>Workflows</small>
             </div>
           </article>
         </section>

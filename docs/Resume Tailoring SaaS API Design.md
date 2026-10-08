@@ -34,8 +34,7 @@ The API provides the backend interface for:
 - ATS improvement
 - PDF generation
 - Resume sharing
-- Usage limits
-- Billing
+- Operational rate limits
 - Background jobs
 
 The API is designed around the modular-monolith architecture established in the System Design document.
@@ -414,7 +413,6 @@ The Express API is divided into:
 ├── share-links
 ├── jobs
 ├── usage
-├── billing
 └── webhooks
 ```
 
@@ -1854,233 +1852,28 @@ The raw token exists only in the user's share URL.
 
 ---
 
-# 65. Usage API
+# 65. Operational AI Limits
 
-## Get Usage
+The product is free to use. Expensive AI endpoints still enforce rolling
+per-user request limits and one-active-operation guards to protect reliability
+and prevent abuse. These limits are not product entitlements and cannot be
+purchased.
 
-```http
-GET /api/v1/usage
-```
-
-### Response
-
-```json
-{
-  "data": {
-    "plan": "free",
-    "limit": 2,
-    "used": 1,
-    "remaining": 1,
-    "period": {
-      "start": "2026-09-27T00:00:00Z",
-      "end": "2026-09-28T00:00:00Z"
-    }
-  }
-}
-```
-
-For Pro, the period is the billing period.
-
----
-
-# 66. Quota Enforcement
-
-Quota checks occur on the server.
-
-The client cannot decide whether a user has remaining generations.
-
-Tailoring flow:
-
-```text
-Tailoring Request
- ↓
-Load Subscription/Plan
- ↓
-Check Usage
- ↓
-Reserve Generation
- ↓
-Create Job
-```
-
----
-
-# 67. Quota Reservation
-
-For a successful generation:
-
-```text
-reserved
-   ↓
-consumed
-```
-
-For failure:
-
-```text
-reserved
-   ↓
-released
-```
-
-This prevents a failed AI request from permanently consuming a generation.
-
----
-
-# 68. Quota Conflict
-
-When a user has no remaining generation:
-
-```text
-429 Too Many Requests
-```
-
-Example:
+When a short-term limit is reached, return `429 Too Many Requests` with a
+`Retry-After` header and a neutral retry message:
 
 ```json
 {
   "error": {
-    "code": "QUOTA_EXCEEDED",
-    "message": "You have reached your current AI generation limit.",
+    "code": "RATE_LIMITED",
+    "message": "Too many AI requests were made in a short period. Please try again later.",
     "requestId": "req_123"
   }
 }
 ```
 
-The frontend can show an upgrade prompt.
-
----
-
-# 69. Billing API
-
-The payment provider is still provider-neutral.
-
-## Get Subscription
-
-```http
-GET /api/v1/billing/subscription
-```
-
-### Response
-
-```json
-{
-  "data": {
-    "plan": "pro",
-    "status": "active",
-    "currentPeriodStart": "2026-09-01T00:00:00Z",
-    "currentPeriodEnd": "2026-10-01T00:00:00Z",
-    "cancelAtPeriodEnd": false
-  }
-}
-```
-
----
-
-# 70. Create Checkout
-
-```http
-POST /api/v1/billing/checkout
-```
-
-### Request
-
-```json
-{
-  "plan": "pro"
-}
-```
-
-### Response
-
-```json
-{
-  "data": {
-    "checkoutUrl": "https://payment-provider.example/checkout/..."
-  }
-}
-```
-
-The actual payment provider can be:
-
-```text
-Stripe
-Dodo
-Future provider
-```
-
-without changing the public business contract substantially.
-
----
-
-# 71. Cancel Subscription
-
-```http
-POST /api/v1/billing/subscription/cancel
-```
-
-### Request
-
-```json
-{
-  "atPeriodEnd": true
-}
-```
-
-### Response
-
-```json
-{
-  "data": {
-    "status": "active",
-    "cancelAtPeriodEnd": true
-  }
-}
-```
-
----
-
-# 72. Payment Webhooks
-
-Payment providers communicate through webhooks.
-
-Provider-neutral route:
-
-```http
-POST /api/v1/webhooks/payments/:provider
-```
-
-Example:
-
-```text
-POST /api/v1/webhooks/payments/stripe
-```
-
-The API must:
-
-1. Verify webhook signature.
-2. Parse event.
-3. Check idempotency.
-4. Process billing event.
-5. Update local subscription state.
-6. Return success.
-
----
-
-# 73. Webhook Idempotency
-
-Payment providers may send the same event more than once.
-
-The API must store the provider event ID.
-
-```text
-eventId already processed?
-    ↓
-Yes → return 200
-No  → process event
-```
-
-Never apply the same subscription transition twice.
+Idempotent operation keys must prevent repeated requests for the same workflow
+from consuming the operational allowance more than once.
 
 ---
 
@@ -2301,7 +2094,6 @@ Especially:
 POST /tailoring-sessions
 POST /ats/analyses
 POST /versions/:id/pdf
-POST /billing/checkout
 POST /share-links
 ```
 
@@ -2673,7 +2465,6 @@ Possible external failures:
 AI provider unavailable
 R2 unavailable
 Resend unavailable
-Payment provider unavailable
 ```
 
 The API should translate provider failures into internal error codes.
@@ -2804,11 +2595,10 @@ The API documentation should include:
 Test service logic:
 
 ```text
-UsageService
+RateLimitService
 VersionService
 MatchingService
 SuggestionService
-BillingService
 ```
 
 ## Integration tests
@@ -3019,32 +2809,6 @@ GET /api/v1/public/share/:token
 
 ---
 
-## Usage
-
-```text
-GET /api/v1/usage
-```
-
----
-
-## Billing
-
-```text
-GET  /api/v1/billing/subscription
-POST /api/v1/billing/checkout
-POST /api/v1/billing/subscription/cancel
-```
-
----
-
-## Webhooks
-
-```text
-POST /api/v1/webhooks/payments/:provider
-```
-
----
-
 # 110. Core API Workflow — Resume Import
 
 ```text
@@ -3182,9 +2946,7 @@ HTTP Layer
 ├── ATSController
 ├── PDFController
 ├── SharingController
-├── UsageController
-├── BillingController
-└── WebhookController
+└── RateLimitMiddleware
 ```
 
 Services:
@@ -3200,8 +2962,7 @@ SuggestionService
 ATSService
 PDFService
 SharingService
-UsageService
-BillingService
+RateLimitService
 ```
 
 Infrastructure:
@@ -3211,7 +2972,6 @@ MongoRepository
 R2Storage
 AIService
 EmailService
-PaymentProvider
 JobQueue
 ```
 
@@ -3279,8 +3039,7 @@ The frontend never directly controls:
 - AI providers
 - MongoDB
 - R2
-- Usage limits
-- Billing state
+- Operational rate limits
 - Version integrity
 
 The Express API remains the central authority for all business operations.

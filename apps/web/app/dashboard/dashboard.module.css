@@ -86,26 +86,6 @@
   margin-left: auto;
 }
 
-.usageBadge {
-  display: inline-flex;
-  min-height: 25px;
-  align-items: center;
-  gap: 5px;
-  padding: 0 10px;
-  border-radius: 999px;
-  background: #f0edf2;
-  color: #4d4652;
-  font-size: 10px;
-  font-weight: 700;
-}
-
-.usageBadge i {
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: var(--dashboard-violet);
-}
-
 .iconButton {
   position: relative;
   width: 32px;
@@ -307,7 +287,7 @@
 
 .stats {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   margin-top: 25px;
   border: 1px solid #eee9ef;
   border-radius: 7px;
@@ -324,8 +304,7 @@
   border-left: 1px solid #f0ecf1;
 }
 
-.stats article > span,
-.creditLabel {
+.stats article > span {
   display: flex;
   justify-content: space-between;
   color: #514b55;
@@ -335,7 +314,7 @@
   text-transform: uppercase;
 }
 
-.stats article > div:not(.creditTrack) {
+.stats article > div {
   display: flex;
   align-items: baseline;
   gap: 8px;
@@ -350,38 +329,9 @@
   line-height: 1;
 }
 
-.stats small,
-.upgradeButton {
+.stats small {
   color: #5d765f;
   font-size: 10px;
-}
-
-.upgradeButton {
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: var(--dashboard-violet);
-  cursor: pointer;
-}
-
-.creditLabel b {
-  color: var(--dashboard-plum);
-  font-size: 9px;
-}
-
-.creditTrack {
-  height: 5px;
-  margin-top: 34px;
-  overflow: hidden;
-  border-radius: 99px;
-  background: #e6e2e8;
-}
-
-.creditTrack i {
-  display: block;
-  width: 0;
-  height: 100%;
-  background: var(--dashboard-plum);
 }
 
 .resumeSection {
@@ -1147,16 +1097,6 @@
     gap: 7px;
   }
 
-  .usageBadge {
-    min-height: 27px;
-    padding: 0 8px;
-    border: 1px solid #ddd7e2;
-    border-radius: 2px;
-    background: transparent;
-    font-size: 8px;
-  }
-
-  .usageBadge i,
   .accountMenu summary > i {
     display: none;
   }
@@ -1237,8 +1177,7 @@
     border-left: 1px solid #ece6ee;
   }
 
-  .stats article > span,
-  .creditLabel {
+  .stats article > span {
     font-size: 7px;
   }
 
@@ -1246,13 +1185,8 @@
     font-size: 25px;
   }
 
-  .stats small,
-  .upgradeButton {
+  .stats small {
     font-size: 8px;
-  }
-
-  .creditTrack {
-    margin-top: 27px;
   }
 
   .resumeSection {
