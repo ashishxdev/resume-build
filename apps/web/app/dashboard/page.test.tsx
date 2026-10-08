@@ -15,6 +15,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import DashboardPage from "./page";
 
 const mocks = vi.hoisted(() => ({
+  deleteResume: vi.fn(),
+  deleteTailoringSession: vi.fn(),
+  downloadTailoredResume: vi.fn(),
   listResumes: vi.fn(),
   listTailoringSessions: vi.fn(),
   replace: vi.fn(),
@@ -34,10 +37,13 @@ vi.mock("@/lib/auth/client", () => ({
 }));
 
 vi.mock("@/lib/resume/import-client", () => ({
+  deleteResume: mocks.deleteResume,
   listResumes: mocks.listResumes,
 }));
 
 vi.mock("@/lib/tailoring/client", () => ({
+  deleteTailoringSession: mocks.deleteTailoringSession,
+  downloadTailoredResume: mocks.downloadTailoredResume,
   listTailoringSessions: mocks.listTailoringSessions,
 }));
 
@@ -56,10 +62,19 @@ describe("DashboardPage", () => {
   beforeEach(() => {
     mocks.replace.mockReset();
     mocks.signOut.mockReset();
+    mocks.deleteResume.mockReset();
+    mocks.deleteTailoringSession.mockReset();
+    mocks.downloadTailoredResume.mockReset();
     mocks.listResumes.mockReset();
     mocks.listTailoringSessions.mockReset();
     mocks.listResumes.mockResolvedValue([]);
     mocks.listTailoringSessions.mockResolvedValue([]);
+    mocks.deleteResume.mockResolvedValue(undefined);
+    mocks.deleteTailoringSession.mockResolvedValue(undefined);
+    mocks.downloadTailoredResume.mockResolvedValue({
+      blob: new Blob(["resume"]),
+      filename: "acme-resume.pdf",
+    });
     mocks.useSession.mockReturnValue({
       data: {
         user: {
@@ -83,6 +98,14 @@ describe("DashboardPage", () => {
     expect(screen.getByRole("heading", { name: "Your resumes" })).toBeTruthy();
     expect(screen.getByText("0 uploaded")).toBeTruthy();
     expect(screen.getByText("No activity yet")).toBeTruthy();
+    expect(screen.getAllByRole("link", { name: "Resumes" })[0]).toHaveProperty(
+      "href",
+      "http://localhost:3000/resumes",
+    );
+    expect(screen.getAllByRole("link", { name: "Activity" })[0]).toHaveProperty(
+      "href",
+      "http://localhost:3000/activity",
+    );
     expect(mocks.replace).not.toHaveBeenCalled();
   });
 
@@ -109,12 +132,68 @@ describe("DashboardPage", () => {
 
     expect(await screen.findByText("Acme")).toBeTruthy();
     expect(
-      screen.getByText("Tailored drafts").parentElement?.textContent,
+      screen.getAllByText("Tailored drafts")[0]?.parentElement?.textContent,
     ).toContain("1Applications");
     expect(screen.getByRole("link", { name: "Open" })).toHaveProperty(
       "href",
       "http://localhost:3000/tailoring/tailor_1",
     );
+  });
+
+  it("shows, downloads, views, and deletes a saved tailored draft", async () => {
+    const createObjectUrl = vi.fn(() => "blob:tailored-resume");
+    const revokeObjectUrl = vi.fn();
+    Object.defineProperty(URL, "createObjectURL", {
+      configurable: true,
+      value: createObjectUrl,
+    });
+    Object.defineProperty(URL, "revokeObjectURL", {
+      configurable: true,
+      value: revokeObjectUrl,
+    });
+    const anchorClick = vi
+      .spyOn(HTMLAnchorElement.prototype, "click")
+      .mockImplementation(() => {});
+    mocks.listTailoringSessions.mockResolvedValue([
+      {
+        id: "tailor_saved",
+        resumeId: "resume_1",
+        status: "completed",
+        company: "Acme",
+        role: "Product Designer",
+        updatedAt: "2026-10-03T10:00:00.000Z",
+      },
+    ]);
+    render(React.createElement(DashboardPage));
+
+    expect(await screen.findByText("1 saved")).toBeTruthy();
+    expect(screen.getByRole("link", { name: "View" })).toHaveProperty(
+      "href",
+      "http://localhost:3000/tailoring/tailor_saved/resume",
+    );
+    fireEvent.click(screen.getByRole("button", { name: "PDF" }));
+    await act(async () => {});
+    expect(mocks.downloadTailoredResume).toHaveBeenCalledWith(
+      "tailor_saved",
+      "pdf",
+      "comfortable",
+    );
+    expect(createObjectUrl).toHaveBeenCalled();
+    expect(anchorClick).toHaveBeenCalled();
+    expect(revokeObjectUrl).toHaveBeenCalledWith("blob:tailored-resume");
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Delete tailored draft Product Designer",
+      }),
+    );
+    expect(
+      screen.getByRole("heading", { name: "Delete this tailored draft?" }),
+    ).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Delete permanently" }));
+    await screen.findByText("The tailored draft was permanently deleted.");
+    expect(mocks.deleteTailoringSession).toHaveBeenCalledWith("tailor_saved");
+    expect(screen.getByText("No tailored drafts yet")).toBeTruthy();
   });
 
   it("keeps resumes visible when tailoring activity fails", async () => {
@@ -165,6 +244,79 @@ describe("DashboardPage", () => {
     ).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Upload PDF/DOCX" }));
     expect(screen.getByRole("dialog")).toBeTruthy();
+  });
+
+  it("confirms permanent resume deletion and removes it from the dashboard", async () => {
+    mocks.listResumes.mockResolvedValue([
+      {
+        id: "resume_delete",
+        name: "Product Designer",
+        originalFileName: "resume.pdf",
+        importId: "import_delete",
+        importStatus: "uploaded",
+        extractionStatus: "verified",
+        compatibilityStatus: "supported",
+        updatedAt: "2026-10-03T10:00:00.000Z",
+      },
+    ]);
+    mocks.listTailoringSessions.mockResolvedValue([
+      {
+        id: "tailor_delete",
+        resumeId: "resume_delete",
+        status: "completed",
+        company: "Acme",
+        role: "Product Designer",
+        updatedAt: "2026-10-03T10:00:00.000Z",
+      },
+    ]);
+    render(React.createElement(DashboardPage));
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Delete Product Designer" }),
+    );
+    expect(
+      screen.getByRole("heading", { name: "Delete “Product Designer”?" }),
+    ).toBeTruthy();
+    expect(screen.getByText(/Cloudflare storage/)).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Delete permanently" }));
+
+    await screen.findByText("“Product Designer” was permanently deleted.");
+    expect(mocks.deleteResume).toHaveBeenCalledWith("resume_delete");
+    expect(screen.queryByText("resume.pdf")).toBeNull();
+    expect(screen.queryByText("Acme")).toBeNull();
+  });
+
+  it("keeps the confirmation open when resume deletion fails", async () => {
+    mocks.deleteResume.mockRejectedValueOnce(new Error("Unavailable"));
+    mocks.listResumes.mockResolvedValue([
+      {
+        id: "resume_delete_failure",
+        name: "Design Systems",
+        originalFileName: "design-systems.pdf",
+        importId: "import_delete_failure",
+        importStatus: "uploaded",
+        extractionStatus: "verified",
+        compatibilityStatus: "supported",
+        updatedAt: "2026-10-03T10:00:00.000Z",
+      },
+    ]);
+    render(React.createElement(DashboardPage));
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Delete Design Systems" }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Delete permanently" }));
+
+    expect(
+      await screen.findByText(
+        "We could not delete this resume from cloud storage. Please try again.",
+      ),
+    ).toBeTruthy();
+    expect(screen.getByText("design-systems.pdf")).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: "Delete permanently" }),
+    ).toBeTruthy();
   });
 
   it("gives feedback for notifications", () => {

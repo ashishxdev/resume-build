@@ -67,6 +67,8 @@ const app = createApp(
   {
     repository: resumeImportRuntime.repository,
     extractionRepository: resumeExtractionRuntime.repository,
+    jobDescriptionRepository: jobDescriptionRuntime.repository,
+    tailoringRepository: tailoringRuntime.repository,
     objectStorage,
   },
   {

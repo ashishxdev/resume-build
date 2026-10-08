@@ -205,6 +205,30 @@ export function createTailoringRouter(
     },
   );
 
+  router.delete(
+    "/api/v1/tailoring-sessions/:id",
+    async (request, response, next) => {
+      try {
+        const ownerId = await requireUser(request, response);
+        if (!ownerId) return;
+        const deleted = await services.repository.deleteOwned(
+          ownerId,
+          request.params.id,
+        );
+        if (!deleted)
+          return sendError(
+            response,
+            404,
+            "TAILORING_SESSION_NOT_FOUND",
+            "Tailoring session was not found.",
+          );
+        response.status(204).end();
+      } catch (error) {
+        next(error);
+      }
+    },
+  );
+
   router.get(
     "/api/v1/tailoring-sessions/:id/export",
     async (request, response, next) => {

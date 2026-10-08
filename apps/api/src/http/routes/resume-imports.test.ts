@@ -8,8 +8,10 @@ import type {
   ResumeObjectStorage,
   StoredObjectInspection,
 } from "../../infrastructure/storage/r2-object-storage.js";
+import { createMemoryJobDescriptionRepository } from "../../modules/job-descriptions/job-description-repository.js";
 import { createMemoryResumeImportRepository } from "../../modules/resumes/resume-import-repository.js";
 import { createMemoryResumeExtractionRepository } from "../../modules/resumes/resume-extraction-repository.js";
+import { createMemoryTailoringRepository } from "../../modules/tailoring/tailoring-repository.js";
 
 const testEnvironment = {
   NODE_ENV: "test",
@@ -134,6 +136,122 @@ describe("resume imports", () => {
         compatibilityStatus: "supported",
       }),
     ]);
+  });
+
+  it("deletes an owned resume, its extraction, and its R2 object", async () => {
+    const authRuntime = createAuthRuntime(testEnvironment);
+    const repository = createMemoryResumeImportRepository();
+    const extractionRepository = createMemoryResumeExtractionRepository();
+    const jobDescriptionRepository = createMemoryJobDescriptionRepository();
+    const tailoringRepository = createMemoryTailoringRepository();
+    const deleteJobDescriptions = vi.spyOn(
+      jobDescriptionRepository,
+      "deleteManyOwnedByResumeId",
+    );
+    const deleteTailoringSessions = vi.spyOn(
+      tailoringRepository,
+      "deleteManyOwnedByResumeId",
+    );
+    const { storage, deletedKeys } = createStorage();
+    const app = createApp(testEnvironment, authRuntime.auth, false, {
+      repository,
+      extractionRepository,
+      jobDescriptionRepository,
+      tailoringRepository,
+      objectStorage: storage,
+    });
+    const owner = request.agent(app);
+    await signUp(owner, "delete-owner@example.com");
+
+    const created = await owner
+      .post("/api/v1/imports")
+      .send(upload)
+      .expect(201);
+    await owner
+      .post(`/api/v1/imports/${created.body.data.importId}/complete`)
+      .expect(202);
+
+    await owner
+      .delete(`/api/v1/resumes/${created.body.data.resumeId}`)
+      .expect(204);
+
+    expect(deletedKeys).toEqual([
+      expect.stringContaining(
+        `/resumes/${created.body.data.resumeId}/original/`,
+      ),
+    ]);
+    expect((await owner.get("/api/v1/resumes").expect(200)).body.data).toEqual(
+      [],
+    );
+    expect(deleteJobDescriptions).toHaveBeenCalledWith(
+      expect.any(String),
+      created.body.data.resumeId,
+    );
+    expect(deleteTailoringSessions).toHaveBeenCalledWith(
+      expect.any(String),
+      created.body.data.resumeId,
+    );
+    await owner
+      .get(`/api/v1/resumes/${created.body.data.resumeId}/verification`)
+      .expect(404);
+  });
+
+  it("does not reveal or delete another user's resume", async () => {
+    const authRuntime = createAuthRuntime(testEnvironment);
+    const repository = createMemoryResumeImportRepository();
+    const extractionRepository = createMemoryResumeExtractionRepository();
+    const { storage, deletedKeys } = createStorage();
+    const app = createApp(testEnvironment, authRuntime.auth, false, {
+      repository,
+      extractionRepository,
+      objectStorage: storage,
+    });
+    const owner = request.agent(app);
+    const intruder = request.agent(app);
+    await signUp(owner, "delete-owner-two@example.com");
+    await signUp(intruder, "delete-intruder@example.com");
+
+    const created = await owner
+      .post("/api/v1/imports")
+      .send(upload)
+      .expect(201);
+    await intruder
+      .delete(`/api/v1/resumes/${created.body.data.resumeId}`)
+      .expect(404);
+
+    expect(deletedKeys).toEqual([]);
+    expect(
+      (await owner.get("/api/v1/resumes").expect(200)).body.data,
+    ).toHaveLength(1);
+  });
+
+  it("keeps resume metadata retryable when R2 deletion fails", async () => {
+    const authRuntime = createAuthRuntime(testEnvironment);
+    const repository = createMemoryResumeImportRepository();
+    const extractionRepository = createMemoryResumeExtractionRepository();
+    const { storage } = createStorage();
+    vi.spyOn(storage, "deleteObject").mockRejectedValueOnce(
+      new Error("R2 unavailable"),
+    );
+    const app = createApp(testEnvironment, authRuntime.auth, false, {
+      repository,
+      extractionRepository,
+      objectStorage: storage,
+    });
+    const owner = request.agent(app);
+    await signUp(owner, "delete-retry@example.com");
+
+    const created = await owner
+      .post("/api/v1/imports")
+      .send(upload)
+      .expect(201);
+    await owner
+      .delete(`/api/v1/resumes/${created.body.data.resumeId}`)
+      .expect(502);
+
+    expect(
+      (await owner.get("/api/v1/resumes").expect(200)).body.data,
+    ).toHaveLength(1);
   });
 
   it("does not expose another user's import", async () => {

@@ -48,6 +48,7 @@ export interface JobDescriptionRepository {
     rawText: string;
   }): Promise<JobDescriptionRecord>;
   findOwned(userId: string, id: string): Promise<JobDescriptionRecord | null>;
+  deleteManyOwnedByResumeId(userId: string, resumeId: string): Promise<void>;
   claimNext(): Promise<JobDescriptionRecord | null>;
   complete(
     id: string,
@@ -127,6 +128,13 @@ export function createMemoryJobDescriptionRepository(): JobDescriptionRepository
     async findOwned(userId, id) {
       const record = records.get(id);
       return record?.userId === userId ? clone(record) : null;
+    },
+    async deleteManyOwnedByResumeId(userId, resumeId) {
+      for (const [id, record] of records) {
+        if (record.userId === userId && record.resumeId === resumeId) {
+          records.delete(id);
+        }
+      }
     },
     async claimNext() {
       const now = new Date();
@@ -277,6 +285,9 @@ export function createMongoJobDescriptionRepository(
     },
     async findOwned(userId, id) {
       return records.findOne({ userId, id });
+    },
+    async deleteManyOwnedByResumeId(userId, resumeId) {
+      await records.deleteMany({ userId, resumeId });
     },
     async claimNext() {
       await ensureIndexes();

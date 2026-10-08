@@ -15,8 +15,8 @@ Update this file whenever a major feature is started, completed, materially rede
 | Project foundation | Complete | pnpm/Turborepo monorepo with web, API, shared contracts, resume engine, renderer, linting, TypeScript, and test foundations. |
 | Marketing homepage | Complete | Responsive Stitch-inspired homepage implementing the Atelier Digital visual system and core product messaging. |
 | Authentication | In progress | Email/password authentication now includes Resend-backed, rate-limited password recovery with single-use tokens and session revocation. Google OAuth still requires configuration and end-to-end verification. |
-| Dashboard workspace | Complete | Responsive authenticated dashboard implements the approved desktop and mobile Stitch designs with truthful empty, loading, navigation, activity, and trust states. |
-| Resume workflows | In progress | PDF/DOCX import, Gemini-assisted extraction, verified base versions, grounded job matching, evidence-backed suggestion review, immutable tailored versions, transparent ATS compatibility analysis and improvement actions, and Professional ATS PDF/DOCX export are complete. Additional templates and sharing remain future milestones. |
+| Dashboard workspace | Complete | Responsive authenticated dashboard implements the approved desktop and mobile Stitch designs with truthful empty, loading, navigation, activity, resume management, tailored-draft management, trust states, and dedicated resume/activity routes. |
+| Resume workflows | In progress | PDF/DOCX import, Gemini-assisted extraction, verified base versions, grounded job matching, evidence-backed suggestion review, immutable tailored versions, transparent ATS compatibility analysis and improvement actions, Professional ATS PDF/DOCX export, and permanent owned-resume deletion are complete. Additional templates and sharing remain future milestones. |
 | Backend business modules | In progress | Owned imports, private R2 originals, recoverable queues, grounded parsing and matching, explicit suggestion decisions, transactional tailored-version persistence, ATS analysis and improvement workflows, saved ATS snapshots, and authenticated deterministic document export are complete. |
 
 ## Milestones
@@ -338,6 +338,63 @@ Update this file whenever a major feature is started, completed, materially rede
   - `docs/Resume Tailoring SaaS API Design.md`
   - `docs/Resume Tailoring SaaS Database Design.md`
   - `docs/Resume Tailoring SaaS System Design.md`
+
+### 16. Permanent Resume Deletion
+
+- **Date:** 2026-10-08
+- **Status:** Complete
+- **Scope delivered:**
+  - Added an owner-only dashboard delete action with an explicit irreversible-action confirmation and recoverable error state.
+  - Delete the original resume object from private Cloudflare R2 before removing application metadata, keeping failures retryable.
+  - Cascade deletion through extraction jobs, job descriptions, tailoring sessions, immutable resume versions, file metadata, and the logical resume/import records.
+  - Remove deleted resume and tailoring activity from the dashboard immediately after the API confirms deletion.
+- **Verification:** 81 API tests and 45 web tests pass, including owner isolation, R2 deletion invocation, retryable storage failure, extraction cleanup, confirmation behavior, immediate dashboard removal, and recoverable UI errors. Workspace type checking, linting, Prettier validation, the full production build, and `git diff --check` pass.
+- **Important limitation:** Automated tests use the storage adapter boundary and do not delete a real user object from the configured R2 bucket. Production deletion requires the configured R2 token to retain object read/write permission.
+- **Primary files:**
+  - `apps/api/src/http/routes/resume-imports.ts`
+  - `apps/api/src/modules/resumes/resume-import-repository.ts`
+  - `apps/api/src/modules/resumes/resume-extraction-repository.ts`
+  - `apps/api/src/modules/job-descriptions/job-description-repository.ts`
+  - `apps/api/src/modules/tailoring/tailoring-repository.ts`
+  - `apps/web/app/dashboard/page.tsx`
+  - `apps/web/lib/resume/import-client.ts`
+  - `docs/Resume Tailoring SaaS API Design.md`
+
+### 17. Dashboard Tailored-Draft Library
+
+- **Date:** 2026-10-08
+- **Status:** Complete
+- **Scope delivered:**
+  - Added a dedicated responsive dashboard library for completed and in-progress tailoring sessions.
+  - Added direct view/continue actions plus one-click PDF and DOCX downloads for completed versions.
+  - Added owner-only permanent draft deletion with explicit confirmation and recoverable error handling.
+  - Delete only the tailored and ATS-improved versions created by the selected session, preserving the verified base resume and reusable job analysis.
+- **Verification:** 81 API tests and 46 web tests pass, including owner-only session deletion, completed-version view routing, direct PDF download, permanent-delete confirmation, immediate dashboard removal, and preservation messaging for the verified base resume. Workspace type checking, linting, Prettier validation, the full production build, and `git diff --check` pass.
+- **Primary files:**
+  - `apps/api/src/http/routes/tailoring.ts`
+  - `apps/api/src/modules/tailoring/tailoring-repository.ts`
+  - `apps/web/app/dashboard/page.tsx`
+  - `apps/web/app/dashboard/dashboard.module.css`
+  - `apps/web/lib/tailoring/client.ts`
+
+### 18. Dedicated Resume and Activity Workspaces
+
+- **Date:** 2026-10-08
+- **Status:** Complete
+- **Scope delivered:**
+  - Replaced the dashboard's resume and activity hash links with first-class `/resumes` and `/activity` routes.
+  - Centralized desktop and mobile workspace navigation so only the current route receives the active underline or active mobile state.
+  - Added a complete owned-resume library with upload, verification, tailoring, replacement, and permanent Cloudflare-backed deletion actions.
+  - Added a complete chronological activity view that combines every available resume and tailoring workflow instead of truncating the dashboard's recent-activity preview.
+  - Preserved authenticated redirects, account controls, recoverable loading/error states, responsive layouts, and mobile bottom navigation on both routes.
+- **Verification:** 54 web tests pass across 11 files, including dedicated-route navigation, active-route semantics, complete untruncated resume/activity rendering, permanent deletion, and signed-out redirects. Web type checking, linting, the Next.js production build, and `git diff --check` pass.
+- **Primary files:**
+  - `apps/web/components/dashboard/workspace-navigation.tsx`
+  - `apps/web/components/dashboard/workspace-collection-page.tsx`
+  - `apps/web/app/resumes/page.tsx`
+  - `apps/web/app/activity/page.tsx`
+  - `apps/web/app/dashboard/page.tsx`
+  - `apps/web/app/dashboard/dashboard.module.css`
 
 ## Next Major Milestone
 

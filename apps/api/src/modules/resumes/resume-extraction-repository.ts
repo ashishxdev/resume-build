@@ -55,6 +55,7 @@ export interface ResumeExtractionRepository {
     userId: string,
     resumeIds: string[],
   ): Promise<ResumeExtractionRecord[]>;
+  deleteOwned(userId: string, resumeId: string): Promise<void>;
   claimNext(): Promise<ResumeExtractionRecord | null>;
   complete(
     jobId: string,
@@ -129,6 +130,14 @@ export function createMemoryResumeExtractionRepository(): ResumeExtractionReposi
           (record) => record.userId === userId && ids.has(record.resumeId),
         )
         .map(clone);
+    },
+
+    async deleteOwned(userId, resumeId) {
+      for (const [id, record] of records) {
+        if (record.userId === userId && record.resumeId === resumeId) {
+          records.delete(id);
+        }
+      }
     },
 
     async claimNext() {
@@ -353,6 +362,10 @@ export function createMongoResumeExtractionRepository(
     async findManyOwned(userId, resumeIds) {
       if (resumeIds.length === 0) return [];
       return jobs.find({ userId, resumeId: { $in: resumeIds } }).toArray();
+    },
+
+    async deleteOwned(userId, resumeId) {
+      await jobs.deleteMany({ userId, resumeId });
     },
 
     async claimNext() {

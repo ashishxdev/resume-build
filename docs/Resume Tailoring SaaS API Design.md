@@ -64,7 +64,7 @@ Service
   ↓
 Repository / Infrastructure
   ↓
-MongoDB / R2 / AI / Email / Payment
+MongoDB / R2 / AI / Email
 ```
 
 ---
@@ -560,7 +560,10 @@ PATCH /api/v1/resumes/:resumeId
 DELETE /api/v1/resumes/:resumeId
 ```
 
-The MVP uses logical/soft deletion.
+Deletion is owner-only and permanent. The API removes the original object from
+private R2 first, then deletes dependent extraction jobs, job descriptions,
+tailoring sessions, resume versions, file metadata, and the logical resume.
+If R2 deletion fails, metadata remains available so the user can retry safely.
 
 ### Response
 
@@ -568,7 +571,8 @@ The MVP uses logical/soft deletion.
 204 No Content
 ```
 
-Associated cleanup can happen asynchronously.
+The operation is idempotent at the R2 boundary; a missing or cross-user resume
+returns `404` without revealing ownership.
 
 ---
 
@@ -1139,7 +1143,7 @@ Authenticate
  ↓
 Authorize
  ↓
-Check quota
+Check operational rate limit
  ↓
 Validate resume version
  ↓
@@ -1166,6 +1170,22 @@ Create processing job
 
 ```text
 202 Accepted
+```
+
+## Delete Tailoring Session
+
+```http
+DELETE /api/v1/tailoring-sessions/:sessionId
+```
+
+The endpoint is owner-only and permanently removes the session plus its
+tailored and ATS-improved resume versions. The verified base resume and saved
+job analysis remain available.
+
+### Response
+
+```text
+204 No Content
 ```
 
 ---
@@ -2757,6 +2777,7 @@ POST /api/v1/matching
 ```text
 POST /api/v1/tailoring-sessions
 GET  /api/v1/tailoring-sessions/:sessionId
+DELETE /api/v1/tailoring-sessions/:sessionId
 ```
 
 ---

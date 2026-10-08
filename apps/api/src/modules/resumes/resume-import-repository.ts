@@ -41,6 +41,11 @@ export interface ResumeImportRepository {
     userId: string,
     resumeId: string,
   ): Promise<ResumeImportRecord | null>;
+  findOwnedResume(
+    userId: string,
+    resumeId: string,
+  ): Promise<ResumeImportRecord | null>;
+  deleteOwnedResume(userId: string, resumeId: string): Promise<boolean>;
   listResumes(userId: string): Promise<ResumeSummary[]>;
   markFailed(
     userId: string,
@@ -124,6 +129,25 @@ export function createMemoryResumeImportRepository(): ResumeImportRepository {
       return record ? structuredClone(record) : null;
     },
 
+    async findOwnedResume(userId, resumeId) {
+      const record = [...records.values()].find(
+        (candidate) =>
+          candidate.userId === userId &&
+          candidate.resumeId === resumeId &&
+          candidate.status !== "cancelled",
+      );
+      return record ? structuredClone(record) : null;
+    },
+
+    async deleteOwnedResume(userId, resumeId) {
+      const recordsToDelete = [...records.values()].filter(
+        (candidate) =>
+          candidate.userId === userId && candidate.resumeId === resumeId,
+      );
+      for (const record of recordsToDelete) records.delete(record.id);
+      return recordsToDelete.length > 0;
+    },
+
     async listResumes(userId) {
       return [...records.values()]
         .filter(
@@ -203,6 +227,11 @@ function createMongoResumeImportRepository(
   const imports = database.collection<ResumeImportRecord>("resume_imports");
   const resumes = database.collection<ResumeDocument>("resumes");
   const files = database.collection<FileDocument>("files");
+  const versions = database.collection<{
+    _id: string;
+    resumeId: string;
+    userId: string;
+  }>("resume_versions");
 
   return {
     async create(record) {
@@ -253,6 +282,25 @@ function createMongoResumeImportRepository(
         { userId, resumeId, status: "uploaded" },
         { sort: { updatedAt: -1 } },
       );
+    },
+
+    async findOwnedResume(userId, resumeId) {
+      return imports.findOne(
+        { userId, resumeId, status: { $ne: "cancelled" } },
+        { sort: { updatedAt: -1 } },
+      );
+    },
+
+    async deleteOwnedResume(userId, resumeId) {
+      const record = await imports.findOne({ userId, resumeId });
+      if (!record) return false;
+
+      // Keep the import record until last so a partial cleanup can be retried.
+      await versions.deleteMany({ userId, resumeId });
+      await files.deleteMany({ userId, resumeId });
+      await resumes.deleteOne({ _id: resumeId, userId });
+      const result = await imports.deleteMany({ userId, resumeId });
+      return result.deletedCount > 0;
     },
 
     async listResumes(userId) {

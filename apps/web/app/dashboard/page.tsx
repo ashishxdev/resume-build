@@ -15,9 +15,14 @@ import type {
 } from "@make-my-resume/contracts";
 
 import { ResumeUploadDialog } from "@/components/dashboard/resume-upload-dialog";
+import { WorkspaceNavigation } from "@/components/dashboard/workspace-navigation";
 import { authClient } from "@/lib/auth/client";
-import { listResumes } from "@/lib/resume/import-client";
-import { listTailoringSessions } from "@/lib/tailoring/client";
+import { deleteResume, listResumes } from "@/lib/resume/import-client";
+import {
+  deleteTailoringSession,
+  downloadTailoredResume,
+  listTailoringSessions,
+} from "@/lib/tailoring/client";
 
 import styles from "./dashboard.module.css";
 
@@ -193,6 +198,17 @@ export default function DashboardPage() {
   const [tailoringSessions, setTailoringSessions] = useState<
     TailoringSession[]
   >([]);
+  const [resumePendingDeletion, setResumePendingDeletion] =
+    useState<ResumeSummary | null>(null);
+  const [isDeletingResume, setIsDeletingResume] = useState(false);
+  const [deleteResumeError, setDeleteResumeError] = useState<string | null>(
+    null,
+  );
+  const [draftPendingDeletion, setDraftPendingDeletion] =
+    useState<TailoringSession | null>(null);
+  const [isDeletingDraft, setIsDeletingDraft] = useState(false);
+  const [draftActionError, setDraftActionError] = useState<string | null>(null);
+  const [downloadingDraft, setDownloadingDraft] = useState<string | null>(null);
 
   const refreshResumes = useCallback(async () => {
     setIsLoadingLibrary(true);
@@ -285,6 +301,82 @@ export default function DashboardPage() {
     }
   }
 
+  async function confirmResumeDeletion() {
+    if (!resumePendingDeletion || isDeletingResume) return;
+    const resume = resumePendingDeletion;
+    setDeleteResumeError(null);
+    setIsDeletingResume(true);
+
+    try {
+      await deleteResume(resume.id);
+      setResumes((current) =>
+        current.filter((candidate) => candidate.id !== resume.id),
+      );
+      setTailoringSessions((current) =>
+        current.filter((session) => session.resumeId !== resume.id),
+      );
+      setResumePendingDeletion(null);
+      setFeatureNotice(`“${resume.name}” was permanently deleted.`);
+    } catch {
+      setDeleteResumeError(
+        "We could not delete this resume from cloud storage. Please try again.",
+      );
+    } finally {
+      setIsDeletingResume(false);
+    }
+  }
+
+  async function confirmDraftDeletion() {
+    if (!draftPendingDeletion || isDeletingDraft) return;
+    const draft = draftPendingDeletion;
+    setDraftActionError(null);
+    setIsDeletingDraft(true);
+
+    try {
+      await deleteTailoringSession(draft.id);
+      setTailoringSessions((current) =>
+        current.filter((session) => session.id !== draft.id),
+      );
+      setDraftPendingDeletion(null);
+      setFeatureNotice("The tailored draft was permanently deleted.");
+    } catch {
+      setDraftActionError(
+        "We could not delete this tailored draft. Please try again.",
+      );
+    } finally {
+      setIsDeletingDraft(false);
+    }
+  }
+
+  async function downloadDraft(
+    draft: TailoringSession,
+    format: "pdf" | "docx",
+  ) {
+    const downloadKey = `${draft.id}:${format}`;
+    if (downloadingDraft) return;
+    setDraftActionError(null);
+    setDownloadingDraft(downloadKey);
+    try {
+      const exported = await downloadTailoredResume(
+        draft.id,
+        format,
+        "comfortable",
+      );
+      const url = URL.createObjectURL(exported.blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = exported.filename;
+      anchor.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      setDraftActionError(
+        "We could not download this tailored draft. Please try again.",
+      );
+    } finally {
+      setDownloadingDraft(null);
+    }
+  }
+
   function announceCreateFeature() {
     setFeatureNotice(
       "Creating a resume from scratch will be added after resume import and verification.",
@@ -306,7 +398,6 @@ export default function DashboardPage() {
 
   const firstName = data.user.name?.trim().split(/\s+/)[0] || "there";
   const initials = getInitials(data.user.name);
-  const unreadNotificationCount = 0;
   const uploadedResumes = resumes.filter(
     (resume) =>
       resume.importStatus === "uploaded" &&
@@ -321,50 +412,15 @@ export default function DashboardPage() {
 
   return (
     <div className={styles.page}>
-      <header className={styles.topbar}>
-        <div className={styles.topbarInner}>
-          <Link
-            aria-label="Make My Resume home"
-            className={styles.brand}
-            href="/"
-          >
-            M
-          </Link>
-
-          <nav aria-label="Workspace navigation" className={styles.desktopNav}>
-            <Link className={styles.activeNav} href="/dashboard">
-              Dashboard
-            </Link>
-            <a href="#resumes">Resumes</a>
-            <a href="#activity">Activity</a>
-          </nav>
-
-          <div className={styles.accountArea}>
-            <button
-              aria-label="Notifications — none unread"
-              className={styles.iconButton}
-              data-has-unread={unreadNotificationCount > 0}
-              onClick={showNotifications}
-              type="button"
-            >
-              <Icon name="bell" />
-            </button>
-            <details className={styles.accountMenu}>
-              <summary aria-label="Open account menu">
-                <span>{initials}</span>
-                <i aria-hidden="true" />
-              </summary>
-              <div>
-                <strong>{data.user.name || "Your account"}</strong>
-                <small>{data.user.email}</small>
-                <button disabled={isSigningOut} onClick={signOut} type="button">
-                  {isSigningOut ? "Signing out…" : "Sign out"}
-                </button>
-              </div>
-            </details>
-          </div>
-        </div>
-      </header>
+      <WorkspaceNavigation
+        active="dashboard"
+        email={data.user.email}
+        initials={initials}
+        isSigningOut={isSigningOut}
+        name={data.user.name}
+        onNotifications={showNotifications}
+        onSignOut={() => void signOut()}
+      />
 
       <main className={styles.main}>
         <section className={styles.welcome} aria-labelledby="dashboard-title">
@@ -505,39 +561,52 @@ export default function DashboardPage() {
                             ? "Original preserved"
                             : "Import needs attention"}
                     </span>
-                    {resume.compatibilityStatus ===
-                      "unsupported_legacy_format" && (
+                    <div className={styles.resumeActions}>
+                      {resume.compatibilityStatus ===
+                        "unsupported_legacy_format" && (
+                        <button
+                          onClick={() => setIsUploadOpen(true)}
+                          type="button"
+                        >
+                          Upload PDF/DOCX
+                        </button>
+                      )}
+                      {resume.compatibilityStatus === "supported" &&
+                        resume.extractionStatus && (
+                          <Link href={`/resumes/${resume.id}/verify`}>
+                            {resume.extractionStatus === "verified"
+                              ? "View baseline"
+                              : resume.extractionStatus === "failed"
+                                ? "Resolve"
+                                : "Review extraction"}
+                          </Link>
+                        )}
+                      {resume.compatibilityStatus === "supported" &&
+                        resume.extractionStatus === "verified" && (
+                          <Link href={`/resumes/${resume.id}/tailor`}>
+                            Tailor to a job →
+                          </Link>
+                        )}
+                      {resume.importStatus === "failed" && (
+                        <button
+                          onClick={() => setIsUploadOpen(true)}
+                          type="button"
+                        >
+                          Upload again
+                        </button>
+                      )}
                       <button
-                        onClick={() => setIsUploadOpen(true)}
+                        aria-label={`Delete ${resume.name}`}
+                        className={styles.deleteResumeButton}
+                        onClick={() => {
+                          setDeleteResumeError(null);
+                          setResumePendingDeletion(resume);
+                        }}
                         type="button"
                       >
-                        Upload PDF/DOCX
+                        Delete
                       </button>
-                    )}
-                    {resume.compatibilityStatus === "supported" &&
-                      resume.extractionStatus && (
-                        <Link href={`/resumes/${resume.id}/verify`}>
-                          {resume.extractionStatus === "verified"
-                            ? "View baseline"
-                            : resume.extractionStatus === "failed"
-                              ? "Resolve"
-                              : "Review extraction"}
-                        </Link>
-                      )}
-                    {resume.compatibilityStatus === "supported" &&
-                      resume.extractionStatus === "verified" && (
-                        <Link href={`/resumes/${resume.id}/tailor`}>
-                          Tailor to a job →
-                        </Link>
-                      )}
-                    {resume.importStatus === "failed" && (
-                      <button
-                        onClick={() => setIsUploadOpen(true)}
-                        type="button"
-                      >
-                        Upload again
-                      </button>
-                    )}
+                    </div>
                   </div>
                 </article>
               ))}
@@ -562,6 +631,102 @@ export default function DashboardPage() {
               >
                 <Icon name="upload" /> Upload your first resume
               </button>
+            </div>
+          )}
+        </section>
+
+        <section
+          aria-labelledby="tailored-drafts-title"
+          className={styles.tailoredDraftSection}
+        >
+          <div className={styles.sectionHeading}>
+            <div>
+              <h2 id="tailored-drafts-title">Tailored drafts</h2>
+              <span>{tailoringSessions.length} saved</span>
+            </div>
+          </div>
+          {draftActionError && !draftPendingDeletion && (
+            <div className={styles.libraryError} role="alert">
+              <span>{draftActionError}</span>
+              <button onClick={() => setDraftActionError(null)} type="button">
+                Dismiss
+              </button>
+            </div>
+          )}
+          {tailoringSessions.length > 0 ? (
+            <div className={styles.draftGrid}>
+              {tailoringSessions.map((draft) => {
+                const ready = draft.status === "completed";
+                const title = draft.role || draft.company || "Tailored resume";
+                return (
+                  <article className={styles.draftCard} key={draft.id}>
+                    <div>
+                      <span data-ready={ready}>
+                        {ready ? "Ready" : draft.status.replace("_", " ")}
+                      </span>
+                      <h3>{title}</h3>
+                      <p>
+                        {draft.company && draft.role
+                          ? `${draft.company} · ${draft.role}`
+                          : draft.company || "Saved tailoring workflow"}
+                      </p>
+                      <small>{formatUpdatedAt(draft.updatedAt)}</small>
+                    </div>
+                    <div className={styles.draftActions}>
+                      <Link
+                        href={
+                          ready
+                            ? `/tailoring/${draft.id}/resume`
+                            : `/tailoring/${draft.id}`
+                        }
+                      >
+                        {ready ? "View" : "Continue"}
+                      </Link>
+                      {ready && (
+                        <>
+                          <button
+                            disabled={downloadingDraft !== null}
+                            onClick={() => void downloadDraft(draft, "pdf")}
+                            type="button"
+                          >
+                            {downloadingDraft === `${draft.id}:pdf`
+                              ? "Creating…"
+                              : "PDF"}
+                          </button>
+                          <button
+                            disabled={downloadingDraft !== null}
+                            onClick={() => void downloadDraft(draft, "docx")}
+                            type="button"
+                          >
+                            {downloadingDraft === `${draft.id}:docx`
+                              ? "Creating…"
+                              : "DOCX"}
+                          </button>
+                        </>
+                      )}
+                      <button
+                        aria-label={`Delete tailored draft ${title}`}
+                        className={styles.deleteResumeButton}
+                        onClick={() => {
+                          setDraftActionError(null);
+                          setDraftPendingDeletion(draft);
+                        }}
+                        type="button"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          ) : (
+            <div className={styles.emptyDrafts}>
+              <strong>No tailored drafts yet</strong>
+              <p>
+                Tailor a verified resume to a job description and it will stay
+                available here for viewing and download.
+              </p>
             </div>
           )}
         </section>
@@ -658,41 +823,91 @@ export default function DashboardPage() {
         </nav>
       </footer>
 
-      <nav
-        aria-label="Mobile workspace navigation"
-        className={styles.mobileNav}
-      >
-        <Link className={styles.mobileActive} href="/dashboard">
-          <Icon name="dashboard" />
-          <span>Dashboard</span>
-        </Link>
-        <a href="#resumes">
-          <Icon name="document" />
-          <span>Resumes</span>
-        </a>
-        <a href="#activity">
-          <Icon name="activity" />
-          <span>Activity</span>
-        </a>
-        <details>
-          <summary>
-            <Icon name="profile" />
-            <span>Profile</span>
-          </summary>
-          <div>
-            <small>{data.user.email}</small>
-            <button disabled={isSigningOut} onClick={signOut} type="button">
-              {isSigningOut ? "Signing out…" : "Sign out"}
-            </button>
-          </div>
-        </details>
-      </nav>
-
       {isUploadOpen && (
         <ResumeUploadDialog
           onClose={() => setIsUploadOpen(false)}
           onComplete={() => void refreshResumes()}
         />
+      )}
+
+      {resumePendingDeletion && (
+        <div className={styles.deleteDialogBackdrop}>
+          <section
+            aria-labelledby="delete-resume-title"
+            aria-modal="true"
+            className={styles.deleteDialog}
+            role="dialog"
+          >
+            <span>Permanent deletion</span>
+            <h2 id="delete-resume-title">
+              Delete “{resumePendingDeletion.name}”?
+            </h2>
+            <p>
+              This removes the original file from Cloudflare storage along with
+              its extracted baseline, tailored versions, and related activity.
+              This action cannot be undone.
+            </p>
+            {deleteResumeError && <div role="alert">{deleteResumeError}</div>}
+            <footer>
+              <button
+                disabled={isDeletingResume}
+                onClick={() => {
+                  setDeleteResumeError(null);
+                  setResumePendingDeletion(null);
+                }}
+                type="button"
+              >
+                Keep resume
+              </button>
+              <button
+                disabled={isDeletingResume}
+                onClick={() => void confirmResumeDeletion()}
+                type="button"
+              >
+                {isDeletingResume ? "Deleting…" : "Delete permanently"}
+              </button>
+            </footer>
+          </section>
+        </div>
+      )}
+
+      {draftPendingDeletion && (
+        <div className={styles.deleteDialogBackdrop}>
+          <section
+            aria-labelledby="delete-draft-title"
+            aria-modal="true"
+            className={styles.deleteDialog}
+            role="dialog"
+          >
+            <span>Permanent deletion</span>
+            <h2 id="delete-draft-title">Delete this tailored draft?</h2>
+            <p>
+              This removes the saved tailoring session and its generated
+              versions. Your verified base resume remains unchanged. This action
+              cannot be undone.
+            </p>
+            {draftActionError && <div role="alert">{draftActionError}</div>}
+            <footer>
+              <button
+                disabled={isDeletingDraft}
+                onClick={() => {
+                  setDraftActionError(null);
+                  setDraftPendingDeletion(null);
+                }}
+                type="button"
+              >
+                Keep draft
+              </button>
+              <button
+                disabled={isDeletingDraft}
+                onClick={() => void confirmDraftDeletion()}
+                type="button"
+              >
+                {isDeletingDraft ? "Deleting…" : "Delete permanently"}
+              </button>
+            </footer>
+          </section>
+        </div>
       )}
     </div>
   );

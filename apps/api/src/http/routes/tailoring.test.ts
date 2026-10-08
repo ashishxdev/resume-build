@@ -276,6 +276,12 @@ describe("tailoring routes", () => {
       .send({ active: false })
       .expect(200);
     expect(rolledBack.body.data.atsImprovementActive).toBe(false);
+    await stranger.delete(`/api/v1/tailoring-sessions/${id}`).expect(404);
+    await owner.delete(`/api/v1/tailoring-sessions/${id}`).expect(204);
+    await owner.get(`/api/v1/tailoring-sessions/${id}`).expect(404);
+    expect(
+      (await owner.get("/api/v1/tailoring-sessions").expect(200)).body.data,
+    ).toEqual([]);
     await authRuntime.close();
   });
 });

@@ -1,5 +1,8 @@
 import Link from "next/link";
 
+import { HomepageHeader } from "@/components/home/homepage-header";
+import { SiteBrand } from "@/components/home/site-brand";
+
 const principles = [
   [
     "01",
@@ -75,53 +78,10 @@ function Check() {
   );
 }
 
-function Brand() {
-  return (
-    <Link className="brand" href="/" aria-label="Make My Resume home">
-      <span className="brand-mark" aria-hidden="true">
-        <i />
-        <i />
-        <i />
-      </span>
-      <span>
-        <b>MAKE MY</b>
-        <b>RESUME</b>
-      </span>
-    </Link>
-  );
-}
-
 export default function HomePage() {
   return (
     <main>
-      <header className="site-header">
-        <div className="header-inner">
-          <Brand />
-          <nav className="desktop-nav" aria-label="Primary navigation">
-            <a href="#product">Product</a>
-            <a href="#how-it-works">How it works</a>
-            <a href="#match-and-ats">Match & ATS</a>
-            <a href="#faq">FAQ</a>
-          </nav>
-          <div className="header-actions">
-            <Link className="login-link" href="/login">
-              Log in
-            </Link>
-            <Link className="button button-small" href="/signup">
-              Get started
-            </Link>
-            <details className="mobile-menu">
-              <summary>Menu</summary>
-              <nav aria-label="Mobile navigation">
-                <a href="#product">Product</a>
-                <a href="#how-it-works">How it works</a>
-                <a href="#match-and-ats">Match & ATS</a>
-                <a href="#faq">FAQ</a>
-              </nav>
-            </details>
-          </div>
-        </div>
-      </header>
+      <HomepageHeader />
 
       <section className="hero" id="product">
         <div className="shell hero-grid">
@@ -630,7 +590,7 @@ export default function HomePage() {
       <footer className="site-footer">
         <div className="shell footer-grid">
           <div className="footer-brand">
-            <Brand />
+            <SiteBrand />
             <p>
               Evidence-based resume tailoring for ambitious professionals who
               refuse to compromise their integrity.

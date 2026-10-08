@@ -193,6 +193,40 @@
   overflow: visible;
 }
 
+.collectionMain {
+  padding-top: 38px;
+}
+
+.collectionHeader {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 32px;
+}
+
+.collectionHeader > div > span {
+  color: var(--dashboard-violet);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.collectionHeader h1 {
+  margin-top: 8px;
+  color: var(--dashboard-plum);
+  font-size: clamp(34px, 4vw, 48px);
+  line-height: 1;
+}
+
+.collectionHeader p {
+  max-width: 620px;
+  margin: 12px 0 0;
+  color: var(--dashboard-muted);
+  font-size: 12px;
+  line-height: 1.65;
+}
+
 .welcome {
   display: flex;
   align-items: end;
@@ -600,6 +634,230 @@
   text-decoration: none;
 }
 
+.resumeActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.resumeCardFooter .deleteResumeButton {
+  border-color: #e4c8ce;
+  color: #96394a;
+}
+
+.deleteDialogBackdrop {
+  position: fixed;
+  z-index: 80;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(30, 17, 43, 0.46);
+  backdrop-filter: blur(3px);
+}
+
+.deleteDialog {
+  width: min(440px, 100%);
+  padding: 28px;
+  border: 1px solid #e2d9e5;
+  border-radius: 9px;
+  background: white;
+  box-shadow: 0 24px 70px rgba(35, 19, 49, 0.24);
+}
+
+.deleteDialog > span {
+  color: #96394a;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.deleteDialog h2 {
+  margin: 10px 0 12px;
+  color: var(--dashboard-plum);
+  font-family: var(--display-font), Georgia, serif;
+  font-size: 27px;
+  font-weight: 550;
+}
+
+.deleteDialog p {
+  margin: 0;
+  color: var(--dashboard-muted);
+  font-size: 12px;
+  line-height: 1.65;
+}
+
+.deleteDialog > div {
+  margin-top: 16px;
+  padding: 10px 12px;
+  border: 1px solid #efd0d6;
+  border-radius: 4px;
+  background: #fff6f7;
+  color: #842f3d;
+  font-size: 11px;
+}
+
+.deleteDialog footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 9px;
+  margin-top: 24px;
+}
+
+.deleteDialog button {
+  min-height: 39px;
+  padding: 0 15px;
+  border: 1px solid #d9cfde;
+  border-radius: 4px;
+  background: white;
+  color: var(--dashboard-plum);
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 750;
+}
+
+.deleteDialog button:last-child {
+  border-color: #8d3042;
+  background: #8d3042;
+  color: white;
+}
+
+.deleteDialog button:disabled {
+  cursor: wait;
+  opacity: 0.62;
+}
+
+.tailoredDraftSection {
+  margin-top: 37px;
+}
+
+.draftGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.draftCard {
+  display: flex;
+  min-width: 0;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 19px;
+  border: 1px solid #ebe5ed;
+  border-radius: 7px;
+  background: white;
+  box-shadow: 0 4px 14px rgba(39, 22, 63, 0.03);
+}
+
+.draftCard > div:first-child {
+  min-width: 0;
+}
+
+.draftCard span {
+  display: inline-flex;
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: #eeeafd;
+  color: #5540aa;
+  font-size: 8px;
+  font-weight: 750;
+  text-transform: capitalize;
+}
+
+.draftCard span[data-ready="true"] {
+  background: #e6f3ec;
+  color: #207052;
+}
+
+.draftCard h3 {
+  margin: 9px 0 0;
+  overflow: hidden;
+  color: var(--dashboard-plum);
+  font-size: 16px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.draftCard p,
+.draftCard small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.draftCard p {
+  margin: 4px 0 0;
+  color: #4f4853;
+  font-size: 10px;
+}
+
+.draftCard small {
+  margin-top: 5px;
+  color: var(--dashboard-muted);
+  font-size: 9px;
+}
+
+.draftActions {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.draftActions a,
+.draftActions button {
+  min-height: 31px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 10px;
+  border: 1px solid #d9cfde;
+  border-radius: 3px;
+  background: white;
+  color: var(--dashboard-plum);
+  cursor: pointer;
+  font-size: 9px;
+  font-weight: 750;
+  text-decoration: none;
+}
+
+.draftActions a {
+  border-color: var(--dashboard-plum);
+  background: var(--dashboard-plum);
+  color: white;
+}
+
+.draftActions button:disabled {
+  cursor: wait;
+  opacity: 0.58;
+}
+
+.emptyDrafts {
+  padding: 24px;
+  border: 1px dashed #ddd4e1;
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.62);
+}
+
+.emptyDrafts strong {
+  color: var(--dashboard-plum);
+  font-family: var(--display-font), Georgia, serif;
+  font-size: 18px;
+  font-weight: 550;
+}
+
+.emptyDrafts p {
+  max-width: 560px;
+  margin: 7px 0 0;
+  color: var(--dashboard-muted);
+  font-size: 10px;
+  line-height: 1.55;
+}
+
 .lowerGrid {
   display: grid;
   grid-template-columns: minmax(0, 2fr) minmax(260px, 0.95fr);
@@ -702,6 +960,29 @@
 .activityList small {
   color: #777079;
   font-size: 8px;
+}
+
+.activityPageCard {
+  margin-top: 34px;
+}
+
+.activityPageCard .activityList li {
+  min-height: 54px;
+}
+
+.activityItemActions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.activityItemActions a {
+  padding: 6px 9px;
+  border: 1px solid #d9cfde;
+  border-radius: 3px;
+  color: var(--dashboard-plum);
+  font-size: 9px;
+  font-weight: 750;
 }
 
 .dialogBackdrop {
@@ -1122,6 +1403,27 @@
     padding: 22px 0 35px;
   }
 
+  .collectionMain {
+    padding-top: 26px;
+  }
+
+  .collectionHeader {
+    display: grid;
+    gap: 18px;
+  }
+
+  .collectionHeader h1 {
+    font-size: 31px;
+  }
+
+  .collectionHeader p {
+    font-size: 10px;
+  }
+
+  .collectionHeader > .primaryButton {
+    width: 100%;
+  }
+
   .welcome {
     display: block;
   }
@@ -1245,6 +1547,40 @@
     gap: 10px;
   }
 
+  .tailoredDraftSection {
+    margin-top: 29px;
+  }
+
+  .draftGrid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .draftCard {
+    display: grid;
+    gap: 14px;
+    padding: 15px;
+  }
+
+  .draftActions {
+    justify-content: flex-start;
+  }
+
+  .draftActions a,
+  .draftActions button {
+    flex: 1 1 auto;
+    justify-content: center;
+  }
+
+  .deleteDialog {
+    padding: 23px 20px;
+  }
+
+  .deleteDialog footer {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
   .resumeCard {
     grid-template-columns: 52px minmax(0, 1fr);
     gap: 12px;
@@ -1283,6 +1619,20 @@
   .activityCard,
   .trustCard {
     padding: 17px;
+  }
+
+  .activityPageCard {
+    margin-top: 22px;
+  }
+
+  .activityPageCard .activityList li {
+    min-height: 64px;
+  }
+
+  .activityItemActions {
+    align-items: flex-end;
+    flex-direction: column;
+    gap: 5px;
   }
 
   .emptyActivity {

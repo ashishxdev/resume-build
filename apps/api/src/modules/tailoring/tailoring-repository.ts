@@ -79,6 +79,11 @@ export interface TailoringRepository {
     jobDescriptionId: string,
   ): Promise<TailoringSessionRecord | null>;
   findManyOwned(userId: string): Promise<TailoringSessionRecord[]>;
+  deleteManyOwnedByResumeId(userId: string, resumeId: string): Promise<void>;
+  deleteOwned(
+    userId: string,
+    id: string,
+  ): Promise<TailoringSessionRecord | null>;
   claimNext(): Promise<TailoringSessionRecord | null>;
   generated(
     id: string,
@@ -306,6 +311,19 @@ export function createMemoryTailoringRepository(): TailoringRepository {
         .filter((record) => record.userId === userId)
         .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())
         .map(clone);
+    },
+    async deleteManyOwnedByResumeId(userId, resumeId) {
+      for (const [id, record] of records) {
+        if (record.userId === userId && record.resumeId === resumeId) {
+          records.delete(id);
+        }
+      }
+    },
+    async deleteOwned(userId, id) {
+      const record = records.get(id);
+      if (!record || record.userId !== userId) return null;
+      records.delete(id);
+      return clone(record);
     },
     async claimNext() {
       const now = new Date();
@@ -782,6 +800,43 @@ export function createMongoTailoringRepository(
     },
     async findManyOwned(userId) {
       return records.find({ userId }).sort({ updatedAt: -1 }).toArray();
+    },
+    async deleteManyOwnedByResumeId(userId, resumeId) {
+      await records.deleteMany({ userId, resumeId });
+    },
+    async deleteOwned(userId, id) {
+      const session = client.startSession();
+      let deleted: TailoringSessionRecord | null = null;
+      try {
+        await session.withTransaction(async () => {
+          const current = await records.findOne({ userId, id }, { session });
+          if (!current) return;
+          const versionIds = [
+            current.tailoredVersionId,
+            current.atsImprovedVersionId,
+          ].filter((versionId): versionId is string => Boolean(versionId));
+          if (versionIds.length > 0) {
+            await versions.deleteMany(
+              {
+                _id: { $in: versionIds },
+                userId,
+                resumeId: current.resumeId,
+                tailoringSessionId: current.id,
+              },
+              { session },
+            );
+          }
+          const result = await records.deleteOne({ userId, id }, { session });
+          if (result.deletedCount !== 1) throw new TailoringStateConflict();
+          deleted = current;
+        });
+        return deleted;
+      } catch (error) {
+        if (error instanceof TailoringStateConflict) return null;
+        throw error;
+      } finally {
+        await session.endSession();
+      }
     },
     async claimNext() {
       await ensureIndexes();

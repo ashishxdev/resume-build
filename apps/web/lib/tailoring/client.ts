@@ -68,6 +68,24 @@ export async function listTailoringSessions() {
   return parsed.data.data;
 }
 
+export async function deleteTailoringSession(id: string) {
+  const response = await fetch(
+    `${clientEnvironment.NEXT_PUBLIC_API_URL}/api/v1/tailoring-sessions/${encodeURIComponent(id)}`,
+    { method: "DELETE", credentials: "include" },
+  );
+  if (!response.ok) {
+    const parsed = errorEnvelope.safeParse(
+      await response.json().catch(() => null),
+    );
+    throw new Error(
+      parsed.success
+        ? (parsed.data.error.message ??
+            "The tailored draft could not be deleted.")
+        : "The tailored draft could not be deleted.",
+    );
+  }
+}
+
 export function retryTailoringSession(id: string) {
   return request(`/api/v1/tailoring-sessions/${encodeURIComponent(id)}/retry`, {
     method: "POST",

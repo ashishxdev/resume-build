@@ -128,6 +128,12 @@ export async function listResumes(): Promise<ResumeSummary[]> {
   return parsed.data.data;
 }
 
+export async function deleteResume(resumeId: string) {
+  await apiRequest(`/api/v1/resumes/${encodeURIComponent(resumeId)}`, {
+    method: "DELETE",
+  });
+}
+
 export async function createResumeImport(input: CreateResumeImportRequest) {
   const response = await apiRequest("/api/v1/imports", {
     method: "POST",

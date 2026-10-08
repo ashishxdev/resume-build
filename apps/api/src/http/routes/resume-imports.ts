@@ -14,12 +14,16 @@ import type {
   ResumeImportRepository,
 } from "../../modules/resumes/resume-import-repository.js";
 import type { ResumeExtractionRepository } from "../../modules/resumes/resume-extraction-repository.js";
+import type { JobDescriptionRepository } from "../../modules/job-descriptions/job-description-repository.js";
+import type { TailoringRepository } from "../../modules/tailoring/tailoring-repository.js";
 import { createId } from "../../shared/ids/create-id.js";
 
 export interface ResumeImportServices {
   objectStorage: ResumeObjectStorage | null;
   repository: ResumeImportRepository;
   extractionRepository?: ResumeExtractionRepository;
+  jobDescriptionRepository?: JobDescriptionRepository;
+  tailoringRepository?: TailoringRepository;
 }
 
 const fileExtensions: Record<ResumeMimeType, string> = {
@@ -379,6 +383,88 @@ export function createResumeImportRouter(
           mimeType: uploaded.mimeType,
         });
         response.status(202).json({ data: serializeImport(uploaded) });
+      } catch (error) {
+        next(error);
+      }
+    },
+  );
+
+  router.delete(
+    "/api/v1/resumes/:resumeId",
+    async (request, response, next) => {
+      try {
+        const userId = await authenticatedUserId(request);
+        if (!userId) {
+          sendError(
+            response,
+            401,
+            "UNAUTHORIZED",
+            "Authentication is required.",
+          );
+          return;
+        }
+        if (!services.objectStorage) {
+          sendError(
+            response,
+            503,
+            "STORAGE_NOT_CONFIGURED",
+            "Resume storage is not configured.",
+          );
+          return;
+        }
+
+        const resumeId = request.params.resumeId;
+        const record = await services.repository.findOwnedResume(
+          userId,
+          resumeId,
+        );
+        if (!record) {
+          sendError(response, 404, "RESUME_NOT_FOUND", "Resume not found.");
+          return;
+        }
+
+        const expectedObjectPrefix = `users/${userId}/resumes/${resumeId}/`;
+        if (!record.objectKey.startsWith(expectedObjectPrefix)) {
+          sendError(
+            response,
+            409,
+            "INVALID_STORAGE_REFERENCE",
+            "The resume storage reference is invalid.",
+          );
+          return;
+        }
+
+        try {
+          await services.objectStorage.deleteObject(record.objectKey);
+        } catch {
+          sendError(
+            response,
+            502,
+            "STORAGE_DELETE_FAILED",
+            "The resume could not be removed from cloud storage. Please try again.",
+          );
+          return;
+        }
+
+        await services.tailoringRepository?.deleteManyOwnedByResumeId(
+          userId,
+          resumeId,
+        );
+        await services.jobDescriptionRepository?.deleteManyOwnedByResumeId(
+          userId,
+          resumeId,
+        );
+        await services.extractionRepository?.deleteOwned(userId, resumeId);
+        const deleted = await services.repository.deleteOwnedResume(
+          userId,
+          resumeId,
+        );
+        if (!deleted) {
+          sendError(response, 404, "RESUME_NOT_FOUND", "Resume not found.");
+          return;
+        }
+
+        response.status(204).end();
       } catch (error) {
         next(error);
       }
