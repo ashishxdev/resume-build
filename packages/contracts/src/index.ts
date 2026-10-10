@@ -3,6 +3,7 @@ export * from "./resume/lifecycle.js";
 export * from "./resume/import.js";
 export * from "./resume/verification.js";
 export * from "./resume/document.js";
+export * from "./resume/version.js";
 export * from "./job-description/analysis.js";
 export * from "./suggestions/status.js";
 export * from "./tailoring/session.js";

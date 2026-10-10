@@ -7,6 +7,7 @@ import { createJobDescriptionAnalyzer } from "../infrastructure/ai/job-descripti
 import { createR2ObjectStorage } from "../infrastructure/storage/r2-object-storage.js";
 import { createResumeImportRepositoryRuntime } from "../modules/resumes/resume-import-repository.js";
 import { createResumeExtractionRepositoryRuntime } from "../modules/resumes/resume-extraction-repository.js";
+import { createResumeVersionRepositoryRuntime } from "../modules/resumes/resume-version-repository.js";
 import { createResumeExtractionService } from "../modules/resumes/resume-extraction-service.js";
 import { createJobDescriptionRepositoryRuntime } from "../modules/job-descriptions/job-description-repository.js";
 import { createJobAnalysisRateLimiterRuntime } from "../modules/job-descriptions/job-analysis-rate-limiter.js";
@@ -34,6 +35,10 @@ const jobDescriptionRuntime =
 const jobAnalysisRateLimitRuntime =
   createJobAnalysisRateLimiterRuntime(environment);
 const tailoringRuntime = createTailoringRepositoryRuntime(environment);
+const resumeVersionRuntime = createResumeVersionRepositoryRuntime(
+  environment,
+  tailoringRuntime.repository,
+);
 const objectStorage = createR2ObjectStorage(environment);
 const stopExtractionLoop = startResumeExtractionLoop(
   createResumeExtractionService(
@@ -83,6 +88,11 @@ const app = createApp(
     resumeImportRepository: resumeImportRuntime.repository,
     objectStorage,
   },
+  {
+    repository: resumeVersionRuntime.repository,
+    resumeImportRepository: resumeImportRuntime.repository,
+    objectStorage,
+  },
 );
 
 const server = app.listen(environment.PORT, () => {
@@ -108,6 +118,7 @@ function shutdown(signal: string) {
     await jobDescriptionRuntime.close();
     await jobAnalysisRateLimitRuntime.close();
     await tailoringRuntime.close();
+    await resumeVersionRuntime.close();
   });
 }
 

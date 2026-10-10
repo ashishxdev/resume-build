@@ -401,9 +401,31 @@ Update this file whenever a major feature is started, completed, materially rede
   - `apps/web/app/dashboard/page.tsx`
   - `apps/web/app/dashboard/dashboard.module.css`
 
+### 19. Resume Version History and Management
+
+- **Date:** 2026-10-10
+- **Status:** Complete
+- **Scope delivered:**
+  - Added an owner-only immutable version API for verified baselines, tailored snapshots, ATS-improved snapshots, and restored copies, backed directly by `resume_versions` and the logical resume record.
+  - Added a dedicated responsive `/resumes/:resumeId/versions` workspace with an ordered timeline, truthful active-version state, canonical Professional ATS previews, and version-specific PDF/DOCX exports.
+  - Added exact side-by-side claim comparison with changed and unchanged states so users can inspect wording differences without losing context.
+  - Added server-enforced activation, display-name editing, and restore-as-copy behavior; restoration creates a new immutable active snapshot rather than rewriting history.
+  - Added dependency-aware permanent deletion that protects every baseline and active version, blocks snapshots referenced by restored copies, and removes a tailoring workflow and all of its generated versions together when required.
+  - Added a first-class Version history action to every verified resume in the resume library.
+- **Verification:** 85 API tests and 58 web tests pass, including owner isolation, timeline ordering, baseline and active-version protection, rename, activation, immutable restoration, deletion, private version-specific DOCX export, professional preview rendering, comparison highlighting, scoped authentication redirects, and resume-library routing. Full workspace type checking, linting, Prettier validation, production builds, and `git diff --check` pass.
+- **Important limitations:** Existing generated snapshots receive deterministic names from their company and role until users rename them. Deleting a tailored or ATS-improved snapshot intentionally deletes its complete tailoring workflow because those versions share session state. The first release compares structured verified claims rather than a visual pixel-level document diff.
+- **Primary files:**
+  - `packages/contracts/src/resume/version.ts`
+  - `apps/api/src/modules/resumes/resume-version-repository.ts`
+  - `apps/api/src/http/routes/resume-versions.ts`
+  - `apps/web/lib/resume/version-client.ts`
+  - `apps/web/components/resume/resume-version-history-page.tsx`
+  - `apps/web/components/resume/resume-version-history.module.css`
+  - `apps/web/app/resumes/[resumeId]/versions/page.tsx`
+
 ## Next Major Milestone
 
-Resume version history and management are next: expose the immutable baseline, tailored, and ATS-improved versions in a user-facing timeline with names, timestamps, comparison, restore controls, and deletion/retention rules. Additional resume templates, presentation controls, saved export artifacts, and sharing can build on the canonical document model after version management is stable.
+Multiple professional templates and presentation controls are next: add a small curated template gallery, typography and accent choices, per-version template preferences, and reliable PDF/DOCX parity without weakening ATS-safe structure. Saved export artifacts and private sharing can follow after template selection is stable.
 
 ## Status Definitions
 

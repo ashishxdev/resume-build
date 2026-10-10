@@ -1,0 +1,724 @@
+.page {
+  width: min(1180px, calc(100% - 48px));
+  margin: 0 auto;
+  padding: 38px 0 110px;
+  color: #241735;
+}
+
+.backLink {
+  color: #584c61;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.hero {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 28px;
+  margin: 28px 0 30px;
+}
+
+.hero > div:first-child > span,
+.versionToolbar > div > span,
+.compareWorkspace > header span,
+.dialog > span {
+  color: #716779;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+}
+
+.hero h1 {
+  margin: 8px 0 7px;
+  font-family: var(--display-font), Georgia, serif;
+  font-size: clamp(38px, 5vw, 58px);
+  line-height: 1;
+  letter-spacing: -0.04em;
+}
+
+.hero p {
+  max-width: 650px;
+  margin: 0;
+  color: #6e6672;
+  line-height: 1.6;
+}
+
+.viewSwitch {
+  display: flex;
+  padding: 4px;
+  border: 1px solid #dfd8e4;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.viewSwitch button {
+  min-width: 92px;
+  padding: 10px 14px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: #625869;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.viewSwitch button[aria-pressed="true"] {
+  background: #2c1742;
+  color: #fff;
+}
+
+.notice,
+.errorNotice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 20px;
+  padding: 13px 16px;
+  border: 1px solid #cfe4d8;
+  border-radius: 7px;
+  background: #f1faf5;
+  color: #275d45;
+  font-size: 13px;
+}
+
+.errorNotice {
+  border-color: #eccaca;
+  background: #fff6f5;
+  color: #8b3232;
+}
+
+.notice button,
+.errorNotice button {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font-size: 19px;
+}
+
+.workspace {
+  display: grid;
+  grid-template-columns: 285px minmax(0, 1fr);
+  gap: 22px;
+  align-items: start;
+}
+
+.timeline {
+  position: sticky;
+  top: 92px;
+  overflow: hidden;
+  border: 1px solid #e1dbe5;
+  border-radius: 11px;
+  background: #fff;
+  box-shadow: 0 12px 32px rgba(41, 23, 58, 0.055);
+}
+
+.timelineHeading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 19px;
+  border-bottom: 1px solid #ebe6ee;
+}
+
+.timelineHeading span,
+.timelineHeading strong {
+  display: block;
+}
+
+.timelineHeading span {
+  color: #817687;
+  font-size: 10px;
+  text-transform: uppercase;
+}
+
+.timelineHeading strong {
+  margin-top: 3px;
+  font-family: var(--display-font), Georgia, serif;
+  font-size: 19px;
+}
+
+.timelineHeading i {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #6554e9;
+  box-shadow: 0 0 0 5px #eeeafd;
+}
+
+.timeline ol {
+  display: grid;
+  margin: 0;
+  padding: 8px;
+  list-style: none;
+}
+
+.timeline li + li {
+  border-top: 1px solid #eee9f0;
+}
+
+.timeline li > button {
+  position: relative;
+  width: 100%;
+  display: grid;
+  gap: 4px;
+  padding: 16px 14px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: #2f213b;
+  cursor: pointer;
+  text-align: left;
+}
+
+.timeline li > button:hover,
+.timeline .selectedVersion {
+  background: #f5f1f8;
+}
+
+.timeline button > span {
+  width: fit-content;
+  padding: 3px 6px;
+  border-radius: 10px;
+  background: #eeeaf1;
+  color: #655b69;
+  font-size: 9px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.timeline button > span[data-type="base"] {
+  background: #e5f3ea;
+  color: #26704f;
+}
+
+.timeline button > span[data-type="ats_improved"] {
+  background: #eae7ff;
+  color: #4e3bc1;
+}
+
+.timeline button > span[data-type="restored"] {
+  background: #fff1d9;
+  color: #885812;
+}
+
+.timeline button strong {
+  line-height: 1.35;
+}
+
+.timeline button small {
+  color: #807783;
+  font-size: 10px;
+}
+
+.timeline button em {
+  position: absolute;
+  top: 15px;
+  right: 12px;
+  color: #4f41c7;
+  font-size: 9px;
+  font-style: normal;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.content {
+  min-width: 0;
+}
+
+.versionToolbar,
+.exportBar,
+.compareWorkspace > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 20px 22px;
+  border: 1px solid #e1dbe5;
+  border-radius: 10px;
+  background: #fff;
+}
+
+.versionToolbar h2,
+.compareWorkspace h2 {
+  margin: 5px 0;
+  font-family: var(--display-font), Georgia, serif;
+  font-size: 28px;
+}
+
+.versionToolbar p,
+.compareWorkspace > header p {
+  margin: 0;
+  color: #776e7b;
+  font-size: 12px;
+}
+
+.toolbarActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: end;
+  gap: 7px;
+}
+
+.toolbarActions button,
+.exportBar button {
+  min-height: 39px;
+  padding: 0 13px;
+  border: 1px solid #dcd4e0;
+  border-radius: 5px;
+  background: #fff;
+  color: #33223f;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.toolbarActions button:first-child,
+.exportBar > button:first-of-type {
+  border-color: #2c1742;
+  background: #2c1742;
+  color: #fff;
+}
+
+.toolbarActions button:disabled,
+.exportBar button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.exportBar {
+  margin: 10px 0;
+  padding: 12px 14px;
+  justify-content: flex-end;
+}
+
+.exportBar fieldset {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0 auto 0 0;
+  padding: 0;
+  border: 0;
+}
+
+.exportBar legend {
+  float: left;
+  margin-right: 12px;
+  color: #776d7c;
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.exportBar label {
+  color: #4d4452;
+  cursor: pointer;
+  font-size: 11px;
+}
+
+.exportBar input {
+  margin-right: 5px;
+  accent-color: #38204e;
+}
+
+.exportBar .deleteButton {
+  border-color: #e4caca;
+  color: #9c3737;
+}
+
+.protectionNote {
+  margin: 0 0 10px;
+  color: #776d7c;
+  font-size: 11px;
+  text-align: right;
+}
+
+.paperStage {
+  overflow: hidden;
+  padding: 26px;
+  border: 1px solid #ddd4e3;
+  border-radius: 12px;
+  background: #eee9f1;
+}
+
+.paperStage :global(.professional-resume) {
+  width: min(100%, 816px);
+  min-height: 1056px;
+  box-sizing: border-box;
+  margin: 0 auto;
+  padding: 58px 62px;
+  background: #fff;
+  box-shadow: 0 18px 45px rgba(41, 25, 54, 0.13);
+  color: #222027;
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+.paperStage :global(.professional-resume[data-density="compact"]) {
+  padding-top: 48px;
+  padding-bottom: 48px;
+}
+
+.paperStage :global(.professional-resume__header) {
+  margin-bottom: 32px;
+  text-align: center;
+}
+
+.paperStage :global(.professional-resume__header h1) {
+  margin: 0;
+  color: #211535;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 34px;
+}
+
+.paperStage :global(.professional-resume__header p) {
+  margin: 8px 0 0;
+  color: #4d4652;
+  font-size: 13px;
+}
+
+.paperStage :global(.professional-resume__header ul) {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px 18px;
+  margin: 10px 0 0;
+  padding: 0;
+  color: #67606b;
+  font-size: 10px;
+  list-style: none;
+}
+
+.paperStage :global(.professional-resume__section) {
+  margin-top: 24px;
+}
+
+.paperStage :global(.professional-resume__section h2) {
+  margin: 0 0 11px;
+  color: #211535;
+  font-size: 11px;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+}
+
+.paperStage :global(.professional-resume__items) {
+  display: grid;
+  gap: 14px;
+}
+
+.paperStage :global(.professional-resume__item h3) {
+  margin: 0 0 4px;
+  font-size: 12px;
+}
+
+.paperStage :global(.professional-resume__item p) {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.55;
+  white-space: pre-line;
+}
+
+.compareWorkspace {
+  display: grid;
+  gap: 12px;
+}
+
+.compareSelectors {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: end;
+  gap: 15px;
+  padding: 18px;
+  border: 1px solid #e1dbe5;
+  border-radius: 9px;
+  background: #fff;
+}
+
+.compareSelectors label {
+  display: grid;
+  gap: 7px;
+  color: #6c6371;
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.compareSelectors select {
+  min-width: 0;
+  height: 42px;
+  padding: 0 10px;
+  border: 1px solid #ddd5e1;
+  border-radius: 5px;
+  background: #fff;
+  color: #2f203d;
+}
+
+.compareSelectors > span {
+  padding-bottom: 11px;
+  color: #746879;
+}
+
+.comparisonList {
+  display: grid;
+  gap: 10px;
+}
+
+.comparisonList article {
+  overflow: hidden;
+  border: 1px solid #e1dbe5;
+  border-radius: 9px;
+  background: #fff;
+}
+
+.comparisonList article[data-changed="true"] {
+  border-color: #b9afe7;
+  box-shadow: 0 8px 24px rgba(81, 61, 143, 0.07);
+}
+
+.comparisonList article > header {
+  display: flex;
+  justify-content: space-between;
+  padding: 9px 15px;
+  background: #f5f2f7;
+  color: #685d6e;
+  font-size: 9px;
+  text-transform: uppercase;
+}
+
+.comparisonList article[data-changed="true"] > header {
+  background: #eeeafd;
+  color: #4d3b9d;
+}
+
+.comparisonList article > div {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+
+.comparisonList section {
+  min-width: 0;
+  padding: 18px;
+}
+
+.comparisonList section + section {
+  border-left: 1px solid #ebe6ee;
+}
+
+.comparisonList small {
+  color: #817886;
+  font-size: 9px;
+}
+
+.comparisonList h3 {
+  margin: 7px 0;
+  font-size: 13px;
+}
+
+.comparisonList p {
+  margin: 0;
+  color: #4e4653;
+  font-size: 12px;
+  line-height: 1.6;
+  white-space: pre-line;
+}
+
+.loadingPanel,
+.centerState {
+  display: grid;
+  min-height: 420px;
+  place-content: center;
+  gap: 10px;
+  color: #6e6573;
+  text-align: center;
+}
+
+.centerState {
+  min-height: 100vh;
+  background: #faf7fc;
+}
+
+.centerState > span {
+  width: 24px;
+  height: 24px;
+  margin: auto;
+  border: 2px solid #d8d0dd;
+  border-top-color: #3d2551;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+.dialogBackdrop {
+  position: fixed;
+  z-index: 50;
+  inset: 0;
+  display: grid;
+  padding: 20px;
+  place-items: center;
+  background: rgba(31, 19, 42, 0.54);
+}
+
+.dialog {
+  width: min(440px, 100%);
+  padding: 28px;
+  border: 1px solid #e0d8e4;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 24px 70px rgba(31, 18, 43, 0.24);
+}
+
+.dialog h2 {
+  margin: 7px 0 12px;
+  font-family: var(--display-font), Georgia, serif;
+  font-size: 29px;
+}
+
+.dialog p {
+  color: #6d6471;
+  line-height: 1.6;
+}
+
+.dialog label {
+  display: grid;
+  gap: 7px;
+  color: #554b5b;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.dialog input {
+  height: 44px;
+  padding: 0 12px;
+  border: 1px solid #d8d0dc;
+  border-radius: 5px;
+  color: #2d2037;
+  font: inherit;
+}
+
+.dialog footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 9px;
+  margin-top: 24px;
+}
+
+.dialog footer button {
+  min-height: 41px;
+  padding: 0 16px;
+  border: 1px solid #dcd4e0;
+  border-radius: 5px;
+  background: #fff;
+  color: #352540;
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.dialog footer button:last-child {
+  border-color: #2c1742;
+  background: #2c1742;
+  color: #fff;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 900px) {
+  .workspace {
+    grid-template-columns: 1fr;
+  }
+
+  .timeline {
+    position: static;
+  }
+
+  .timeline ol {
+    grid-auto-columns: minmax(230px, 78vw);
+    grid-auto-flow: column;
+    overflow-x: auto;
+  }
+
+  .timeline li + li {
+    border-top: 0;
+    border-left: 1px solid #eee9f0;
+  }
+}
+
+@media (max-width: 680px) {
+  .page {
+    width: calc(100% - 28px);
+    padding: 24px 0 100px;
+  }
+
+  .hero,
+  .versionToolbar,
+  .compareWorkspace > header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .hero h1 {
+    font-size: 38px;
+  }
+
+  .viewSwitch button {
+    flex: 1;
+  }
+
+  .toolbarActions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .toolbarActions button:first-child:last-child,
+  .toolbarActions button:last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+  }
+
+  .exportBar {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .exportBar fieldset,
+  .exportBar .deleteButton {
+    grid-column: 1 / -1;
+  }
+
+  .exportBar button {
+    width: 100%;
+  }
+
+  .paperStage {
+    padding: 9px;
+  }
+
+  .paperStage :global(.professional-resume) {
+    min-height: 0;
+    padding: 34px 23px;
+  }
+
+  .paperStage :global(.professional-resume__header h1) {
+    font-size: 27px;
+  }
+
+  .compareSelectors {
+    grid-template-columns: 1fr;
+  }
+
+  .compareSelectors > span {
+    display: none;
+  }
+
+  .comparisonList article > div {
+    grid-template-columns: 1fr;
+  }
+
+  .comparisonList section + section {
+    border-top: 1px solid #ebe6ee;
+    border-left: 0;
+  }
+}

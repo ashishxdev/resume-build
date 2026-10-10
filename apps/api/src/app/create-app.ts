@@ -13,6 +13,10 @@ import {
 } from "../http/routes/resume-imports.js";
 import { createResumeVerificationRouter } from "../http/routes/resume-verification.js";
 import {
+  createResumeVersionRouter,
+  type ResumeVersionRouteServices,
+} from "../http/routes/resume-versions.js";
+import {
   createJobDescriptionRouter,
   type JobDescriptionServices,
 } from "../http/routes/job-descriptions.js";
@@ -37,6 +41,7 @@ export function createApp(
   resumeImportServices?: ResumeImportServices,
   jobDescriptionServices?: JobDescriptionServices,
   tailoringServices?: TailoringRouteServices,
+  resumeVersionServices?: ResumeVersionRouteServices,
 ) {
   const app = express();
   const logger = createLogger(environment);
@@ -90,6 +95,9 @@ export function createApp(
   }
   if (tailoringServices) {
     app.use(createTailoringRouter(auth, tailoringServices));
+  }
+  if (resumeVersionServices) {
+    app.use(createResumeVersionRouter(auth, resumeVersionServices));
   }
 
   return app;

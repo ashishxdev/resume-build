@@ -128,6 +128,11 @@ describe("WorkspaceCollectionPage", () => {
         .getAllByRole("link", { name: "Dashboard" })[0]
         ?.getAttribute("aria-current"),
     ).toBeNull();
+    expect(
+      screen
+        .getAllByRole("link", { name: "Version history" })[0]
+        ?.getAttribute("href"),
+    ).toBe("/resumes/resume_1/versions");
   });
 
   it("shows every resume and tailoring record in activity history", async () => {

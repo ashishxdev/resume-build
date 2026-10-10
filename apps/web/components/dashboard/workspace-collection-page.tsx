@@ -593,9 +593,14 @@ export function WorkspaceCollectionPage({ page }: { page: CollectionPage }) {
                           )}
                         {resume.compatibilityStatus === "supported" &&
                           resume.extractionStatus === "verified" && (
-                            <Link href={`/resumes/${resume.id}/tailor`}>
-                              Tailor to a job →
-                            </Link>
+                            <>
+                              <Link href={`/resumes/${resume.id}/versions`}>
+                                Version history
+                              </Link>
+                              <Link href={`/resumes/${resume.id}/tailor`}>
+                                Tailor to a job →
+                              </Link>
+                            </>
                           )}
                         {resume.importStatus === "failed" && (
                           <button
