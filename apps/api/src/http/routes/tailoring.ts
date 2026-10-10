@@ -1,6 +1,8 @@
 import {
   completeTailoringSessionRequestSchema,
-  resumeExportOptionsSchema,
+  DEFAULT_RESUME_PRESENTATION,
+  resumeExportFormatSchema,
+  resumeTemplateDensitySchema,
   type TailoringSession,
   updateTailoringSuggestionRequestSchema,
 } from "@make-my-resume/contracts";
@@ -13,6 +15,7 @@ import type { JobAnalysisRateLimiter } from "../../modules/job-descriptions/job-
 import type { JobDescriptionRepository } from "../../modules/job-descriptions/job-description-repository.js";
 import type { ResumeObjectStorage } from "../../infrastructure/storage/r2-object-storage.js";
 import type { ResumeImportRepository } from "../../modules/resumes/resume-import-repository.js";
+import type { ResumeVersionRepository } from "../../modules/resumes/resume-version-repository.js";
 import {
   analyzeAts,
   hasImprovedRequirementCoverage,
@@ -34,6 +37,7 @@ export interface TailoringRouteServices {
   jobDescriptionRepository: JobDescriptionRepository;
   rateLimiter: JobAnalysisRateLimiter;
   resumeImportRepository?: ResumeImportRepository;
+  resumeVersionRepository?: ResumeVersionRepository;
   objectStorage?: ResumeObjectStorage | null;
 }
 
@@ -235,11 +239,11 @@ export function createTailoringRouter(
       try {
         const ownerId = await requireUser(request, response);
         if (!ownerId) return;
-        const parsed = resumeExportOptionsSchema.safeParse({
-          format: request.query.format,
-          density: request.query.density ?? "comfortable",
-        });
-        if (!parsed.success)
+        const format = resumeExportFormatSchema.safeParse(request.query.format);
+        const density = resumeTemplateDensitySchema
+          .optional()
+          .safeParse(request.query.density);
+        if (!format.success || !density.success)
           return sendError(
             response,
             400,
@@ -278,9 +282,24 @@ export function createTailoringRouter(
         const document = buildProfessionalResumeDocument(exportClaims, {
           tailoredClaimIds,
         });
+        const exportedVersionId =
+          record.atsImprovementActive && record.atsImprovedVersionId
+            ? record.atsImprovedVersionId
+            : record.tailoredVersionId;
+        const savedVersion = services.resumeVersionRepository
+          ? await services.resumeVersionRepository.findOwned(
+              ownerId,
+              record.resumeId,
+              exportedVersionId,
+            )
+          : null;
+        const presentation = {
+          ...(savedVersion?.presentation ?? DEFAULT_RESUME_PRESENTATION),
+          ...(density.data ? { density: density.data } : {}),
+        };
         let sourceProjectLinks: string[] = [];
         if (
-          parsed.data.format === "pdf" &&
+          format.data === "pdf" &&
           services.resumeImportRepository &&
           services.objectStorage
         ) {
@@ -298,8 +317,8 @@ export function createTailoringRouter(
         }
         const exported = await renderProfessionalResume(
           document,
-          parsed.data.format,
-          parsed.data.density,
+          format.data,
+          presentation,
           sourceProjectLinks,
         );
         response.setHeader("Cache-Control", "private, no-store");

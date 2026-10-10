@@ -1,12 +1,16 @@
 "use client";
 
 import type {
+  ResumeAccentColor,
   ResumeClaim,
   ResumeExportFormat,
-  ResumeTemplateDensity,
+  ResumeFontFamily,
+  ResumePresentationSettings,
+  ResumeTemplateId,
   ResumeVersion,
   ResumeVersionSummary,
 } from "@make-my-resume/contracts";
+import { DEFAULT_RESUME_PRESENTATION } from "@make-my-resume/contracts";
 import { buildProfessionalResumeDocument } from "@make-my-resume/resume-engine";
 import { ProfessionalResume } from "@make-my-resume/resume-renderer";
 import Link from "next/link";
@@ -24,11 +28,47 @@ import {
   listResumeVersions,
   renameResumeVersion,
   restoreResumeVersion,
+  updateResumeVersionPresentation,
 } from "@/lib/resume/version-client";
 
 import styles from "./resume-version-history.module.css";
 
-type View = "preview" | "compare";
+type View = "preview" | "design" | "compare";
+
+const templateOptions: Array<{
+  id: ResumeTemplateId;
+  name: string;
+  description: string;
+}> = [
+  {
+    id: "professional",
+    name: "Professional",
+    description: "Centered, traditional, and balanced.",
+  },
+  {
+    id: "modern",
+    name: "Modern",
+    description: "Left-aligned with restrained accent rules.",
+  },
+  {
+    id: "compact",
+    name: "Compact",
+    description: "Tighter spacing for content-heavy resumes.",
+  },
+];
+
+const fontOptions: Array<{ id: ResumeFontFamily; name: string }> = [
+  { id: "hybrid", name: "Balanced" },
+  { id: "serif", name: "Classic serif" },
+  { id: "sans", name: "Modern sans" },
+];
+
+const accentOptions: Array<{ id: ResumeAccentColor; name: string }> = [
+  { id: "plum", name: "Plum" },
+  { id: "navy", name: "Navy" },
+  { id: "forest", name: "Forest" },
+  { id: "charcoal", name: "Charcoal" },
+];
 
 function initials(name?: string | null) {
   return (
@@ -105,7 +145,10 @@ export function ResumeVersionHistoryPage() {
   const [leftId, setLeftId] = useState<string | null>(null);
   const [rightId, setRightId] = useState<string | null>(null);
   const [view, setView] = useState<View>("preview");
-  const [density, setDensity] = useState<ResumeTemplateDensity>("comfortable");
+  const [designDraft, setDesignDraft] = useState<{
+    versionId: string;
+    presentation: ResumePresentationSettings;
+  } | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -117,6 +160,7 @@ export function ResumeVersionHistoryPage() {
   const [renaming, setRenaming] = useState<ResumeVersionSummary | null>(null);
   const [renameValue, setRenameValue] = useState("");
   const [deleting, setDeleting] = useState<ResumeVersionSummary | null>(null);
+  const [savingDesign, setSavingDesign] = useState(false);
 
   const refresh = useCallback(async () => {
     const next = await listResumeVersions(resumeId);
@@ -229,6 +273,10 @@ export function ResumeVersionHistoryPage() {
   }, [details, leftId, resumeId, rightId, view]);
 
   const selected = selectedId ? details[selectedId] : null;
+  const draftPresentation =
+    selected && designDraft?.versionId === selected.id
+      ? designDraft.presentation
+      : (selected?.presentation ?? DEFAULT_RESUME_PRESENTATION);
   const document = useMemo(
     () => (selected ? buildProfessionalResumeDocument(selected.claims) : null),
     [selected],
@@ -239,6 +287,27 @@ export function ResumeVersionHistoryPage() {
     () => (left && right ? comparisonRows(left, right) : []),
     [left, right],
   );
+  const designChanged = Boolean(
+    selected &&
+    JSON.stringify(selected.presentation) !== JSON.stringify(draftPresentation),
+  );
+
+  const availableSections = useMemo(() => {
+    if (!document) return [];
+    const byKind = new Map(
+      document.sections.map((section) => [section.kind, section]),
+    );
+    return [
+      ...draftPresentation.sectionOrder
+        .map((kind) => byKind.get(kind))
+        .filter((section): section is NonNullable<typeof section> =>
+          Boolean(section),
+        ),
+      ...document.sections.filter(
+        (section) => !draftPresentation.sectionOrder.includes(section.kind),
+      ),
+    ];
+  }, [document, draftPresentation.sectionOrder]);
 
   async function signOut() {
     if (isSigningOut) return;
@@ -358,7 +427,6 @@ export function ResumeVersionHistoryPage() {
         resumeId,
         selected.id,
         format,
-        density,
       );
       const url = URL.createObjectURL(exported.blob);
       const anchor = window.document.createElement("a");
@@ -378,6 +446,61 @@ export function ResumeVersionHistoryPage() {
     } finally {
       setDownloading(null);
     }
+  }
+
+  async function saveDesign() {
+    if (!selected || savingDesign || !designChanged) return;
+    setSavingDesign(true);
+    setError(null);
+    try {
+      const updated = await updateResumeVersionPresentation(
+        resumeId,
+        selected.id,
+        draftPresentation,
+      );
+      setDetails((current) => ({ ...current, [updated.id]: updated }));
+      setDesignDraft(null);
+      await refresh();
+      setNotice("Template and presentation settings saved for this version.");
+    } catch (requestError) {
+      setError(
+        requestError instanceof Error
+          ? requestError.message
+          : "The design settings could not be saved.",
+      );
+    } finally {
+      setSavingDesign(false);
+    }
+  }
+
+  function updatePresentation(update: Partial<ResumePresentationSettings>) {
+    if (!selected) return;
+    setDesignDraft({
+      versionId: selected.id,
+      presentation: { ...draftPresentation, ...update },
+    });
+  }
+
+  function moveSection(
+    kind: ResumePresentationSettings["sectionOrder"][number],
+    direction: -1 | 1,
+  ) {
+    if (!selected) return;
+    const order = [...draftPresentation.sectionOrder];
+    const currentIndex = order.indexOf(kind);
+    const availableKinds = availableSections.map((section) => section.kind);
+    const visibleIndex = availableKinds.indexOf(kind);
+    const targetKind = availableKinds[visibleIndex + direction];
+    const targetIndex = targetKind ? order.indexOf(targetKind) : -1;
+    if (currentIndex < 0 || targetIndex < 0) return;
+    [order[currentIndex], order[targetIndex]] = [
+      order[targetIndex]!,
+      order[currentIndex]!,
+    ];
+    setDesignDraft({
+      versionId: selected.id,
+      presentation: { ...draftPresentation, sectionOrder: order },
+    });
   }
 
   if (isPending || !authSession || loading) {
@@ -436,6 +559,13 @@ export function ResumeVersionHistoryPage() {
               type="button"
             >
               Preview
+            </button>
+            <button
+              aria-pressed={view === "design"}
+              onClick={() => setView("design")}
+              type="button"
+            >
+              Design
             </button>
             <button
               aria-pressed={view === "compare"}
@@ -552,27 +682,13 @@ export function ResumeVersionHistoryPage() {
                   </header>
 
                   <div className={styles.exportBar}>
-                    <fieldset>
-                      <legend>Spacing</legend>
-                      <label>
-                        <input
-                          checked={density === "comfortable"}
-                          name="history-density"
-                          onChange={() => setDensity("comfortable")}
-                          type="radio"
-                        />
-                        Comfortable
-                      </label>
-                      <label>
-                        <input
-                          checked={density === "compact"}
-                          name="history-density"
-                          onChange={() => setDensity("compact")}
-                          type="radio"
-                        />
-                        Compact
-                      </label>
-                    </fieldset>
+                    <p>
+                      {templateOptions.find(
+                        (option) =>
+                          option.id === selected.presentation.template,
+                      )?.name ?? "Professional"}{" "}
+                      template · {selected.presentation.density} spacing
+                    </p>
                     <button
                       disabled={downloading !== null}
                       onClick={() => void download("pdf")}
@@ -608,12 +724,242 @@ export function ResumeVersionHistoryPage() {
                     className={styles.paperStage}
                     aria-label="Resume version preview"
                   >
-                    <ProfessionalResume density={density} document={document} />
+                    <ProfessionalResume
+                      document={document}
+                      presentation={selected.presentation}
+                    />
                   </div>
                 </>
               ) : (
                 <div className={styles.loadingPanel}>
                   Loading version preview…
+                </div>
+              )
+            ) : view === "design" ? (
+              selected && document ? (
+                <div className={styles.designWorkspace}>
+                  <aside className={styles.designPanel}>
+                    <header>
+                      <span>Template studio</span>
+                      <h2>Style this version</h2>
+                      <p>
+                        Presentation changes never rewrite verified resume
+                        content.
+                      </p>
+                    </header>
+
+                    <fieldset className={styles.templateGallery}>
+                      <legend>Template</legend>
+                      {templateOptions.map((option) => (
+                        <label
+                          data-selected={
+                            draftPresentation.template === option.id
+                          }
+                          key={option.id}
+                        >
+                          <input
+                            checked={draftPresentation.template === option.id}
+                            name="resume-template"
+                            onChange={() =>
+                              updatePresentation({ template: option.id })
+                            }
+                            type="radio"
+                          />
+                          <span aria-hidden="true" data-template={option.id}>
+                            <i />
+                            <i />
+                            <i />
+                          </span>
+                          <strong>{option.name}</strong>
+                          <small>{option.description}</small>
+                        </label>
+                      ))}
+                    </fieldset>
+
+                    <div className={styles.controlGrid}>
+                      <label>
+                        Typography
+                        <select
+                          aria-label="Typography"
+                          onChange={(event) =>
+                            updatePresentation({
+                              fontFamily: event.target
+                                .value as ResumeFontFamily,
+                            })
+                          }
+                          value={draftPresentation.fontFamily}
+                        >
+                          {fontOptions.map((option) => (
+                            <option key={option.id} value={option.id}>
+                              {option.name}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <fieldset>
+                        <legend>Spacing</legend>
+                        <label>
+                          <input
+                            checked={
+                              draftPresentation.density === "comfortable"
+                            }
+                            name="design-density"
+                            onChange={() =>
+                              updatePresentation({ density: "comfortable" })
+                            }
+                            type="radio"
+                          />
+                          Comfortable
+                        </label>
+                        <label>
+                          <input
+                            checked={draftPresentation.density === "compact"}
+                            name="design-density"
+                            onChange={() =>
+                              updatePresentation({ density: "compact" })
+                            }
+                            type="radio"
+                          />
+                          Compact
+                        </label>
+                      </fieldset>
+                    </div>
+
+                    <fieldset className={styles.accentPicker}>
+                      <legend>Accent color</legend>
+                      {accentOptions.map((option) => (
+                        <label key={option.id}>
+                          <input
+                            checked={
+                              draftPresentation.accentColor === option.id
+                            }
+                            name="accent-color"
+                            onChange={() =>
+                              updatePresentation({ accentColor: option.id })
+                            }
+                            type="radio"
+                          />
+                          <span data-color={option.id} />
+                          {option.name}
+                        </label>
+                      ))}
+                    </fieldset>
+
+                    <fieldset className={styles.sectionControls}>
+                      <legend>Sections</legend>
+                      <p>Choose what appears and adjust the reading order.</p>
+                      {availableSections.map((section, index) => {
+                        const visible =
+                          !draftPresentation.hiddenSections.includes(
+                            section.kind,
+                          );
+                        const visibleCount = availableSections.filter(
+                          (candidate) =>
+                            !draftPresentation.hiddenSections.includes(
+                              candidate.kind,
+                            ),
+                        ).length;
+                        return (
+                          <div key={section.kind}>
+                            <label>
+                              <input
+                                checked={visible}
+                                disabled={visible && visibleCount === 1}
+                                onChange={() =>
+                                  updatePresentation({
+                                    hiddenSections: visible
+                                      ? [
+                                          ...draftPresentation.hiddenSections,
+                                          section.kind,
+                                        ]
+                                      : draftPresentation.hiddenSections.filter(
+                                          (kind) => kind !== section.kind,
+                                        ),
+                                  })
+                                }
+                                type="checkbox"
+                              />
+                              {section.title}
+                            </label>
+                            <span>
+                              <button
+                                aria-label={`Move ${section.title} up`}
+                                disabled={index === 0}
+                                onClick={() => moveSection(section.kind, -1)}
+                                type="button"
+                              >
+                                ↑
+                              </button>
+                              <button
+                                aria-label={`Move ${section.title} down`}
+                                disabled={
+                                  index === availableSections.length - 1
+                                }
+                                onClick={() => moveSection(section.kind, 1)}
+                                type="button"
+                              >
+                                ↓
+                              </button>
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </fieldset>
+
+                    <div className={styles.designActions}>
+                      <button
+                        disabled={!designChanged || savingDesign}
+                        onClick={() => void saveDesign()}
+                        type="button"
+                      >
+                        {savingDesign ? "Saving design…" : "Save design"}
+                      </button>
+                      <button
+                        disabled={!designChanged}
+                        onClick={() => setDesignDraft(null)}
+                        type="button"
+                      >
+                        Reset changes
+                      </button>
+                    </div>
+                    <small className={styles.atsSafetyNote}>
+                      All templates stay single-column, searchable, and free of
+                      decorative skill charts.
+                    </small>
+                  </aside>
+
+                  <section className={styles.designPreview}>
+                    <header>
+                      <div>
+                        <span>Live preview</span>
+                        <strong>
+                          {designChanged ? "Unsaved changes" : "Saved design"}
+                        </strong>
+                      </div>
+                      <button
+                        disabled={designChanged || downloading !== null}
+                        onClick={() => void download("pdf")}
+                        title={
+                          designChanged
+                            ? "Save the design before downloading."
+                            : undefined
+                        }
+                        type="button"
+                      >
+                        {downloading === "pdf" ? "Creating…" : "Download PDF"}
+                      </button>
+                    </header>
+                    <div className={styles.paperStage}>
+                      <ProfessionalResume
+                        document={document}
+                        presentation={draftPresentation}
+                      />
+                    </div>
+                  </section>
+                </div>
+              ) : (
+                <div className={styles.loadingPanel}>
+                  Loading design studio…
                 </div>
               )
             ) : (

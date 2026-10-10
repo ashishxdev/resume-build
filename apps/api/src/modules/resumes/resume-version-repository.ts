@@ -1,4 +1,9 @@
-import type { ResumeClaim, ResumeVersionType } from "@make-my-resume/contracts";
+import type {
+  ResumeClaim,
+  ResumePresentationSettings,
+  ResumeVersionType,
+} from "@make-my-resume/contracts";
+import { normalizeResumePresentation } from "@make-my-resume/resume-engine";
 import { MongoClient, type Db } from "mongodb";
 
 import type { Environment } from "../../config/environment.js";
@@ -17,6 +22,7 @@ export interface ResumeVersionRecord {
   company: string | null;
   role: string | null;
   claims: ResumeClaim[];
+  presentation: ResumePresentationSettings;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -50,6 +56,12 @@ export interface ResumeVersionRepository {
     resumeId: string,
     versionId: string,
     name: string,
+  ): Promise<ResumeVersionRecord | null>;
+  updatePresentationOwned(
+    userId: string,
+    resumeId: string,
+    versionId: string,
+    presentation: ResumePresentationSettings,
   ): Promise<ResumeVersionRecord | null>;
   activateOwned(
     userId: string,
@@ -160,6 +172,17 @@ export function createMemoryResumeVersionRepository(
       return cloneRecord(record);
     },
 
+    async updatePresentationOwned(userId, resumeId, versionId, presentation) {
+      const collection = ownedCollection(userId, resumeId);
+      const record = collection?.versions.find(
+        (version) => version.id === versionId && version.userId === userId,
+      );
+      if (!record) return null;
+      record.presentation = normalizeResumePresentation(presentation);
+      record.updatedAt = new Date();
+      return cloneRecord(record);
+    },
+
     async activateOwned(userId, resumeId, versionId) {
       const collection = ownedCollection(userId, resumeId);
       if (
@@ -254,6 +277,7 @@ interface MongoResumeVersionDocument {
   company?: string | null;
   role?: string | null;
   content: { claims: ResumeClaim[] };
+  presentation?: ResumePresentationSettings;
   schemaVersion: number;
   verificationStatus: "verified";
   createdAt: Date;
@@ -303,6 +327,7 @@ function toRecord(
     company,
     role,
     claims: structuredClone(document.content.claims),
+    presentation: normalizeResumePresentation(document.presentation),
     createdAt: document.createdAt,
     updatedAt: document.updatedAt,
   };
@@ -394,6 +419,28 @@ export function createMongoResumeVersionRepository(
       );
     },
 
+    async updatePresentationOwned(userId, resumeId, versionId, presentation) {
+      if (!(await ownedResume(userId, resumeId))) return null;
+      const document = await versions.findOneAndUpdate(
+        { _id: versionId, userId, resumeId },
+        {
+          $set: {
+            presentation: normalizeResumePresentation(presentation),
+            updatedAt: new Date(),
+          },
+        },
+        { returnDocument: "after" },
+      );
+      if (!document) return null;
+      const sessions = await sessionDetails(userId);
+      return toRecord(
+        document,
+        document.tailoringSessionId
+          ? sessions.get(document.tailoringSessionId)
+          : undefined,
+      );
+    },
+
     async activateOwned(userId, resumeId, versionId) {
       const version = await versions.findOne({
         _id: versionId,
@@ -440,6 +487,7 @@ export function createMongoResumeVersionRepository(
             company: sourceRecord.company,
             role: sourceRecord.role,
             content: structuredClone(source.content),
+            presentation: sourceRecord.presentation,
             schemaVersion: 1,
             verificationStatus: "verified",
             createdAt: now,

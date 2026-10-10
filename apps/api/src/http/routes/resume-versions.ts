@@ -1,6 +1,8 @@
 import {
   renameResumeVersionRequestSchema,
-  resumeExportOptionsSchema,
+  resumeExportFormatSchema,
+  resumeTemplateDensitySchema,
+  updateResumePresentationRequestSchema,
   type ResumeVersion,
   type ResumeVersionList,
   type ResumeVersionSummary,
@@ -107,6 +109,7 @@ function serializeSummary(
     role: record.role,
     isActive: collection.activeVersionId === record.id,
     ...deletion,
+    presentation: record.presentation,
     createdAt: record.createdAt.toISOString(),
     updatedAt: record.updatedAt.toISOString(),
   };
@@ -271,6 +274,74 @@ export function createResumeVersionRouter(
     },
   );
 
+  router.patch(
+    "/api/v1/resumes/:resumeId/versions/:versionId/presentation",
+    async (request, response, next) => {
+      try {
+        const userId = await requireUser(request, response);
+        if (!userId) return;
+        const parsed = updateResumePresentationRequestSchema.safeParse(
+          request.body,
+        );
+        if (!parsed.success)
+          return sendError(
+            response,
+            400,
+            "INVALID_PRESENTATION_SETTINGS",
+            "Choose supported template, typography, color, spacing, and section settings.",
+          );
+        const existing = await services.repository.findOwned(
+          userId,
+          request.params.resumeId,
+          request.params.versionId,
+        );
+        if (!existing)
+          return sendError(
+            response,
+            404,
+            "VERSION_NOT_FOUND",
+            "Resume version was not found.",
+          );
+        const document = buildProfessionalResumeDocument(existing.claims);
+        if (
+          document.sections.length > 0 &&
+          document.sections.every((section) =>
+            parsed.data.hiddenSections.includes(section.kind),
+          )
+        )
+          return sendError(
+            response,
+            400,
+            "ALL_SECTIONS_HIDDEN",
+            "Keep at least one resume section visible.",
+          );
+        const updated = await services.repository.updatePresentationOwned(
+          userId,
+          request.params.resumeId,
+          request.params.versionId,
+          parsed.data,
+        );
+        if (!updated)
+          return sendError(
+            response,
+            404,
+            "VERSION_NOT_FOUND",
+            "Resume version was not found.",
+          );
+        const collection = await services.repository.listOwned(
+          userId,
+          request.params.resumeId,
+        );
+        if (!collection) return;
+        response.status(200).json({
+          data: serializeVersion(updated, collection),
+        });
+      } catch (error) {
+        next(error);
+      }
+    },
+  );
+
   router.post(
     "/api/v1/resumes/:resumeId/versions/:versionId/activate",
     async (request, response, next) => {
@@ -382,11 +453,11 @@ export function createResumeVersionRouter(
       try {
         const userId = await requireUser(request, response);
         if (!userId) return;
-        const parsed = resumeExportOptionsSchema.safeParse({
-          format: request.query.format,
-          density: request.query.density ?? "comfortable",
-        });
-        if (!parsed.success)
+        const format = resumeExportFormatSchema.safeParse(request.query.format);
+        const density = resumeTemplateDensitySchema
+          .optional()
+          .safeParse(request.query.density);
+        if (!format.success || !density.success)
           return sendError(
             response,
             400,
@@ -406,8 +477,11 @@ export function createResumeVersionRouter(
             "Resume version was not found.",
           );
         const document = buildProfessionalResumeDocument(record.claims);
+        const presentation = density.data
+          ? { ...record.presentation, density: density.data }
+          : record.presentation;
         let sourceProjectLinks: string[] = [];
-        if (parsed.data.format === "pdf" && services.objectStorage) {
+        if (format.data === "pdf" && services.objectStorage) {
           const sourceImport =
             await services.resumeImportRepository.findOwnedByResumeId(
               userId,
@@ -421,8 +495,8 @@ export function createResumeVersionRouter(
         }
         const exported = await renderProfessionalResume(
           document,
-          parsed.data.format,
-          parsed.data.density,
+          format.data,
+          presentation,
           sourceProjectLinks,
         );
         response.setHeader("Cache-Control", "private, no-store");

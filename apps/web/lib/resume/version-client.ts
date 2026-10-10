@@ -1,5 +1,6 @@
 import {
   type ResumeExportFormat,
+  type ResumePresentationSettings,
   type ResumeTemplateDensity,
   resumeVersionListSchema,
   resumeVersionSchema,
@@ -102,6 +103,26 @@ export async function renameResumeVersion(
   return parsed.data.data;
 }
 
+export async function updateResumeVersionPresentation(
+  resumeId: string,
+  versionId: string,
+  presentation: ResumePresentationSettings,
+) {
+  const response = await request(
+    `${versionPath(resumeId, versionId)}/presentation`,
+    {
+      method: "PATCH",
+      body: JSON.stringify(presentation),
+    },
+  );
+  const parsed = z
+    .object({ data: resumeVersionSchema })
+    .safeParse(await response.json());
+  if (!parsed.success)
+    throw new ResumeVersionApiError("The saved design settings were invalid.");
+  return parsed.data.data;
+}
+
 export async function activateResumeVersion(
   resumeId: string,
   versionId: string,
@@ -137,9 +158,10 @@ export async function downloadResumeVersion(
   resumeId: string,
   versionId: string,
   format: ResumeExportFormat,
-  density: ResumeTemplateDensity,
+  density?: ResumeTemplateDensity,
 ) {
-  const parameters = new URLSearchParams({ format, density });
+  const parameters = new URLSearchParams({ format });
+  if (density) parameters.set("density", density);
   const response = await request(
     `${versionPath(resumeId, versionId)}/export?${parameters}`,
   );

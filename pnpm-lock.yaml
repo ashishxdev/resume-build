@@ -428,6 +428,9 @@ importers:
       '@make-my-resume/contracts':
         specifier: workspace:*
         version: link:../contracts
+      '@make-my-resume/resume-engine':
+        specifier: workspace:*
+        version: link:../resume-engine
     devDependencies:
       '@make-my-resume/eslint-config':
         specifier: workspace:*

@@ -86,6 +86,7 @@ const app = createApp(
     jobDescriptionRepository: jobDescriptionRuntime.repository,
     rateLimiter: jobAnalysisRateLimitRuntime.limiter,
     resumeImportRepository: resumeImportRuntime.repository,
+    resumeVersionRepository: resumeVersionRuntime.repository,
     objectStorage,
   },
   {

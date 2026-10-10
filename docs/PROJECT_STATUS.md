@@ -1,6 +1,6 @@
 # Make My Resume — Project Status
 
-Last updated: 2026-10-08
+Last updated: 2026-10-10
 
 ## Purpose
 
@@ -16,8 +16,8 @@ Update this file whenever a major feature is started, completed, materially rede
 | Marketing homepage | Complete | Responsive Stitch-inspired homepage implementing the Atelier Digital visual system and core product messaging. |
 | Authentication | In progress | Email/password authentication now includes Resend-backed, rate-limited password recovery with single-use tokens and session revocation. Google OAuth still requires configuration and end-to-end verification. |
 | Dashboard workspace | Complete | Responsive authenticated dashboard implements the approved desktop and mobile Stitch designs with truthful empty, loading, navigation, activity, resume management, tailored-draft management, trust states, and dedicated resume/activity routes. |
-| Resume workflows | In progress | PDF/DOCX import, Gemini-assisted extraction, verified base versions, grounded job matching, evidence-backed suggestion review, immutable tailored versions, transparent ATS compatibility analysis and improvement actions, Professional ATS PDF/DOCX export, and permanent owned-resume deletion are complete. Additional templates and sharing remain future milestones. |
-| Backend business modules | In progress | Owned imports, private R2 originals, recoverable queues, grounded parsing and matching, explicit suggestion decisions, transactional tailored-version persistence, ATS analysis and improvement workflows, saved ATS snapshots, and authenticated deterministic document export are complete. |
+| Resume workflows | In progress | PDF/DOCX import, Gemini-assisted extraction, verified base versions, grounded job matching, evidence-backed suggestion review, immutable tailored versions, transparent ATS compatibility analysis and improvement actions, three ATS-safe export templates, per-version presentation controls, and permanent owned-resume deletion are complete. Private sharing remains a future milestone. |
+| Backend business modules | In progress | Owned imports, private R2 originals, recoverable queues, grounded parsing and matching, explicit suggestion decisions, transactional tailored-version persistence, ATS analysis and improvement workflows, saved ATS snapshots, per-version presentation persistence, and authenticated deterministic document export are complete. |
 
 ## Milestones
 
@@ -423,9 +423,32 @@ Update this file whenever a major feature is started, completed, materially rede
   - `apps/web/components/resume/resume-version-history.module.css`
   - `apps/web/app/resumes/[resumeId]/versions/page.tsx`
 
+### 20. Resume Template and Styling Studio
+
+- **Date:** 2026-10-10
+- **Status:** Complete
+- **Scope delivered:**
+  - Added three curated, single-column ATS-safe templates: Professional, Modern, and Compact.
+  - Added per-version typography, accent color, comfortable/compact spacing, section visibility, and section-order controls in a responsive Design view within version history.
+  - Persist presentation settings on each immutable resume version with owner-only API validation and backward-compatible defaults for existing snapshots.
+  - Keep verified wording unchanged while applying section presentation choices through a shared deterministic resume-engine transformation.
+  - Use saved presentation settings for the browser preview and version-specific PDF/DOCX exports; tailoring-session downloads also resolve the settings stored on their active generated version.
+  - Preserve presentation settings when a historical version is restored as a new immutable copy.
+- **Verification:** 86 API tests, 59 web tests, and 5 resume-engine tests pass. Full workspace type checking, linting, Prettier validation, production builds, and `git diff --check` pass. Representative Professional, Modern, and Compact PDFs and DOCX files were generated, rendered to six page images with Poppler and the bundled LibreOffice runtime, and visually inspected with no clipping, overlap, broken wrapping, missing glyphs, or unstable page breaks.
+- **Important limitations:** The first release intentionally keeps every template single-column and limits users to curated typography and color choices. It does not provide arbitrary positioning, multi-column layouts, images, decorative skill charts, or pixel-level parity between browser, PDFKit, and Word layout engines.
+- **Primary files:**
+  - `packages/contracts/src/resume/document.ts`
+  - `packages/resume-engine/src/document/apply-resume-presentation.ts`
+  - `packages/resume-renderer/src/professional-resume.tsx`
+  - `apps/api/src/modules/resumes/resume-version-repository.ts`
+  - `apps/api/src/modules/tailoring/resume-export-service.ts`
+  - `apps/api/src/http/routes/resume-versions.ts`
+  - `apps/web/components/resume/resume-version-history-page.tsx`
+  - `apps/web/components/resume/resume-version-history.module.css`
+
 ## Next Major Milestone
 
-Multiple professional templates and presentation controls are next: add a small curated template gallery, typography and accent choices, per-version template preferences, and reliable PDF/DOCX parity without weakening ATS-safe structure. Saved export artifacts and private sharing can follow after template selection is stable.
+Private resume sharing is next: create unlisted, revocable share links for selected versions, render the saved template on a noindex public page, provide a PDF download, and let the owner disable or regenerate access immediately. Saved export artifacts can follow once sharing is stable.
 
 ## Status Definitions
 

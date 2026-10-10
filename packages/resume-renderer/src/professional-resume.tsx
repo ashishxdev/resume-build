@@ -1,38 +1,62 @@
 import type {
   ProfessionalResumeDocument,
+  ResumePresentationSettings,
   ResumeTemplateDensity,
 } from "@make-my-resume/contracts";
+import {
+  DEFAULT_RESUME_PRESENTATION,
+  RESUME_ACCENT_COLORS,
+} from "@make-my-resume/contracts";
+import {
+  applyResumePresentation,
+  normalizeResumePresentation,
+} from "@make-my-resume/resume-engine";
+import type { CSSProperties } from "react";
 
 export interface ProfessionalResumeProps {
   document: ProfessionalResumeDocument;
   density?: ResumeTemplateDensity;
+  presentation?: ResumePresentationSettings;
   className?: string;
 }
 
 export function ProfessionalResume({
   document,
-  density = "comfortable",
+  density,
+  presentation = DEFAULT_RESUME_PRESENTATION,
   className,
 }: ProfessionalResumeProps) {
+  const resolved = normalizeResumePresentation({
+    ...presentation,
+    density: density ?? presentation.density,
+  });
+  const displayedDocument = applyResumePresentation(document, resolved);
+  const style = {
+    "--resume-accent": RESUME_ACCENT_COLORS[resolved.accentColor],
+  } as CSSProperties;
+
   return (
     <article
       className={["professional-resume", className].filter(Boolean).join(" ")}
-      data-density={density}
+      data-density={resolved.density}
+      data-font={resolved.fontFamily}
       data-resume-renderer="professional-ats"
+      data-template={resolved.template}
+      style={style}
     >
       <header className="professional-resume__header">
-        <h1>{document.name}</h1>
-        {document.headline && <p>{document.headline}</p>}
-        {document.contact.length > 0 && (
+        <h1>{displayedDocument.name}</h1>
+        {displayedDocument.headline && <p>{displayedDocument.headline}</p>}
+        {displayedDocument.contact.length > 0 && (
           <ul aria-label="Contact information">
-            {document.contact.map((detail) => (
+            {displayedDocument.contact.map((detail) => (
               <li key={detail}>{detail}</li>
             ))}
           </ul>
         )}
       </header>
 
-      {document.sections.map((section) => (
+      {displayedDocument.sections.map((section) => (
         <section
           className="professional-resume__section"
           data-section={section.kind}

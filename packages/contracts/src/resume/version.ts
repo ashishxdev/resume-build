@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { resumeClaimSchema } from "./verification.js";
+import { resumePresentationSettingsSchema } from "./document.js";
 
 export const resumeVersionTypeSchema = z.enum([
   "base",
@@ -24,6 +25,7 @@ export const resumeVersionSummarySchema = z.object({
   canDelete: z.boolean(),
   deleteScope: z.enum(["version", "tailoring_session"]).nullable(),
   deleteBlockedReason: z.string().nullable(),
+  presentation: resumePresentationSettingsSchema,
   createdAt: z.string(),
   updatedAt: z.string(),
 });
@@ -43,10 +45,16 @@ export const renameResumeVersionRequestSchema = z.object({
   name: z.string().trim().min(1).max(120),
 });
 
+export const updateResumePresentationRequestSchema =
+  resumePresentationSettingsSchema;
+
 export type ResumeVersionType = z.infer<typeof resumeVersionTypeSchema>;
 export type ResumeVersionSummary = z.infer<typeof resumeVersionSummarySchema>;
 export type ResumeVersion = z.infer<typeof resumeVersionSchema>;
 export type ResumeVersionList = z.infer<typeof resumeVersionListSchema>;
 export type RenameResumeVersionRequest = z.infer<
   typeof renameResumeVersionRequestSchema
+>;
+export type UpdateResumePresentationRequest = z.infer<
+  typeof updateResumePresentationRequestSchema
 >;

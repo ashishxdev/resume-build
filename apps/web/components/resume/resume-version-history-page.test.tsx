@@ -11,6 +11,7 @@ import React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ResumeVersionHistoryPage } from "./resume-version-history-page";
+import { DEFAULT_RESUME_PRESENTATION } from "@make-my-resume/contracts";
 
 const mocks = vi.hoisted(() => ({
   activate: vi.fn(),
@@ -21,6 +22,7 @@ const mocks = vi.hoisted(() => ({
   rename: vi.fn(),
   replace: vi.fn(),
   restore: vi.fn(),
+  updatePresentation: vi.fn(),
   signOut: vi.fn(),
   useSession: vi.fn(),
 }));
@@ -45,6 +47,7 @@ vi.mock("@/lib/resume/version-client", () => ({
   listResumeVersions: mocks.list,
   renameResumeVersion: mocks.rename,
   restoreResumeVersion: mocks.restore,
+  updateResumeVersionPresentation: mocks.updatePresentation,
 }));
 
 const personalClaim = {
@@ -92,6 +95,7 @@ const baseSummary = {
   canDelete: false,
   deleteScope: null,
   deleteBlockedReason: "The verified baseline is permanently protected.",
+  presentation: DEFAULT_RESUME_PRESENTATION,
   createdAt: "2026-10-01T08:00:00.000Z",
   updatedAt: "2026-10-01T08:00:00.000Z",
 };
@@ -170,6 +174,12 @@ describe("ResumeVersionHistoryPage", () => {
       blob: new Blob(["resume"]),
       filename: "acme-engineer.pdf",
     });
+    mocks.updatePresentation.mockImplementation(
+      async (_resumeId: string, _versionId: string, presentation: unknown) => ({
+        ...tailoredVersion,
+        presentation,
+      }),
+    );
   });
 
   afterEach(() => {
@@ -229,7 +239,36 @@ describe("ResumeVersionHistoryPage", () => {
         "resume_1",
         "version_restored",
         "pdf",
-        "comfortable",
+      ),
+    );
+  });
+
+  it("previews and saves per-version template settings", async () => {
+    const { container } = render(<ResumeVersionHistoryPage />);
+    await screen.findByRole("heading", { name: "Alex Mercer" });
+
+    fireEvent.click(screen.getByRole("button", { name: "Design" }));
+    fireEvent.click(screen.getByLabelText(/Modern/));
+    expect(
+      container
+        .querySelector(".professional-resume")
+        ?.getAttribute("data-template"),
+    ).toBe("modern");
+    fireEvent.change(screen.getByLabelText("Typography"), {
+      target: { value: "sans" },
+    });
+    fireEvent.click(screen.getByLabelText(/Navy/));
+    fireEvent.click(screen.getByRole("button", { name: "Save design" }));
+
+    await waitFor(() =>
+      expect(mocks.updatePresentation).toHaveBeenCalledWith(
+        "resume_1",
+        "version_tailored",
+        expect.objectContaining({
+          template: "modern",
+          fontFamily: "sans",
+          accentColor: "navy",
+        }),
       ),
     );
   });

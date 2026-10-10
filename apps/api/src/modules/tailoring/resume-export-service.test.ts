@@ -1,4 +1,7 @@
-import type { ProfessionalResumeDocument } from "@make-my-resume/contracts";
+import {
+  DEFAULT_RESUME_PRESENTATION,
+  type ProfessionalResumeDocument,
+} from "@make-my-resume/contracts";
 import mammoth from "mammoth";
 import { getDocument } from "pdfjs-dist/legacy/build/pdf.mjs";
 import { describe, expect, it } from "vitest";
@@ -60,12 +63,21 @@ describe("renderProfessionalResume", () => {
   });
 
   it("creates an editable DOCX with the same content", async () => {
-    const result = await renderProfessionalResume(resume, "docx", "compact");
+    const result = await renderProfessionalResume(resume, "docx", {
+      ...DEFAULT_RESUME_PRESENTATION,
+      template: "modern",
+      fontFamily: "sans",
+      accentColor: "navy",
+      density: "compact",
+      sectionOrder: ["experience", "summary"],
+      hiddenSections: ["summary"],
+    });
     expect(result.bytes.subarray(0, 2).toString()).toBe("PK");
     const extracted = await mammoth.extractRawText({ buffer: result.bytes });
     expect(extracted.value).toContain("Alex Mercer");
     expect(extracted.value).toContain(
       "Led a verified design-system rollout across four products.",
     );
+    expect(extracted.value).not.toContain("accessible enterprise workflows");
   });
 });

@@ -34,6 +34,51 @@ export const professionalResumeDocumentSchema = z.object({
 
 export const resumeTemplateDensitySchema = z.enum(["comfortable", "compact"]);
 
+export const resumeTemplateIdSchema = z.enum([
+  "professional",
+  "modern",
+  "compact",
+]);
+
+export const resumeFontFamilySchema = z.enum(["hybrid", "serif", "sans"]);
+
+export const resumeAccentColorSchema = z.enum([
+  "plum",
+  "navy",
+  "forest",
+  "charcoal",
+]);
+
+export const resumePresentationSettingsSchema = z
+  .object({
+    template: resumeTemplateIdSchema,
+    fontFamily: resumeFontFamilySchema,
+    accentColor: resumeAccentColorSchema,
+    density: resumeTemplateDensitySchema,
+    sectionOrder: z
+      .array(resumeDocumentSectionKindSchema)
+      .max(resumeDocumentSectionKindSchema.options.length),
+    hiddenSections: z
+      .array(resumeDocumentSectionKindSchema)
+      .max(resumeDocumentSectionKindSchema.options.length - 1),
+  })
+  .superRefine((value, context) => {
+    if (new Set(value.sectionOrder).size !== value.sectionOrder.length) {
+      context.addIssue({
+        code: "custom",
+        message: "Section order cannot contain duplicates.",
+        path: ["sectionOrder"],
+      });
+    }
+    if (new Set(value.hiddenSections).size !== value.hiddenSections.length) {
+      context.addIssue({
+        code: "custom",
+        message: "Hidden sections cannot contain duplicates.",
+        path: ["hiddenSections"],
+      });
+    }
+  });
+
 export const resumeExportFormatSchema = z.enum(["pdf", "docx"]);
 
 export const resumeExportOptionsSchema = z.object({
@@ -47,4 +92,26 @@ export type ProfessionalResumeDocument = z.infer<
 export type ResumeDocumentSection = z.infer<typeof resumeDocumentSectionSchema>;
 export type ResumeDocumentItem = z.infer<typeof resumeDocumentItemSchema>;
 export type ResumeTemplateDensity = z.infer<typeof resumeTemplateDensitySchema>;
+export type ResumeTemplateId = z.infer<typeof resumeTemplateIdSchema>;
+export type ResumeFontFamily = z.infer<typeof resumeFontFamilySchema>;
+export type ResumeAccentColor = z.infer<typeof resumeAccentColorSchema>;
+export type ResumePresentationSettings = z.infer<
+  typeof resumePresentationSettingsSchema
+>;
 export type ResumeExportFormat = z.infer<typeof resumeExportFormatSchema>;
+
+export const DEFAULT_RESUME_PRESENTATION: ResumePresentationSettings = {
+  template: "professional",
+  fontFamily: "hybrid",
+  accentColor: "plum",
+  density: "comfortable",
+  sectionOrder: [...resumeDocumentSectionKindSchema.options],
+  hiddenSections: [],
+};
+
+export const RESUME_ACCENT_COLORS: Record<ResumeAccentColor, string> = {
+  plum: "#38204E",
+  navy: "#24446A",
+  forest: "#28624C",
+  charcoal: "#34323A",
+};

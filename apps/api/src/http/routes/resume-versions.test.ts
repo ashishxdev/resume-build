@@ -1,4 +1,7 @@
-import type { ResumeClaim } from "@make-my-resume/contracts";
+import {
+  DEFAULT_RESUME_PRESENTATION,
+  type ResumeClaim,
+} from "@make-my-resume/contracts";
 import express from "express";
 import request from "supertest";
 import { describe, expect, it } from "vitest";
@@ -43,6 +46,7 @@ function version(
     company: input.type === "base" ? null : "Acme",
     role: input.type === "base" ? null : "Engineer",
     claims: [claim],
+    presentation: DEFAULT_RESUME_PRESENTATION,
     createdAt,
     updatedAt: createdAt,
     ...input,
@@ -168,6 +172,44 @@ describe("resume version routes", () => {
       .delete("/api/v1/resumes/resume_1/versions/version_base")
       .expect(409);
     expect(response.body.error.code).toBe("BASE_VERSION_PROTECTED");
+  });
+
+  it("persists owner-only presentation settings for preview and export", async () => {
+    const { app } = createTestApp("user_1");
+    const presentation = {
+      ...DEFAULT_RESUME_PRESENTATION,
+      template: "modern" as const,
+      fontFamily: "sans" as const,
+      accentColor: "navy" as const,
+      density: "compact" as const,
+      sectionOrder: ["skills", "experience"] as const,
+      hiddenSections: ["achievements"] as const,
+    };
+
+    const response = await request(app)
+      .patch("/api/v1/resumes/resume_1/versions/version_tailored/presentation")
+      .send(presentation)
+      .expect(200);
+
+    expect(response.body.data.presentation).toEqual(presentation);
+    const version = await request(app)
+      .get("/api/v1/resumes/resume_1/versions/version_tailored")
+      .expect(200);
+    expect(version.body.data.presentation).toEqual(presentation);
+
+    const hiddenAll = await request(app)
+      .patch("/api/v1/resumes/resume_1/versions/version_tailored/presentation")
+      .send({
+        ...DEFAULT_RESUME_PRESENTATION,
+        hiddenSections: ["experience"],
+      })
+      .expect(400);
+    expect(hiddenAll.body.error.code).toBe("ALL_SECTIONS_HIDDEN");
+
+    await request(createTestApp("user_2").app)
+      .patch("/api/v1/resumes/resume_1/versions/version_tailored/presentation")
+      .send(presentation)
+      .expect(404);
   });
 
   it("exports an owned historical snapshot with private download headers", async () => {

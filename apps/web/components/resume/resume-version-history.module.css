@@ -295,6 +295,13 @@
   justify-content: flex-end;
 }
 
+.exportBar > p {
+  margin: 0 auto 0 0;
+  color: #6f6574;
+  font-size: 11px;
+  text-transform: capitalize;
+}
+
 .exportBar fieldset {
   display: flex;
   align-items: center;
@@ -356,6 +363,29 @@
   font-family: Arial, Helvetica, sans-serif;
 }
 
+.paperStage :global(.professional-resume[data-font="serif"]) {
+  font-family: Georgia, "Times New Roman", serif;
+}
+
+.paperStage :global(.professional-resume[data-font="sans"]) {
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+.paperStage
+  :global(
+    .professional-resume[data-font="sans"] .professional-resume__header h1
+  ) {
+  font-family: Arial, Helvetica, sans-serif;
+  letter-spacing: -0.035em;
+}
+
+.paperStage
+  :global(
+    .professional-resume[data-font="serif"] .professional-resume__item h3
+  ) {
+  font-family: Georgia, "Times New Roman", serif;
+}
+
 .paperStage :global(.professional-resume[data-density="compact"]) {
   padding-top: 48px;
   padding-bottom: 48px;
@@ -368,7 +398,7 @@
 
 .paperStage :global(.professional-resume__header h1) {
   margin: 0;
-  color: #211535;
+  color: var(--resume-accent, #211535);
   font-family: Georgia, "Times New Roman", serif;
   font-size: 34px;
 }
@@ -397,10 +427,416 @@
 
 .paperStage :global(.professional-resume__section h2) {
   margin: 0 0 11px;
-  color: #211535;
+  color: var(--resume-accent, #211535);
   font-size: 11px;
   letter-spacing: 0.11em;
   text-transform: uppercase;
+}
+
+.paperStage
+  :global(
+    .professional-resume[data-template="modern"] .professional-resume__header
+  ),
+.paperStage
+  :global(
+    .professional-resume[data-template="compact"] .professional-resume__header
+  ) {
+  text-align: left;
+}
+
+.paperStage
+  :global(
+    .professional-resume[data-template="modern"] .professional-resume__header
+  ) {
+  padding-bottom: 17px;
+  border-bottom: 2px solid var(--resume-accent, #38204e);
+}
+
+.paperStage
+  :global(
+    .professional-resume[data-template="modern"] .professional-resume__header ul
+  ),
+.paperStage
+  :global(
+    .professional-resume[data-template="compact"]
+      .professional-resume__header
+      ul
+  ) {
+  justify-content: flex-start;
+}
+
+.paperStage
+  :global(
+    .professional-resume[data-template="modern"]
+      .professional-resume__section
+      h2
+  ) {
+  padding-bottom: 5px;
+  border-bottom: 1px solid color-mix(in srgb, var(--resume-accent) 55%, white);
+}
+
+.paperStage :global(.professional-resume[data-template="compact"]) {
+  padding: 42px 48px;
+}
+
+.paperStage
+  :global(
+    .professional-resume[data-template="compact"] .professional-resume__header
+  ) {
+  margin-bottom: 20px;
+}
+
+.paperStage
+  :global(
+    .professional-resume[data-template="compact"]
+      .professional-resume__header
+      h1
+  ) {
+  font-size: 29px;
+}
+
+.paperStage
+  :global(
+    .professional-resume[data-template="compact"] .professional-resume__section
+  ) {
+  margin-top: 17px;
+}
+
+.paperStage
+  :global(
+    .professional-resume[data-template="compact"] .professional-resume__items
+  ) {
+  gap: 9px;
+}
+
+.paperStage
+  :global(
+    .professional-resume[data-density="compact"] .professional-resume__section
+  ) {
+  margin-top: 18px;
+}
+
+.paperStage
+  :global(
+    .professional-resume[data-density="compact"] .professional-resume__items
+  ) {
+  gap: 10px;
+}
+
+.designWorkspace {
+  display: grid;
+  grid-template-columns: 285px minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+}
+
+.designPanel,
+.designPreview > header {
+  border: 1px solid #e1dbe5;
+  border-radius: 10px;
+  background: #fff;
+}
+
+.designPanel {
+  position: sticky;
+  top: 92px;
+  padding: 20px;
+}
+
+.designPanel > header span,
+.designPreview > header span {
+  color: #756b7a;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.designPanel > header h2 {
+  margin: 5px 0;
+  font-family: var(--display-font), Georgia, serif;
+  font-size: 25px;
+}
+
+.designPanel > header p,
+.sectionControls > p {
+  margin: 0;
+  color: #756c79;
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.designPanel fieldset {
+  margin: 20px 0 0;
+  padding: 0;
+  border: 0;
+}
+
+.designPanel legend,
+.controlGrid > label {
+  margin-bottom: 9px;
+  color: #514757;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.templateGallery {
+  display: grid;
+  gap: 8px;
+}
+
+.templateGallery > label {
+  display: grid;
+  grid-template-columns: 46px 1fr;
+  gap: 2px 10px;
+  padding: 10px;
+  border: 1px solid #e1dae5;
+  border-radius: 7px;
+  cursor: pointer;
+}
+
+.templateGallery > label[data-selected="true"] {
+  border-color: #5a43c3;
+  background: #f5f2fd;
+  box-shadow: inset 0 0 0 1px #5a43c3;
+}
+
+.templateGallery input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.templateGallery label > span {
+  grid-row: 1 / 3;
+  display: grid;
+  align-content: center;
+  gap: 4px;
+  padding: 7px;
+  border: 1px solid #ddd6e1;
+  background: #fff;
+}
+
+.templateGallery label > span i {
+  display: block;
+  height: 2px;
+  background: #bcb4c1;
+}
+
+.templateGallery label > span i:first-child {
+  width: 70%;
+  height: 4px;
+  background: #38204e;
+}
+
+.templateGallery label > span[data-template="modern"] i:first-child,
+.templateGallery label > span[data-template="compact"] i:first-child {
+  justify-self: start;
+}
+
+.templateGallery label > span[data-template="professional"] i:first-child {
+  justify-self: center;
+}
+
+.templateGallery strong {
+  align-self: end;
+  font-size: 12px;
+}
+
+.templateGallery small {
+  color: #776e7b;
+  font-size: 9px;
+  line-height: 1.35;
+}
+
+.controlGrid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 14px;
+  margin-top: 20px;
+}
+
+.controlGrid > label {
+  display: grid;
+  gap: 7px;
+  margin: 0;
+}
+
+.controlGrid select {
+  width: 100%;
+  height: 40px;
+  padding: 0 9px;
+  border: 1px solid #dbd3df;
+  border-radius: 5px;
+  background: #fff;
+  color: #33243f;
+}
+
+.controlGrid fieldset label {
+  margin-right: 12px;
+  color: #5e5563;
+  font-size: 10px;
+}
+
+.accentPicker {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px;
+}
+
+.accentPicker legend,
+.sectionControls legend {
+  grid-column: 1 / -1;
+}
+
+.accentPicker label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #5b5260;
+  cursor: pointer;
+  font-size: 10px;
+}
+
+.accentPicker input {
+  position: absolute;
+  opacity: 0;
+}
+
+.accentPicker label > span {
+  width: 16px;
+  height: 16px;
+  border: 3px solid #fff;
+  border-radius: 50%;
+  background: #38204e;
+  box-shadow: 0 0 0 1px #cfc6d3;
+}
+
+.accentPicker label > span[data-color="navy"] {
+  background: #24446a;
+}
+
+.accentPicker label > span[data-color="forest"] {
+  background: #28624c;
+}
+
+.accentPicker label > span[data-color="charcoal"] {
+  background: #34323a;
+}
+
+.accentPicker input:checked + span {
+  box-shadow: 0 0 0 2px #6554e9;
+}
+
+.sectionControls {
+  display: grid;
+  gap: 0;
+}
+
+.sectionControls > p {
+  margin-bottom: 8px;
+}
+
+.sectionControls > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 0;
+  border-top: 1px solid #eee9f0;
+}
+
+.sectionControls > div > label {
+  color: #45394d;
+  font-size: 11px;
+}
+
+.sectionControls > div > span {
+  display: flex;
+  gap: 4px;
+}
+
+.sectionControls button {
+  width: 27px;
+  height: 27px;
+  border: 1px solid #ddd5e1;
+  border-radius: 4px;
+  background: #fff;
+  color: #483855;
+  cursor: pointer;
+}
+
+.sectionControls button:disabled {
+  cursor: not-allowed;
+  opacity: 0.3;
+}
+
+.designActions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px;
+  margin-top: 20px;
+}
+
+.designActions button,
+.designPreview > header button {
+  min-height: 40px;
+  border: 1px solid #2c1742;
+  border-radius: 5px;
+  background: #2c1742;
+  color: #fff;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.designActions button + button {
+  border-color: #ddd5e1;
+  background: #fff;
+  color: #4a3d52;
+}
+
+.designActions button:disabled,
+.designPreview > header button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.atsSafetyNote {
+  display: block;
+  margin-top: 13px;
+  color: #397059;
+  font-size: 9px;
+  line-height: 1.5;
+}
+
+.designPreview {
+  min-width: 0;
+}
+
+.designPreview > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+  padding: 12px 14px;
+}
+
+.designPreview > header span,
+.designPreview > header strong {
+  display: block;
+}
+
+.designPreview > header strong {
+  margin-top: 2px;
+  font-size: 12px;
+}
+
+.designPreview > header button {
+  padding: 0 12px;
 }
 
 .paperStage :global(.professional-resume__items) {
@@ -645,6 +1081,18 @@
     border-top: 0;
     border-left: 1px solid #eee9f0;
   }
+
+  .designWorkspace {
+    grid-template-columns: 1fr;
+  }
+
+  .designPanel {
+    position: static;
+  }
+
+  .templateGallery {
+    grid-template-columns: repeat(3, 1fr);
+  }
 }
 
 @media (max-width: 680px) {
@@ -684,8 +1132,14 @@
   }
 
   .exportBar fieldset,
-  .exportBar .deleteButton {
+  .exportBar .deleteButton,
+  .exportBar > p {
     grid-column: 1 / -1;
+  }
+
+  .exportBar > p {
+    margin: 0;
+    text-align: center;
   }
 
   .exportBar button {
@@ -699,6 +1153,10 @@
   .paperStage :global(.professional-resume) {
     min-height: 0;
     padding: 34px 23px;
+  }
+
+  .paperStage :global(.professional-resume[data-template="compact"]) {
+    padding: 30px 22px;
   }
 
   .paperStage :global(.professional-resume__header h1) {
@@ -720,5 +1178,13 @@
   .comparisonList section + section {
     border-top: 1px solid #ebe6ee;
     border-left: 0;
+  }
+
+  .templateGallery {
+    grid-template-columns: 1fr;
+  }
+
+  .designActions {
+    grid-template-columns: 1fr;
   }
 }

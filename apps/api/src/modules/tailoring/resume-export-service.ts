@@ -1,10 +1,20 @@
 import type {
   ProfessionalResumeDocument,
   ResumeDocumentItem,
+  ResumePresentationSettings,
   ResumeTemplateDensity,
 } from "@make-my-resume/contracts";
 import {
+  DEFAULT_RESUME_PRESENTATION,
+  RESUME_ACCENT_COLORS,
+} from "@make-my-resume/contracts";
+import {
+  applyResumePresentation,
+  normalizeResumePresentation,
+} from "@make-my-resume/resume-engine";
+import {
   AlignmentType,
+  BorderStyle,
   Document,
   HeadingLevel,
   Packer,
@@ -199,6 +209,8 @@ function renderPdfContacts(
   document: PDFKit.PDFDocument,
   contacts: string[],
   compact: boolean,
+  alignment: "left" | "center",
+  accent: string,
 ) {
   const separator = "  |  ";
   const availableWidth =
@@ -230,7 +242,10 @@ function renderPdfContacts(
         (index ? document.widthOfString(separator) : 0),
       0,
     );
-    let x = (document.page.width - totalWidth) / 2;
+    let x =
+      alignment === "center"
+        ? (document.page.width - totalWidth) / 2
+        : document.page.margins.left;
     const y = document.y;
     const lineHeight = document.currentLineHeight(true);
     contactRow.forEach((contact, index) => {
@@ -241,7 +256,7 @@ function renderPdfContacts(
         x += document.widthOfString(separator);
       }
       const link = pdfLinkTarget(contact);
-      document.fillColor(link ? "#49335E" : "#57515F").text(contact, x, y, {
+      document.fillColor(link ? accent : "#57515F").text(contact, x, y, {
         lineBreak: false,
         ...(link ? { link } : {}),
       });
@@ -256,13 +271,28 @@ function renderPdfContacts(
 
 async function renderPdf(
   resume: ProfessionalResumeDocument,
-  density: ResumeTemplateDensity,
+  presentation: ResumePresentationSettings,
   sourceProjectLinks: readonly string[],
 ) {
-  const compact = density === "compact";
+  const compact =
+    presentation.density === "compact" || presentation.template === "compact";
+  const leftAligned = presentation.template !== "professional";
+  const accent = RESUME_ACCENT_COLORS[presentation.accentColor];
+  const titleFont =
+    presentation.fontFamily === "sans" ? "Helvetica-Bold" : "Times-Bold";
+  const bodyFont =
+    presentation.fontFamily === "serif" ? "Times-Roman" : "Helvetica";
+  const bodyBoldFont =
+    presentation.fontFamily === "serif" ? "Times-Bold" : "Helvetica-Bold";
+  const horizontalMargin = presentation.template === "compact" ? 42 : 50;
   const document = new PDFDocument({
     size: "LETTER",
-    margins: { top: 44, right: 50, bottom: 44, left: 50 },
+    margins: {
+      top: presentation.template === "compact" ? 36 : 44,
+      right: horizontalMargin,
+      bottom: presentation.template === "compact" ? 36 : 44,
+      left: horizontalMargin,
+    },
     info: {
       Title: `${resume.name} Resume`,
       Author: resume.name,
@@ -278,25 +308,41 @@ async function renderPdf(
   let projectIndex = 0;
 
   document
-    .fillColor("#211535")
-    .font("Times-Bold")
-    .fontSize(compact ? 21 : 24)
-    .text(resume.name, { align: "center" });
+    .fillColor(accent)
+    .font(titleFont)
+    .fontSize(compact ? 20 : presentation.template === "modern" ? 25 : 24)
+    .text(resume.name, { align: leftAligned ? "left" : "center" });
   if (resume.headline) {
     document
       .moveDown(0.18)
       .fillColor("#36313d")
-      .font("Helvetica")
+      .font(bodyFont)
       .fontSize(compact ? 9.2 : 10)
-      .text(resume.headline, { align: "center" });
+      .text(resume.headline, { align: leftAligned ? "left" : "center" });
   }
   if (resume.contact.length) {
     document
       .moveDown(0.25)
       .fillColor("#57515f")
-      .font("Helvetica")
+      .font(bodyFont)
       .fontSize(compact ? 7.8 : 8.4);
-    renderPdfContacts(document, resume.contact, compact);
+    renderPdfContacts(
+      document,
+      resume.contact,
+      compact,
+      leftAligned ? "left" : "center",
+      accent,
+    );
+  }
+  if (presentation.template === "modern") {
+    const ruleY = document.y + 4;
+    document
+      .moveTo(document.page.margins.left, ruleY)
+      .lineTo(document.page.width - document.page.margins.right, ruleY)
+      .lineWidth(1.2)
+      .strokeColor(accent)
+      .stroke();
+    document.y = ruleY + 3;
   }
   document.moveDown(compact ? 0.65 : 0.9);
 
@@ -304,12 +350,22 @@ async function renderPdf(
     ensurePdfSpace(document, compact ? 42 : 52);
     document
       .moveDown(sectionGap / bodySize)
-      .fillColor("#211535")
-      .font("Helvetica-Bold")
+      .fillColor(accent)
+      .font(bodyBoldFont)
       .fontSize(compact ? 8.8 : 9.4)
       .text(section.title.toLocaleUpperCase("en"), {
         characterSpacing: 0.75,
       });
+    if (presentation.template === "modern") {
+      const ruleY = document.y + 1;
+      document
+        .moveTo(document.page.margins.left, ruleY)
+        .lineTo(document.page.width - document.page.margins.right, ruleY)
+        .lineWidth(0.55)
+        .strokeColor(accent)
+        .stroke();
+      document.y = ruleY + 2;
+    }
     document.moveDown(compact ? 0.35 : 0.5);
 
     for (const item of section.items) {
@@ -325,7 +381,7 @@ async function renderPdf(
       if (item.heading) {
         document
           .fillColor("#1f1d22")
-          .font("Helvetica-Bold")
+          .font(bodyBoldFont)
           .fontSize(compact ? 9.4 : 10)
           .text(item.heading, {
             ...(liveLink && /\bLive\b/i.test(item.heading)
@@ -334,7 +390,7 @@ async function renderPdf(
           });
         document.moveDown(0.18);
       }
-      document.fillColor("#29262e").font("Helvetica").fontSize(bodySize);
+      document.fillColor("#29262e").font(bodyFont).fontSize(bodySize);
       for (const line of bodyLines(item.body)) {
         renderPdfLinkedLine(document, line, { lineGap: bodyGap }, liveLink);
       }
@@ -346,7 +402,11 @@ async function renderPdf(
   return pending;
 }
 
-function itemParagraphs(item: ResumeDocumentItem, compact: boolean) {
+function itemParagraphs(
+  item: ResumeDocumentItem,
+  compact: boolean,
+  bodyFont: string,
+) {
   const paragraphs: Paragraph[] = [];
   if (item.heading) {
     paragraphs.push(
@@ -356,7 +416,7 @@ function itemParagraphs(item: ResumeDocumentItem, compact: boolean) {
             text: item.heading,
             bold: true,
             color: "1F1D22",
-            font: "Arial",
+            font: bodyFont,
             size: compact ? 19 : 20,
           }),
         ],
@@ -373,7 +433,7 @@ function itemParagraphs(item: ResumeDocumentItem, compact: boolean) {
         new TextRun({
           text: line,
           color: "29262E",
-          font: "Arial",
+          font: bodyFont,
           size: compact ? 18 : 19,
         }),
       ]),
@@ -388,14 +448,22 @@ function itemParagraphs(item: ResumeDocumentItem, compact: boolean) {
 
 async function renderDocx(
   resume: ProfessionalResumeDocument,
-  density: ResumeTemplateDensity,
+  presentation: ResumePresentationSettings,
 ) {
-  const compact = density === "compact";
+  const compact =
+    presentation.density === "compact" || presentation.template === "compact";
+  const leftAligned = presentation.template !== "professional";
+  const alignment = leftAligned ? AlignmentType.LEFT : AlignmentType.CENTER;
+  const accent = RESUME_ACCENT_COLORS[presentation.accentColor].slice(1);
+  const titleFont =
+    presentation.fontFamily === "sans" ? "Arial" : "Times New Roman";
+  const bodyFont =
+    presentation.fontFamily === "serif" ? "Times New Roman" : "Arial";
   const children: Paragraph[] = [
     new Paragraph({
       text: resume.name,
       heading: HeadingLevel.TITLE,
-      alignment: AlignmentType.CENTER,
+      alignment,
       spacing: { after: compact ? 45 : 70 },
     }),
   ];
@@ -406,11 +474,11 @@ async function renderDocx(
           new TextRun({
             text: resume.headline,
             color: "36313D",
-            font: "Arial",
+            font: bodyFont,
             size: compact ? 19 : 20,
           }),
         ],
-        alignment: AlignmentType.CENTER,
+        alignment,
         spacing: { after: 55 },
       }),
     );
@@ -422,11 +490,11 @@ async function renderDocx(
           new TextRun({
             text: resume.contact.join("  |  "),
             color: "57515F",
-            font: "Arial",
+            font: bodyFont,
             size: compact ? 16 : 17,
           }),
         ],
-        alignment: AlignmentType.CENTER,
+        alignment,
         spacing: { after: compact ? 130 : 180 },
         tabStops: [
           { type: TabStopType.CENTER, position: TabStopPosition.MAX / 2 },
@@ -445,10 +513,22 @@ async function renderDocx(
           before: compact ? 120 : 180,
           after: compact ? 60 : 85,
         },
+        ...(presentation.template === "modern"
+          ? {
+              border: {
+                bottom: {
+                  color: accent,
+                  size: 6,
+                  space: 3,
+                  style: BorderStyle.SINGLE,
+                },
+              },
+            }
+          : {}),
       }),
     );
     for (const item of section.items) {
-      children.push(...itemParagraphs(item, compact));
+      children.push(...itemParagraphs(item, compact, bodyFont));
     }
   }
 
@@ -459,24 +539,28 @@ async function renderDocx(
     styles: {
       default: {
         document: {
-          run: { font: "Arial", size: compact ? 18 : 19, color: "29262E" },
+          run: {
+            font: bodyFont,
+            size: compact ? 18 : 19,
+            color: "29262E",
+          },
           paragraph: { spacing: { line: compact ? 225 : 245 } },
         },
         title: {
           run: {
-            font: "Times New Roman",
+            font: titleFont,
             size: compact ? 42 : 48,
             bold: true,
-            color: "000000",
+            color: accent,
           },
           paragraph: { spacing: { before: 0, after: 0 } },
         },
         heading1: {
           run: {
-            font: "Arial",
+            font: bodyFont,
             size: compact ? 18 : 19,
             bold: true,
-            color: "000000",
+            color: accent,
             allCaps: true,
           },
           paragraph: { spacing: { before: 0, after: 0 } },
@@ -488,7 +572,12 @@ async function renderDocx(
         properties: {
           page: {
             size: { width: 12_240, height: 15_840 },
-            margin: { top: 720, right: 792, bottom: 720, left: 792 },
+            margin: {
+              top: presentation.template === "compact" ? 576 : 720,
+              right: presentation.template === "compact" ? 672 : 792,
+              bottom: presentation.template === "compact" ? 576 : 720,
+              left: presentation.template === "compact" ? 672 : 792,
+            },
           },
         },
         children,
@@ -501,18 +590,24 @@ async function renderDocx(
 export async function renderProfessionalResume(
   resume: ProfessionalResumeDocument,
   format: "pdf" | "docx",
-  density: ResumeTemplateDensity,
+  presentation: ResumePresentationSettings | ResumeTemplateDensity,
   sourceProjectLinks: readonly string[] = [],
 ): Promise<ResumeExportResult> {
+  const resolved = normalizeResumePresentation(
+    typeof presentation === "string"
+      ? { ...DEFAULT_RESUME_PRESENTATION, density: presentation }
+      : presentation,
+  );
+  const displayedResume = applyResumePresentation(resume, resolved);
   if (format === "pdf") {
     return {
-      bytes: await renderPdf(resume, density, sourceProjectLinks),
+      bytes: await renderPdf(displayedResume, resolved, sourceProjectLinks),
       contentType: "application/pdf",
       extension: "pdf",
     };
   }
   return {
-    bytes: await renderDocx(resume, density),
+    bytes: await renderDocx(displayedResume, resolved),
     contentType:
       "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     extension: "docx",
