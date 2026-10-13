@@ -7,10 +7,15 @@ import type {
   TailoringSessionStatus,
   TailoringSuggestion,
 } from "@make-my-resume/contracts";
+import { normalizeResumePresentation } from "@make-my-resume/resume-engine";
 import { MongoClient, type Db } from "mongodb";
 
 import type { Environment } from "../../config/environment.js";
 import { createId } from "../../shared/ids/create-id.js";
+import {
+  removeMemoryResumeVersions,
+  type MemoryResumeStore,
+} from "../resumes/memory-resume-store.js";
 
 export const tailoringLeaseMilliseconds = 2 * 60 * 1_000;
 const maximumAttempts = 3;
@@ -271,7 +276,9 @@ function newRecord(
   };
 }
 
-export function createMemoryTailoringRepository(): TailoringRepository {
+export function createMemoryTailoringRepository(
+  store?: MemoryResumeStore,
+): TailoringRepository {
   const records = new Map<string, TailoringSessionRecord>();
   return {
     async create(input) {
@@ -318,11 +325,28 @@ export function createMemoryTailoringRepository(): TailoringRepository {
           records.delete(id);
         }
       }
+      if (store) {
+        removeMemoryResumeVersions(
+          store,
+          (version) =>
+            version.userId === userId &&
+            version.resumeId === resumeId &&
+            version.tailoringSessionId !== null,
+        );
+      }
     },
     async deleteOwned(userId, id) {
       const record = records.get(id);
       if (!record || record.userId !== userId) return null;
       records.delete(id);
+      if (store) {
+        removeMemoryResumeVersions(
+          store,
+          (version) =>
+            version.userId === userId &&
+            version.tailoringSessionId === record.id,
+        );
+      }
       return clone(record);
     },
     async claimNext() {
@@ -478,6 +502,29 @@ export function createMemoryTailoringRepository(): TailoringRepository {
       record.status = "completed";
       record.revision += 1;
       record.updatedAt = new Date();
+      if (store) {
+        const versions = store.versions.get(record.resumeId) ?? [];
+        const subject = [record.company, record.role]
+          .filter(Boolean)
+          .join(" — ");
+        versions.push({
+          id: record.tailoredVersionId,
+          resumeId: record.resumeId,
+          userId,
+          name: (subject || "Tailored resume").slice(0, 120),
+          type: "tailored",
+          sourceVersionId: record.resumeVersionId,
+          jobDescriptionId: record.jobDescriptionId,
+          tailoringSessionId: record.id,
+          company: record.company,
+          role: record.role,
+          claims: structuredClone(record.finalClaims),
+          presentation: normalizeResumePresentation(),
+          createdAt: record.updatedAt,
+          updatedAt: record.updatedAt,
+        });
+        store.versions.set(record.resumeId, versions);
+      }
       return clone(record);
     },
     async queueAts(userId, id) {
@@ -706,6 +753,29 @@ export function createMemoryTailoringRepository(): TailoringRepository {
       record.atsImprovementActive = true;
       record.revision += 1;
       record.updatedAt = new Date();
+      if (store) {
+        const versions = store.versions.get(record.resumeId) ?? [];
+        const subject = [record.company, record.role]
+          .filter(Boolean)
+          .join(" — ");
+        versions.push({
+          id: output.versionId,
+          resumeId: record.resumeId,
+          userId,
+          name: `${subject || "Tailored resume"} — ATS improved`.slice(0, 120),
+          type: "ats_improved",
+          sourceVersionId: record.tailoredVersionId,
+          jobDescriptionId: record.jobDescriptionId,
+          tailoringSessionId: record.id,
+          company: record.company,
+          role: record.role,
+          claims: structuredClone(output.claims),
+          presentation: normalizeResumePresentation(),
+          createdAt: record.updatedAt,
+          updatedAt: record.updatedAt,
+        });
+        store.versions.set(record.resumeId, versions);
+      }
       return clone(record);
     },
     async setAtsImprovementActive(userId, id, active) {
@@ -1382,10 +1452,13 @@ export function createMongoTailoringRepository(
   };
 }
 
-export function createTailoringRepositoryRuntime(environment: Environment) {
+export function createTailoringRepositoryRuntime(
+  environment: Environment,
+  memoryStore?: MemoryResumeStore,
+) {
   if (environment.AUTH_STORAGE === "memory") {
     return {
-      repository: createMemoryTailoringRepository(),
+      repository: createMemoryTailoringRepository(memoryStore),
       close: async () => undefined,
     };
   }

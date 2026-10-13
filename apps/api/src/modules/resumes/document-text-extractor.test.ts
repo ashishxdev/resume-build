@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
+import { Document, Packer, Paragraph } from "docx";
 
 import {
+  assertDocxArchiveLimits,
+  assertPdfPageLimit,
   createDocxDocumentPage,
+  documentExtractionLimits,
+  DocumentExtractionLimitError,
+  extractDocumentText,
   joinPdfTextItems,
 } from "./document-text-extractor.js";
 
@@ -50,5 +56,59 @@ describe("createDocxDocumentPage", () => {
     expect(createDocxDocumentPage("  Summary\nProduct designer  ")).toEqual([
       { pageNumber: 1, text: "Summary\nProduct designer" },
     ]);
+  });
+
+  it("rejects extracted text that exceeds the character budget", () => {
+    expect(() =>
+      createDocxDocumentPage(
+        "x".repeat(documentExtractionLimits.maximumExtractedCharacters + 1),
+      ),
+    ).toThrow(DocumentExtractionLimitError);
+  });
+
+  it("extracts a normal DOCX after validating its archive budget", async () => {
+    const bytes = await Packer.toBuffer(
+      new Document({
+        sections: [
+          { children: [new Paragraph("Built reliable TypeScript services.")] },
+        ],
+      }),
+    );
+    await expect(
+      extractDocumentText(
+        bytes,
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      ),
+    ).resolves.toEqual([
+      { pageNumber: 1, text: "Built reliable TypeScript services." },
+    ]);
+  });
+});
+
+describe("document resource limits", () => {
+  it("rejects PDFs with excessive page counts", () => {
+    expect(() =>
+      assertPdfPageLimit(documentExtractionLimits.maximumPdfPages + 1),
+    ).toThrow(/at most/);
+  });
+
+  it("rejects DOCX archives with excessive entries or expanded size", () => {
+    expect(() =>
+      assertDocxArchiveLimits(
+        Array.from(
+          { length: documentExtractionLimits.maximumDocxEntries + 1 },
+          () => ({ uncompressedSize: 0 }),
+        ),
+      ),
+    ).toThrow(/too many archive entries/);
+
+    expect(() =>
+      assertDocxArchiveLimits([
+        {
+          uncompressedSize:
+            documentExtractionLimits.maximumDocxUncompressedBytes + 1,
+        },
+      ]),
+    ).toThrow(/expanded DOCX is too large/);
   });
 });

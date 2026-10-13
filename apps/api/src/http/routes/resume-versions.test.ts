@@ -9,6 +9,7 @@ import { describe, expect, it } from "vitest";
 import { createResumeVersionRouter } from "./resume-versions.js";
 import type { Auth } from "../../infrastructure/auth/auth.js";
 import { createMemoryResumeImportRepository } from "../../modules/resumes/resume-import-repository.js";
+import { createMemoryResumeShareRepository } from "../../modules/resumes/resume-share-repository.js";
 import {
   createMemoryResumeVersionRepository,
   type ResumeVersionRecord,
@@ -65,6 +66,7 @@ function authFor(userId: string | null) {
 }
 
 function createTestApp(userId: string | null) {
+  const shareRepository = createMemoryResumeShareRepository();
   const repository = createMemoryResumeVersionRepository([
     {
       resumeId: "resume_1",
@@ -82,9 +84,10 @@ function createTestApp(userId: string | null) {
     createResumeVersionRouter(authFor(userId), {
       repository,
       resumeImportRepository: createMemoryResumeImportRepository(),
+      shareRepository,
     }),
   );
-  return { app, repository };
+  return { app, repository, shareRepository };
 }
 
 describe("resume version routes", () => {
@@ -172,6 +175,25 @@ describe("resume version routes", () => {
       .delete("/api/v1/resumes/resume_1/versions/version_base")
       .expect(409);
     expect(response.body.error.code).toBe("BASE_VERSION_PROTECTED");
+  });
+
+  it("removes private links when their version is deleted", async () => {
+    const { app, shareRepository } = createTestApp("user_1");
+    await shareRepository.createOwned("user_1", "resume_1", "version_tailored");
+    await request(app)
+      .post("/api/v1/resumes/resume_1/versions/version_base/activate")
+      .expect(200);
+    await request(app)
+      .delete("/api/v1/resumes/resume_1/versions/version_tailored")
+      .expect(204);
+
+    expect(
+      await shareRepository.findOwnedForVersion(
+        "user_1",
+        "resume_1",
+        "version_tailored",
+      ),
+    ).toBeNull();
   });
 
   it("persists owner-only presentation settings for preview and export", async () => {

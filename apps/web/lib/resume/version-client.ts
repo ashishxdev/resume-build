@@ -1,6 +1,10 @@
 import {
+  publicResumeShareSchema,
+  resumeShareSchema,
+  resumeShareStatusSchema,
   type ResumeExportFormat,
   type ResumePresentationSettings,
+  type ResumeShare,
   type ResumeTemplateDensity,
   resumeVersionListSchema,
   resumeVersionSchema,
@@ -59,6 +63,10 @@ async function request(path: string, init?: RequestInit) {
 function versionPath(resumeId: string, versionId?: string) {
   const root = `/api/v1/resumes/${encodeURIComponent(resumeId)}/versions`;
   return versionId ? `${root}/${encodeURIComponent(versionId)}` : root;
+}
+
+function sharePath(resumeId: string, versionId: string) {
+  return `${versionPath(resumeId, versionId)}/share`;
 }
 
 export async function listResumeVersions(
@@ -168,5 +176,92 @@ export async function downloadResumeVersion(
   const disposition = response.headers.get("Content-Disposition") ?? "";
   const filename =
     disposition.match(/filename="([^"]+)"/)?.[1] ?? `resume-version.${format}`;
+  return { blob: await response.blob(), filename };
+}
+
+export async function getResumeVersionShare(
+  resumeId: string,
+  versionId: string,
+): Promise<ResumeShare | null> {
+  const response = await request(sharePath(resumeId, versionId));
+  const parsed = z
+    .object({ data: resumeShareStatusSchema })
+    .safeParse(await response.json());
+  if (!parsed.success)
+    throw new ResumeVersionApiError("The private-link status was invalid.");
+  return parsed.data.data;
+}
+
+export async function createResumeVersionShare(
+  resumeId: string,
+  versionId: string,
+) {
+  const response = await request(sharePath(resumeId, versionId), {
+    method: "POST",
+  });
+  const parsed = z
+    .object({ data: resumeShareSchema })
+    .safeParse(await response.json());
+  if (!parsed.success)
+    throw new ResumeVersionApiError("The private link was invalid.");
+  return parsed.data.data;
+}
+
+export async function setResumeVersionShareEnabled(
+  resumeId: string,
+  versionId: string,
+  enabled: boolean,
+) {
+  const response = await request(sharePath(resumeId, versionId), {
+    method: "PATCH",
+    body: JSON.stringify({ enabled }),
+  });
+  const parsed = z
+    .object({ data: resumeShareSchema })
+    .safeParse(await response.json());
+  if (!parsed.success)
+    throw new ResumeVersionApiError("The private-link status was invalid.");
+  return parsed.data.data;
+}
+
+export async function regenerateResumeVersionShare(
+  resumeId: string,
+  versionId: string,
+) {
+  const response = await request(
+    `${sharePath(resumeId, versionId)}/regenerate`,
+    {
+      method: "POST",
+    },
+  );
+  const parsed = z
+    .object({ data: resumeShareSchema })
+    .safeParse(await response.json());
+  if (!parsed.success)
+    throw new ResumeVersionApiError(
+      "The regenerated private link was invalid.",
+    );
+  return parsed.data.data;
+}
+
+export async function getPublicResumeShare(shareToken: string) {
+  const response = await request(
+    `/api/v1/public/resumes/${encodeURIComponent(shareToken)}`,
+  );
+  const parsed = z
+    .object({ data: publicResumeShareSchema })
+    .safeParse(await response.json());
+  if (!parsed.success)
+    throw new ResumeVersionApiError("The shared resume was invalid.");
+  return parsed.data.data;
+}
+
+export async function downloadPublicResumeShare(shareToken: string) {
+  const response = await request(
+    `/api/v1/public/resumes/${encodeURIComponent(shareToken)}/export`,
+  );
+  const disposition = response.headers.get("Content-Disposition") ?? "";
+  const filename =
+    disposition.match(/filename="([^"]+)"/)?.[1] ?? "shared-resume.pdf";
   return { blob: await response.blob(), filename };
 }

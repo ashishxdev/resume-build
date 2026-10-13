@@ -9,6 +9,10 @@ import { MongoClient, type Db } from "mongodb";
 import type { Environment } from "../../config/environment.js";
 import type { TailoringRepository } from "../tailoring/tailoring-repository.js";
 import { createId } from "../../shared/ids/create-id.js";
+import {
+  createMemoryResumeStore,
+  type MemoryResumeStore,
+} from "./memory-resume-store.js";
 
 export interface ResumeVersionRecord {
   id: string;
@@ -108,28 +112,31 @@ function restoredName(source: ResumeVersionRecord) {
 export function createMemoryResumeVersionRepository(
   initial: MemoryResumeVersionSeed[] = [],
   tailoringRepository?: TailoringRepository,
+  store: MemoryResumeStore = createMemoryResumeStore(),
 ): ResumeVersionRepository {
-  const collections = new Map(
-    initial.map((collection) => [
+  for (const collection of initial) {
+    store.resumeNames.set(collection.resumeId, collection.resumeName);
+    store.activeVersionIds.set(
       collection.resumeId,
-      {
-        resumeId: collection.resumeId,
-        resumeName: collection.resumeName,
-        activeVersionId: collection.activeVersionId ?? null,
-        versions: collection.versions.map(cloneRecord),
-      },
-    ]),
-  );
+      collection.activeVersionId ?? null,
+    );
+    store.versions.set(
+      collection.resumeId,
+      collection.versions.map(cloneRecord),
+    );
+  }
 
   function ownedCollection(userId: string, resumeId: string) {
-    const collection = collections.get(resumeId);
-    if (
-      !collection ||
-      !collection.versions.some((item) => item.userId === userId)
-    ) {
+    const versions = store.versions.get(resumeId);
+    if (!versions || !versions.some((item) => item.userId === userId)) {
       return null;
     }
-    return collection;
+    return {
+      resumeId,
+      resumeName: store.resumeNames.get(resumeId) ?? "Imported resume",
+      activeVersionId: store.activeVersionIds.get(resumeId) ?? null,
+      versions,
+    };
   }
 
   return {
@@ -192,7 +199,7 @@ export function createMemoryResumeVersionRepository(
       ) {
         return false;
       }
-      collection.activeVersionId = versionId;
+      store.activeVersionIds.set(resumeId, versionId);
       return true;
     },
 
@@ -214,7 +221,7 @@ export function createMemoryResumeVersionRepository(
         updatedAt: now,
       };
       collection.versions.push(restored);
-      collection.activeVersionId = restored.id;
+      store.activeVersionIds.set(resumeId, restored.id);
       return cloneRecord(restored);
     },
 
@@ -256,8 +263,9 @@ export function createMemoryResumeVersionRepository(
         );
         if (!deleted) return { status: "not_found" };
       }
-      collection.versions = collection.versions.filter(
-        (version) => !groupIds.has(version.id),
+      store.versions.set(
+        resumeId,
+        collection.versions.filter((version) => !groupIds.has(version.id)),
       );
       return { status: "deleted", deletedVersionIds: [...groupIds] };
     },
@@ -561,10 +569,15 @@ export function createMongoResumeVersionRepository(
 export function createResumeVersionRepositoryRuntime(
   environment: Environment,
   tailoringRepository: TailoringRepository,
+  memoryStore?: MemoryResumeStore,
 ) {
   if (environment.AUTH_STORAGE !== "mongodb" || !environment.MONGODB_URI) {
     return {
-      repository: createMemoryResumeVersionRepository([], tailoringRepository),
+      repository: createMemoryResumeVersionRepository(
+        [],
+        tailoringRepository,
+        memoryStore,
+      ),
       close: async () => undefined,
     };
   }

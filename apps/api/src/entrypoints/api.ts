@@ -8,6 +8,7 @@ import { createR2ObjectStorage } from "../infrastructure/storage/r2-object-stora
 import { createResumeImportRepositoryRuntime } from "../modules/resumes/resume-import-repository.js";
 import { createResumeExtractionRepositoryRuntime } from "../modules/resumes/resume-extraction-repository.js";
 import { createResumeVersionRepositoryRuntime } from "../modules/resumes/resume-version-repository.js";
+import { createResumeShareRepositoryRuntime } from "../modules/resumes/resume-share-repository.js";
 import { createResumeExtractionService } from "../modules/resumes/resume-extraction-service.js";
 import { createJobDescriptionRepositoryRuntime } from "../modules/job-descriptions/job-description-repository.js";
 import { createJobAnalysisRateLimiterRuntime } from "../modules/job-descriptions/job-analysis-rate-limiter.js";
@@ -21,24 +22,37 @@ import { createTailoringRepositoryRuntime } from "../modules/tailoring/tailoring
 import { createTailoringService } from "../modules/tailoring/tailoring-service.js";
 import { createAtsAnalysisService } from "../modules/tailoring/ats-analysis-service.js";
 import { startAtsAnalysisLoop } from "../modules/tailoring/ats-analysis-loop.js";
+import { createMemoryResumeStore } from "../modules/resumes/memory-resume-store.js";
 
 loadLocalEnvironmentFiles();
 
 const environment = loadEnvironment();
 const logger = createLogger(environment);
 const authRuntime = createAuthRuntime(environment);
-const resumeImportRuntime = createResumeImportRepositoryRuntime(environment);
-const resumeExtractionRuntime =
-  createResumeExtractionRepositoryRuntime(environment);
+const memoryResumeStore =
+  environment.AUTH_STORAGE === "memory" ? createMemoryResumeStore() : undefined;
+const resumeImportRuntime = createResumeImportRepositoryRuntime(
+  environment,
+  memoryResumeStore,
+);
+const resumeExtractionRuntime = createResumeExtractionRepositoryRuntime(
+  environment,
+  memoryResumeStore,
+);
 const jobDescriptionRuntime =
   createJobDescriptionRepositoryRuntime(environment);
 const jobAnalysisRateLimitRuntime =
   createJobAnalysisRateLimiterRuntime(environment);
-const tailoringRuntime = createTailoringRepositoryRuntime(environment);
+const tailoringRuntime = createTailoringRepositoryRuntime(
+  environment,
+  memoryResumeStore,
+);
 const resumeVersionRuntime = createResumeVersionRepositoryRuntime(
   environment,
   tailoringRuntime.repository,
+  memoryResumeStore,
 );
+const resumeShareRuntime = createResumeShareRepositoryRuntime(environment);
 const objectStorage = createR2ObjectStorage(environment);
 const stopExtractionLoop = startResumeExtractionLoop(
   createResumeExtractionService(
@@ -74,6 +88,7 @@ const app = createApp(
     extractionRepository: resumeExtractionRuntime.repository,
     jobDescriptionRepository: jobDescriptionRuntime.repository,
     tailoringRepository: tailoringRuntime.repository,
+    shareRepository: resumeShareRuntime.repository,
     objectStorage,
   },
   {
@@ -91,6 +106,13 @@ const app = createApp(
   },
   {
     repository: resumeVersionRuntime.repository,
+    resumeImportRepository: resumeImportRuntime.repository,
+    objectStorage,
+    shareRepository: resumeShareRuntime.repository,
+  },
+  {
+    repository: resumeShareRuntime.repository,
+    resumeVersionRepository: resumeVersionRuntime.repository,
     resumeImportRepository: resumeImportRuntime.repository,
     objectStorage,
   },
@@ -120,6 +142,7 @@ function shutdown(signal: string) {
     await jobAnalysisRateLimitRuntime.close();
     await tailoringRuntime.close();
     await resumeVersionRuntime.close();
+    await resumeShareRuntime.close();
   });
 }
 

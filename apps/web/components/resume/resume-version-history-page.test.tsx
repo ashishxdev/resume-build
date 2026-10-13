@@ -15,13 +15,17 @@ import { DEFAULT_RESUME_PRESENTATION } from "@make-my-resume/contracts";
 
 const mocks = vi.hoisted(() => ({
   activate: vi.fn(),
+  createShare: vi.fn(),
   deleteVersion: vi.fn(),
   download: vi.fn(),
   get: vi.fn(),
+  getShare: vi.fn(),
   list: vi.fn(),
   rename: vi.fn(),
+  regenerateShare: vi.fn(),
   replace: vi.fn(),
   restore: vi.fn(),
+  setShareEnabled: vi.fn(),
   updatePresentation: vi.fn(),
   signOut: vi.fn(),
   useSession: vi.fn(),
@@ -41,12 +45,16 @@ vi.mock("@/lib/auth/client", () => ({
 
 vi.mock("@/lib/resume/version-client", () => ({
   activateResumeVersion: mocks.activate,
+  createResumeVersionShare: mocks.createShare,
   deleteResumeVersion: mocks.deleteVersion,
   downloadResumeVersion: mocks.download,
   getResumeVersion: mocks.get,
+  getResumeVersionShare: mocks.getShare,
   listResumeVersions: mocks.list,
   renameResumeVersion: mocks.rename,
+  regenerateResumeVersionShare: mocks.regenerateShare,
   restoreResumeVersion: mocks.restore,
+  setResumeVersionShareEnabled: mocks.setShareEnabled,
   updateResumeVersionPresentation: mocks.updatePresentation,
 }));
 
@@ -136,6 +144,16 @@ const tailoredVersion = {
   claims: [personalClaim, tailoredClaim],
 };
 
+const share = {
+  id: "share_1",
+  resumeId: "resume_1",
+  versionId: "version_tailored",
+  token: "a".repeat(43),
+  enabled: true,
+  createdAt: "2026-10-12T08:00:00.000Z",
+  updatedAt: "2026-10-12T08:00:00.000Z",
+};
+
 describe("ResumeVersionHistoryPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -169,6 +187,18 @@ describe("ResumeVersionHistoryPage", () => {
       tailoringSessionId: null,
       sourceVersionId: "version_tailored",
       deleteScope: "version",
+    });
+    mocks.getShare.mockResolvedValue(null);
+    mocks.createShare.mockResolvedValue(share);
+    mocks.setShareEnabled.mockImplementation(
+      async (_resumeId: string, _versionId: string, enabled: boolean) => ({
+        ...share,
+        enabled,
+      }),
+    );
+    mocks.regenerateShare.mockResolvedValue({
+      ...share,
+      token: "b".repeat(43),
     });
     mocks.download.mockResolvedValue({
       blob: new Blob(["resume"]),
@@ -271,6 +301,34 @@ describe("ResumeVersionHistoryPage", () => {
         }),
       ),
     );
+  });
+
+  it("creates and revokes a private link for the selected version", async () => {
+    render(<ResumeVersionHistoryPage />);
+    await screen.findByRole("heading", { name: "Alex Mercer" });
+
+    fireEvent.click(screen.getByRole("button", { name: "Share privately" }));
+    expect(await screen.findByText("No private link yet")).toBeTruthy();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Create private link" }),
+    );
+
+    expect(await screen.findByText("Link active")).toBeTruthy();
+    expect(mocks.createShare).toHaveBeenCalledWith(
+      "resume_1",
+      "version_tailored",
+    );
+    expect(screen.getByDisplayValue(/\/r\/a{43}$/)).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Disable link" }));
+    await waitFor(() =>
+      expect(mocks.setShareEnabled).toHaveBeenCalledWith(
+        "resume_1",
+        "version_tailored",
+        false,
+      ),
+    );
+    expect(await screen.findByText("Link disabled")).toBeTruthy();
   });
 
   it("redirects signed-out visitors to the scoped login return URL", () => {

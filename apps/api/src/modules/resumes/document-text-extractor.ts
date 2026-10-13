@@ -1,19 +1,114 @@
+import {
+  MAX_RESUME_FILE_SIZE,
+  type ResumeMimeType,
+} from "@make-my-resume/contracts";
+import JSZip from "jszip";
 import mammoth from "mammoth";
 import { getDocument } from "pdfjs-dist/legacy/build/pdf.mjs";
-
-import type { ResumeMimeType } from "@make-my-resume/contracts";
 
 export interface ExtractedPage {
   pageNumber: number;
   text: string;
 }
 
-export function createDocxDocumentPage(text: string): ExtractedPage[] {
-  const normalized = text.trim();
-  return capPages(normalized ? [{ pageNumber: 1, text: normalized }] : []);
+export const documentExtractionLimits = {
+  maximumCompressedBytes: MAX_RESUME_FILE_SIZE,
+  maximumDocxEntries: 2_000,
+  maximumDocxUncompressedBytes: 50 * 1024 * 1024,
+  maximumExtractedCharacters: 250_000,
+  maximumPdfPages: 100,
+  maximumParsingMilliseconds: 15_000,
+} as const;
+
+export class DocumentExtractionLimitError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "DocumentExtractionLimitError";
+  }
 }
 
-const maximumExtractedCharacters = 250_000;
+function assertWithinDeadline(deadline: number) {
+  if (Date.now() >= deadline) {
+    throw new DocumentExtractionLimitError(
+      "The document took too long to parse safely.",
+    );
+  }
+}
+
+async function beforeDeadline<T>(promise: Promise<T>, deadline: number) {
+  const remaining = deadline - Date.now();
+  assertWithinDeadline(deadline);
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<never>((_resolve, reject) => {
+        timer = setTimeout(
+          () =>
+            reject(
+              new DocumentExtractionLimitError(
+                "The document took too long to parse safely.",
+              ),
+            ),
+          remaining,
+        );
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+function assertCharacterLimit(characterCount: number) {
+  if (characterCount > documentExtractionLimits.maximumExtractedCharacters) {
+    throw new DocumentExtractionLimitError(
+      "The document contains too much text to parse safely.",
+    );
+  }
+}
+
+export function assertPdfPageLimit(pageCount: number) {
+  if (pageCount > documentExtractionLimits.maximumPdfPages) {
+    throw new DocumentExtractionLimitError(
+      `PDFs may contain at most ${documentExtractionLimits.maximumPdfPages} pages.`,
+    );
+  }
+}
+
+export function assertDocxArchiveLimits(
+  entries: Array<{ uncompressedSize: number }>,
+) {
+  if (entries.length > documentExtractionLimits.maximumDocxEntries) {
+    throw new DocumentExtractionLimitError(
+      "The DOCX contains too many archive entries to parse safely.",
+    );
+  }
+  let uncompressedBytes = 0;
+  for (const entry of entries) {
+    if (
+      !Number.isSafeInteger(entry.uncompressedSize) ||
+      entry.uncompressedSize < 0
+    ) {
+      throw new DocumentExtractionLimitError(
+        "The DOCX archive size could not be verified safely.",
+      );
+    }
+    uncompressedBytes += entry.uncompressedSize;
+    if (
+      uncompressedBytes > documentExtractionLimits.maximumDocxUncompressedBytes
+    ) {
+      throw new DocumentExtractionLimitError(
+        "The expanded DOCX is too large to parse safely.",
+      );
+    }
+  }
+}
+
+export function createDocxDocumentPage(text: string): ExtractedPage[] {
+  const normalized = text.trim();
+  assertCharacterLimit(normalized.length);
+  return normalized ? [{ pageNumber: 1, text: normalized }] : [];
+}
 
 interface PdfTextItem {
   str: string;
@@ -82,40 +177,74 @@ export function joinPdfTextItems(items: unknown[]) {
     .trim();
 }
 
-function capPages(pages: ExtractedPage[]) {
-  let remaining = maximumExtractedCharacters;
-  return pages.flatMap((page) => {
-    if (remaining <= 0) return [];
-    const text = page.text.slice(0, remaining).trim();
-    remaining -= text.length;
-    return text ? [{ ...page, text }] : [];
-  });
+async function assertSafeDocxArchive(bytes: Uint8Array, deadline: number) {
+  const archive = await beforeDeadline(JSZip.loadAsync(bytes), deadline);
+  const entries = Object.values(archive.files);
+  assertDocxArchiveLimits(
+    entries.map((entry) => {
+      const metadata = entry as typeof entry & {
+        _data?: { uncompressedSize?: number };
+      };
+      return {
+        uncompressedSize: entry.dir
+          ? 0
+          : (metadata._data?.uncompressedSize ?? NaN),
+      };
+    }),
+  );
 }
 
 export async function extractDocumentText(
   bytes: Uint8Array,
   mimeType: ResumeMimeType,
 ): Promise<ExtractedPage[]> {
+  if (bytes.byteLength > documentExtractionLimits.maximumCompressedBytes) {
+    throw new DocumentExtractionLimitError(
+      "The document exceeds the 10 MB upload limit.",
+    );
+  }
+  const deadline =
+    Date.now() + documentExtractionLimits.maximumParsingMilliseconds;
+
   if (mimeType === "application/pdf") {
-    const document = await getDocument({ data: bytes }).promise;
-    const pages: ExtractedPage[] = [];
+    const loadingTask = getDocument({ data: bytes });
+    let document;
     try {
+      document = await beforeDeadline(loadingTask.promise, deadline);
+    } catch (error) {
+      await loadingTask.destroy();
+      throw error;
+    }
+    const pages: ExtractedPage[] = [];
+    let extractedCharacters = 0;
+    try {
+      assertPdfPageLimit(document.numPages);
       for (
         let pageNumber = 1;
         pageNumber <= document.numPages;
         pageNumber += 1
       ) {
-        const page = await document.getPage(pageNumber);
-        const content = await page.getTextContent();
+        assertWithinDeadline(deadline);
+        const page = await beforeDeadline(
+          document.getPage(pageNumber),
+          deadline,
+        );
+        const content = await beforeDeadline(page.getTextContent(), deadline);
         const text = joinPdfTextItems(content.items);
+        extractedCharacters += text.length;
+        assertCharacterLimit(extractedCharacters);
         if (text) pages.push({ pageNumber, text });
       }
     } finally {
-      await document.cleanup();
+      await loadingTask.destroy();
     }
-    return capPages(pages);
+    return pages;
   }
 
-  const result = await mammoth.extractRawText({ buffer: Buffer.from(bytes) });
+  await assertSafeDocxArchive(bytes, deadline);
+  const result = await beforeDeadline(
+    mammoth.extractRawText({ buffer: Buffer.from(bytes) }),
+    deadline,
+  );
   return createDocxDocumentPage(result.value);
 }

@@ -1,7 +1,7 @@
 import request from "supertest";
 import { describe, expect, it } from "vitest";
 
-import { createApp } from "./create-app.js";
+import { createApp, redactSensitiveRequestUrl } from "./create-app.js";
 import { createAuthRuntime } from "../infrastructure/auth/auth.js";
 import type {
   PasswordResetEmail,
@@ -42,6 +42,20 @@ describe("GET /health", () => {
       status: "ok",
       service: "make-my-resume-api",
     });
+  });
+});
+
+describe("sensitive request URL logging", () => {
+  it("redacts private resume bearer tokens", () => {
+    const token = "a".repeat(43);
+    const sanitized = redactSensitiveRequestUrl(
+      `/api/v1/public/resumes/${token}/export?download=1`,
+    );
+
+    expect(sanitized).toBe(
+      "/api/v1/public/resumes/[REDACTED]/export?download=1",
+    );
+    expect(sanitized).not.toContain(token);
   });
 });
 

@@ -16,6 +16,7 @@ import type {
 import type { ResumeExtractionRepository } from "../../modules/resumes/resume-extraction-repository.js";
 import type { JobDescriptionRepository } from "../../modules/job-descriptions/job-description-repository.js";
 import type { TailoringRepository } from "../../modules/tailoring/tailoring-repository.js";
+import type { ResumeShareRepository } from "../../modules/resumes/resume-share-repository.js";
 import { createId } from "../../shared/ids/create-id.js";
 
 export interface ResumeImportServices {
@@ -24,6 +25,7 @@ export interface ResumeImportServices {
   extractionRepository?: ResumeExtractionRepository;
   jobDescriptionRepository?: JobDescriptionRepository;
   tailoringRepository?: TailoringRepository;
+  shareRepository?: ResumeShareRepository;
 }
 
 const fileExtensions: Record<ResumeMimeType, string> = {
@@ -455,6 +457,10 @@ export function createResumeImportRouter(
           resumeId,
         );
         await services.extractionRepository?.deleteOwned(userId, resumeId);
+        await services.shareRepository?.deleteManyOwnedByResumeId(
+          userId,
+          resumeId,
+        );
         const deleted = await services.repository.deleteOwnedResume(
           userId,
           resumeId,
@@ -485,7 +491,7 @@ export function createResumeImportRouter(
           );
           return;
         }
-        const record = await services.repository.cancel(
+        const record = await services.repository.claimForCancellation(
           userId,
           request.params.importId,
         );
@@ -498,9 +504,41 @@ export function createResumeImportRouter(
           );
           return;
         }
-        await services.objectStorage
-          ?.deleteObject(record.objectKey)
-          .catch(() => {});
+        if (!services.objectStorage) {
+          await services.repository.releaseCancellation(userId, record.id);
+          sendError(
+            response,
+            503,
+            "STORAGE_NOT_CONFIGURED",
+            "Resume storage is not configured.",
+          );
+          return;
+        }
+        try {
+          await services.objectStorage.deleteObject(record.objectKey);
+        } catch {
+          await services.repository.releaseCancellation(userId, record.id);
+          sendError(
+            response,
+            502,
+            "STORAGE_DELETE_FAILED",
+            "The upload could not be removed from cloud storage. Please try cancelling again.",
+          );
+          return;
+        }
+        const cancelled = await services.repository.completeCancellation(
+          userId,
+          record.id,
+        );
+        if (!cancelled) {
+          sendError(
+            response,
+            409,
+            "IMPORT_STATE_CHANGED",
+            "This import changed while cancellation was running.",
+          );
+          return;
+        }
         response.status(204).end();
       } catch (error) {
         next(error);

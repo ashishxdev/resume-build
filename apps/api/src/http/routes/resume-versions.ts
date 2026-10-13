@@ -19,6 +19,7 @@ import type {
   ResumeVersionRecord,
   ResumeVersionRepository,
 } from "../../modules/resumes/resume-version-repository.js";
+import type { ResumeShareRepository } from "../../modules/resumes/resume-share-repository.js";
 import {
   extractPdfLiveLinks,
   renderProfessionalResume,
@@ -28,6 +29,7 @@ export interface ResumeVersionRouteServices {
   repository: ResumeVersionRepository;
   resumeImportRepository: ResumeImportRepository;
   objectStorage?: ResumeObjectStorage | null;
+  shareRepository?: ResumeShareRepository;
 }
 
 function sendError(
@@ -440,6 +442,11 @@ export function createResumeVersionRouter(
             "VERSION_HAS_DEPENDENCIES",
             "Delete restored versions that depend on this snapshot first.",
           );
+        await services.shareRepository?.deleteManyOwnedByVersionIds(
+          userId,
+          request.params.resumeId,
+          result.deletedVersionIds,
+        );
         response.status(204).send();
       } catch (error) {
         next(error);

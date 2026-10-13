@@ -16,6 +16,7 @@ import { createTailoringRepositoryRuntime } from "../modules/tailoring/tailoring
 import { createTailoringService } from "../modules/tailoring/tailoring-service.js";
 import { createAtsAnalysisService } from "../modules/tailoring/ats-analysis-service.js";
 import { startAtsAnalysisLoop } from "../modules/tailoring/ats-analysis-loop.js";
+import { createMemoryResumeStore } from "../modules/resumes/memory-resume-store.js";
 
 loadLocalEnvironmentFiles();
 
@@ -24,10 +25,18 @@ const logger = createLogger(environment);
 
 logger.info("Worker started");
 
-const extractionRuntime = createResumeExtractionRepositoryRuntime(environment);
+const memoryResumeStore =
+  environment.AUTH_STORAGE === "memory" ? createMemoryResumeStore() : undefined;
+const extractionRuntime = createResumeExtractionRepositoryRuntime(
+  environment,
+  memoryResumeStore,
+);
 const jobDescriptionRuntime =
   createJobDescriptionRepositoryRuntime(environment);
-const tailoringRuntime = createTailoringRepositoryRuntime(environment);
+const tailoringRuntime = createTailoringRepositoryRuntime(
+  environment,
+  memoryResumeStore,
+);
 const stopExtractionLoop = startResumeExtractionLoop(
   createResumeExtractionService(
     extractionRuntime.repository,

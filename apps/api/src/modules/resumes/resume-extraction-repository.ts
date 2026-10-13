@@ -5,7 +5,9 @@ import type {
 import { MongoClient, type Db, type Filter } from "mongodb";
 
 import type { Environment } from "../../config/environment.js";
+import { normalizeResumePresentation } from "@make-my-resume/resume-engine";
 import { createId } from "../../shared/ids/create-id.js";
+import type { MemoryResumeStore } from "./memory-resume-store.js";
 
 export interface ResumeExtractionRecord {
   id: string;
@@ -86,7 +88,9 @@ function clone(record: ResumeExtractionRecord) {
   return structuredClone(record);
 }
 
-export function createMemoryResumeExtractionRepository(): ResumeExtractionRepository {
+export function createMemoryResumeExtractionRepository(
+  store?: MemoryResumeStore,
+): ResumeExtractionRepository {
   const records = new Map<string, ResumeExtractionRecord>();
 
   return {
@@ -266,6 +270,38 @@ export function createMemoryResumeExtractionRepository(): ResumeExtractionReposi
         : null;
       record.revision += 1;
       record.updatedAt = new Date();
+      if (store) {
+        const versions = store.versions.get(resumeId) ?? [];
+        if (verified && record.versionId) {
+          const existingVersion = versions.find(
+            (version) => version.id === record.versionId,
+          );
+          const baseVersion = {
+            id: record.versionId,
+            resumeId,
+            userId,
+            name: "Verified baseline",
+            type: "base" as const,
+            sourceVersionId: null,
+            jobDescriptionId: null,
+            tailoringSessionId: null,
+            company: null,
+            role: null,
+            claims: structuredClone(claims),
+            presentation: normalizeResumePresentation(),
+            createdAt: existingVersion?.createdAt ?? record.updatedAt,
+            updatedAt: record.updatedAt,
+          };
+          store.versions.set(
+            resumeId,
+            existingVersion
+              ? versions.map((version) =>
+                  version.id === record.versionId ? baseVersion : version,
+                )
+              : [...versions, baseVersion],
+          );
+        }
+      }
       return clone(record);
     },
   };
@@ -581,10 +617,11 @@ export function createMongoResumeExtractionRepository(
 
 export function createResumeExtractionRepositoryRuntime(
   environment: Environment,
+  memoryStore?: MemoryResumeStore,
 ) {
   if (environment.AUTH_STORAGE !== "mongodb" || !environment.MONGODB_URI) {
     return {
-      repository: createMemoryResumeExtractionRepository(),
+      repository: createMemoryResumeExtractionRepository(memoryStore),
       close: async () => {},
     };
   }

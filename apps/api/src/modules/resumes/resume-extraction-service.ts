@@ -1,7 +1,10 @@
 import type { ResumeObjectStorage } from "../../infrastructure/storage/r2-object-storage.js";
 import type { Logger } from "pino";
 
-import { extractDocumentText } from "./document-text-extractor.js";
+import {
+  DocumentExtractionLimitError,
+  extractDocumentText,
+} from "./document-text-extractor.js";
 import type { ResumeAiParser } from "./resume-ai-parser.js";
 import type { ResumeExtractionRepository } from "./resume-extraction-repository.js";
 import { parseResumeClaims } from "./structured-resume-parser.js";
@@ -71,10 +74,12 @@ export function createResumeExtractionService(
       await repository.complete(job.id, job.processingToken, claims);
     } catch (error) {
       const message =
-        error instanceof Error &&
-        error.message === "No readable text was found in this document."
+        error instanceof DocumentExtractionLimitError
           ? error.message
-          : "The document could not be extracted. Try a text-based PDF or DOCX file.";
+          : error instanceof Error &&
+              error.message === "No readable text was found in this document."
+            ? error.message
+            : "The document could not be extracted. Try a text-based PDF or DOCX file.";
       logger?.warn({ error, jobId: job.id }, "Resume extraction failed");
       await repository.fail(job.id, job.processingToken, message);
     }

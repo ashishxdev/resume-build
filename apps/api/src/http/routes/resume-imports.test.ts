@@ -364,6 +364,42 @@ describe("resume imports", () => {
     },
   );
 
+  it("keeps upload cancellation retryable when R2 deletion fails", async () => {
+    const authRuntime = createAuthRuntime(testEnvironment);
+    const repository = createMemoryResumeImportRepository();
+    const storageRuntime = createStorage();
+    vi.spyOn(storageRuntime.storage, "deleteObject").mockRejectedValueOnce(
+      new Error("R2 unavailable"),
+    );
+    const app = createApp(testEnvironment, authRuntime.auth, false, {
+      repository,
+      objectStorage: storageRuntime.storage,
+    });
+    const owner = request.agent(app);
+    await signUp(owner, "cancel-retry@example.com");
+    const created = await owner
+      .post("/api/v1/imports")
+      .send(upload)
+      .expect(201);
+
+    const failed = await owner
+      .delete(`/api/v1/imports/${created.body.data.importId}`)
+      .expect(502);
+    expect(failed.body.error.code).toBe("STORAGE_DELETE_FAILED");
+    expect(
+      (
+        await owner
+          .get(`/api/v1/imports/${created.body.data.importId}`)
+          .expect(200)
+      ).body.data.status,
+    ).toBe("awaiting_upload");
+
+    await owner
+      .delete(`/api/v1/imports/${created.body.data.importId}`)
+      .expect(204);
+    expect(storageRuntime.storage.deleteObject).toHaveBeenCalledTimes(2);
+  });
+
   it("requires authentication, complete configuration, and valid metadata", async () => {
     const authRuntime = createAuthRuntime(testEnvironment);
     const repository = createMemoryResumeImportRepository();

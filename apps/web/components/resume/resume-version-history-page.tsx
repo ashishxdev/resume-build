@@ -6,6 +6,7 @@ import type {
   ResumeExportFormat,
   ResumeFontFamily,
   ResumePresentationSettings,
+  ResumeShare,
   ResumeTemplateId,
   ResumeVersion,
   ResumeVersionSummary,
@@ -22,12 +23,16 @@ import { WorkspaceNavigation } from "@/components/dashboard/workspace-navigation
 import { authClient } from "@/lib/auth/client";
 import {
   activateResumeVersion,
+  createResumeVersionShare,
   deleteResumeVersion,
   downloadResumeVersion,
   getResumeVersion,
+  getResumeVersionShare,
   listResumeVersions,
   renameResumeVersion,
+  regenerateResumeVersionShare,
   restoreResumeVersion,
+  setResumeVersionShareEnabled,
   updateResumeVersionPresentation,
 } from "@/lib/resume/version-client";
 
@@ -161,6 +166,12 @@ export function ResumeVersionHistoryPage() {
   const [renameValue, setRenameValue] = useState("");
   const [deleting, setDeleting] = useState<ResumeVersionSummary | null>(null);
   const [savingDesign, setSavingDesign] = useState(false);
+  const [sharingVersion, setSharingVersion] =
+    useState<ResumeVersionSummary | null>(null);
+  const [share, setShare] = useState<ResumeShare | null | undefined>(undefined);
+  const [shareLoading, setShareLoading] = useState(false);
+  const [shareAction, setShareAction] = useState<string | null>(null);
+  const [shareError, setShareError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     const next = await listResumeVersions(resumeId);
@@ -448,6 +459,103 @@ export function ResumeVersionHistoryPage() {
     }
   }
 
+  async function openShare(version: ResumeVersionSummary) {
+    setSharingVersion(version);
+    setShare(undefined);
+    setShareLoading(true);
+    setShareError(null);
+    setError(null);
+    try {
+      setShare(await getResumeVersionShare(resumeId, version.id));
+    } catch (requestError) {
+      setShareError(
+        requestError instanceof Error
+          ? requestError.message
+          : "The private-link settings could not be loaded.",
+      );
+    } finally {
+      setShareLoading(false);
+    }
+  }
+
+  async function createShare() {
+    if (!sharingVersion || shareAction) return;
+    setShareAction("create");
+    setShareError(null);
+    try {
+      setShare(await createResumeVersionShare(resumeId, sharingVersion.id));
+      setNotice("Private link created. Only people with the link can view it.");
+    } catch (requestError) {
+      setShareError(
+        requestError instanceof Error
+          ? requestError.message
+          : "The private link could not be created.",
+      );
+    } finally {
+      setShareAction(null);
+    }
+  }
+
+  async function toggleShare(enabled: boolean) {
+    if (!sharingVersion || !share || shareAction) return;
+    setShareAction(enabled ? "enable" : "disable");
+    setShareError(null);
+    try {
+      setShare(
+        await setResumeVersionShareEnabled(
+          resumeId,
+          sharingVersion.id,
+          enabled,
+        ),
+      );
+      setNotice(
+        enabled
+          ? "Private sharing is enabled again."
+          : "Private sharing is disabled. The link is no longer accessible.",
+      );
+    } catch (requestError) {
+      setShareError(
+        requestError instanceof Error
+          ? requestError.message
+          : "The private-link status could not be changed.",
+      );
+    } finally {
+      setShareAction(null);
+    }
+  }
+
+  async function regenerateShare() {
+    if (!sharingVersion || !share || shareAction) return;
+    setShareAction("regenerate");
+    setShareError(null);
+    try {
+      setShare(await regenerateResumeVersionShare(resumeId, sharingVersion.id));
+      setNotice(
+        "A new private link was created. The previous link is invalid.",
+      );
+    } catch (requestError) {
+      setShareError(
+        requestError instanceof Error
+          ? requestError.message
+          : "The private link could not be regenerated.",
+      );
+    } finally {
+      setShareAction(null);
+    }
+  }
+
+  async function copyShareLink() {
+    if (!share) return;
+    try {
+      await navigator.clipboard.writeText(
+        `${window.location.origin}/r/${share.token}`,
+      );
+      setNotice("Private link copied to your clipboard.");
+    } catch {
+      setShareError("Copying failed. Select the link and copy it manually.");
+    }
+  }
+
   async function saveDesign() {
     if (!selected || savingDesign || !designChanged) return;
     setSavingDesign(true);
@@ -704,6 +812,12 @@ export function ResumeVersionHistoryPage() {
                       {downloading === "docx"
                         ? "Creating DOCX…"
                         : "Download DOCX"}
+                    </button>
+                    <button
+                      onClick={() => void openShare(selected)}
+                      type="button"
+                    >
+                      Share privately
                     </button>
                     <button
                       className={styles.deleteButton}
@@ -1098,6 +1212,130 @@ export function ResumeVersionHistoryPage() {
               >
                 {pendingAction ? "Deleting…" : "Delete permanently"}
               </button>
+            </footer>
+          </section>
+        </div>
+      )}
+
+      {sharingVersion && (
+        <div className={styles.dialogBackdrop}>
+          <section
+            aria-labelledby="private-share-title"
+            aria-modal="true"
+            className={`${styles.dialog} ${styles.shareDialog}`}
+            role="dialog"
+          >
+            <span>Unlisted access</span>
+            <h2 id="private-share-title">Share “{sharingVersion.name}”</h2>
+            <p>
+              This link exposes only this saved resume version. It is not listed
+              publicly or indexed by search engines.
+            </p>
+
+            {shareError && (
+              <p className={styles.shareError} role="alert">
+                {shareError}
+              </p>
+            )}
+
+            {shareLoading || share === undefined ? (
+              <div className={styles.shareLoading} role="status">
+                Checking private-link status…
+              </div>
+            ) : share === null ? (
+              <div className={styles.shareEmpty}>
+                <strong>No private link yet</strong>
+                <p>Create an unlisted link you can revoke at any time.</p>
+                <button
+                  disabled={shareAction !== null}
+                  onClick={() => void createShare()}
+                  type="button"
+                >
+                  {shareAction === "create"
+                    ? "Creating link…"
+                    : "Create private link"}
+                </button>
+              </div>
+            ) : (
+              <div className={styles.shareControls}>
+                <div
+                  className={styles.shareStatus}
+                  data-enabled={share.enabled}
+                >
+                  <i aria-hidden="true" />
+                  <span>
+                    <strong>
+                      {share.enabled ? "Link active" : "Link disabled"}
+                    </strong>
+                    <small>
+                      {share.enabled
+                        ? "Anyone with this exact link can view and download the PDF."
+                        : "Visitors using this link see an unavailable page."}
+                    </small>
+                  </span>
+                </div>
+                <label>
+                  Private link
+                  <input
+                    onFocus={(event) => event.currentTarget.select()}
+                    readOnly
+                    value={`${window.location.origin}/r/${share.token}`}
+                  />
+                </label>
+                <div className={styles.shareLinkActions}>
+                  <button onClick={() => void copyShareLink()} type="button">
+                    Copy link
+                  </button>
+                  <a
+                    href={`/r/${share.token}`}
+                    rel="noreferrer"
+                    target="_blank"
+                  >
+                    Open preview
+                  </a>
+                </div>
+                <p className={styles.shareWarning}>
+                  Regenerating immediately invalidates the previous URL and
+                  enables the new one.
+                </p>
+              </div>
+            )}
+
+            <footer>
+              <button
+                disabled={shareAction !== null}
+                onClick={() => {
+                  setSharingVersion(null);
+                  setShareError(null);
+                }}
+                type="button"
+              >
+                Close
+              </button>
+              {share && (
+                <>
+                  <button
+                    disabled={shareAction !== null}
+                    onClick={() => void toggleShare(!share.enabled)}
+                    type="button"
+                  >
+                    {shareAction === "enable" || shareAction === "disable"
+                      ? "Updating…"
+                      : share.enabled
+                        ? "Disable link"
+                        : "Enable link"}
+                  </button>
+                  <button
+                    disabled={shareAction !== null}
+                    onClick={() => void regenerateShare()}
+                    type="button"
+                  >
+                    {shareAction === "regenerate"
+                      ? "Regenerating…"
+                      : "Regenerate link"}
+                  </button>
+                </>
+              )}
             </footer>
           </section>
         </div>

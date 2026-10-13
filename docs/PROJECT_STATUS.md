@@ -1,6 +1,6 @@
 # Make My Resume — Project Status
 
-Last updated: 2026-10-10
+Last updated: 2026-10-13
 
 ## Purpose
 
@@ -16,8 +16,8 @@ Update this file whenever a major feature is started, completed, materially rede
 | Marketing homepage | Complete | Responsive Stitch-inspired homepage implementing the Atelier Digital visual system and core product messaging. |
 | Authentication | In progress | Email/password authentication now includes Resend-backed, rate-limited password recovery with single-use tokens and session revocation. Google OAuth still requires configuration and end-to-end verification. |
 | Dashboard workspace | Complete | Responsive authenticated dashboard implements the approved desktop and mobile Stitch designs with truthful empty, loading, navigation, activity, resume management, tailored-draft management, trust states, and dedicated resume/activity routes. |
-| Resume workflows | In progress | PDF/DOCX import, Gemini-assisted extraction, verified base versions, grounded job matching, evidence-backed suggestion review, immutable tailored versions, transparent ATS compatibility analysis and improvement actions, three ATS-safe export templates, per-version presentation controls, and permanent owned-resume deletion are complete. Private sharing remains a future milestone. |
-| Backend business modules | In progress | Owned imports, private R2 originals, recoverable queues, grounded parsing and matching, explicit suggestion decisions, transactional tailored-version persistence, ATS analysis and improvement workflows, saved ATS snapshots, per-version presentation persistence, and authenticated deterministic document export are complete. |
+| Resume workflows | Complete | The full MVP flow is implemented: PDF/DOCX import, grounded extraction and verification, job matching, evidence-backed tailoring, ATS improvement, immutable versions, customizable PDF/DOCX export, deletion, and unlisted revocable sharing. |
+| Backend business modules | Complete | Owned imports, private R2 originals, recoverable queues, grounded AI workflows, transactional versions, ATS analysis, deterministic export, and persistent owner-controlled private sharing are complete for the MVP. |
 
 ## Milestones
 
@@ -60,6 +60,7 @@ Update this file whenever a major feature is started, completed, materially rede
   - Added Better Auth to the Express API with credentialed CORS, trusted-origin validation, secure cookie settings, and a protected current-user endpoint.
   - Added optional Better Auth Infrastructure dashboard integration when `BETTER_AUTH_API_KEY` is configured.
   - Added a development-safe in-memory auth store and a production-ready MongoDB adapter selected through environment configuration.
+  - Kept `.env.example` bootable by supplying a development-only authentication secret that satisfies the same minimum-length validation as real secrets while remaining explicitly unsuitable for production.
   - Added email/password sign-up, sign-in, session restoration, sign-out, password recovery, safe post-auth redirects, and optional Google OAuth when credentials are configured.
   - Built responsive Stitch-inspired sign-in and sign-up pages with clear loading, validation, and error states.
   - Added a protected dashboard shell that redirects signed-out visitors and provides the entry point for future resume workflows.
@@ -156,6 +157,7 @@ Update this file whenever a major feature is started, completed, materially rede
   - Added PDF, DOCX, JPEG, PNG, and WEBP support with a 10 MB limit, idempotent completion, cancellation, and ownership enforcement.
   - Replaced the staged dashboard upload control with a responsive drag-and-drop/file-picker workflow with upload progress, verification, success, retry, cancellation, and actionable failure states.
   - Made verification terminal transitions compare-and-set from `verifying`, preventing concurrent cancellation from being overwritten, and made every unfinished dialog dismissal attempt server-side cancellation before closing.
+  - Made upload cancellation a two-phase operation: cancellation first claims the import, R2 deletion must succeed before metadata becomes terminal, and a storage failure releases the claim so the user can retry without leaving an acknowledged private object behind.
   - Connected the dashboard summary, resume library, and recent activity to the authenticated resume API.
 - **Verification:** 31 API tests and 27 web tests pass. Workspace type checking, linting, Prettier validation, and the production build pass. Regression coverage includes cancellation racing both successful and failed verification, signed content-length propagation, cleanup on failed-dialog dismissal, and keeping the dialog open when cleanup cannot be confirmed. A live R2 size-enforcement check accepted an exact five-byte PUT with HTTP 200 and rejected a six-byte PUT using the same five-byte signed URL with HTTP 403; the temporary object was removed. A prior live browser pass verified the complete direct-upload, API verification, success, and dashboard-refresh flow at desktop and 390 × 844 mobile sizes without console warnings or errors. All disposable QA data was removed afterward.
 - **Important limitation:** Resume content extraction and user verification belong to the following milestone. DOCX validation currently confirms the ZIP container signature; full Office-package validation will happen with extraction. Google OAuth remains deferred until deployment credentials are ready.
@@ -188,6 +190,8 @@ Update this file whenever a major feature is started, completed, materially rede
   - Made extraction-job creation an atomic upsert protected by a unique `resumeId` index, preventing concurrent import completion from creating duplicate jobs.
   - Made verification, base-version persistence, and the resume baseline pointer one MongoDB transaction guarded by an optimistic record revision. Failed writes roll back the entire transition, while competing saves return a state conflict.
   - Assigned DOCX extraction a stable synthetic document page identifier so Gemini claims can use the same exact-quote grounding path as PDF claims.
+  - Added parser resource budgets before and during extraction: the 10 MB compressed limit is rechecked, DOCX archives are capped at 2,000 entries and 50 MB expanded content, PDFs are capped at 100 pages, extracted text is capped at 250,000 characters, and parsing has a 15-second deadline.
+  - Unified local in-memory import, extraction, tailoring, and version-history state so verified baselines and completed tailored versions can be listed, exported, and privately shared without MongoDB during development.
 - **Verification:** 52 API tests and 30 web tests pass. Workspace type checking, linting, Prettier validation, and production builds pass. Regression coverage includes image-format rejection, legacy-image compatibility, idempotent extraction-job creation, lease expiry and reclamation, stale-worker rejection, abandoned-attempt exhaustion, optimistic concurrent-save rejection, cross-account isolation, immutable provenance, verified-version creation, coordinate-aware PDF word reconstruction, synthetic DOCX provenance, deterministic section classification, grounded Gemini response validation for PDF and DOCX, duplicate and multiple-summary filtering, provider-failure fallback, review UI transitions, retry polling through a second terminal failure, and retry feedback. An isolated live MongoDB check in a disposable database passed concurrent unique upsert, expired-lease reclamation, transactional version and pointer consistency, and full rollback under a forced version-write failure; the database was dropped afterward. A live Gemini smoke test using synthetic résumé content and the configured `gemini-3.8-flash` model returned one personal-information claim, one summary, one role-level experience claim, and one consolidated skills claim with valid page evidence. A generated DOCX smoke document also passed the production extraction path. Manual QA previously passed DOCX and PDF upload/extraction, partial review persistence, verified-version creation, mobile layouts, and dashboard state transitions.
 - **Important limitations:** AI parsing requires configured Gemini credentials; when it is disabled, rate-limited, unavailable, malformed, or ungrounded, extraction deliberately falls back to the less precise deterministic parser. Text extracted from a résumé is transmitted to the configured Gemini service for parsing, with interaction storage disabled. User review remains mandatory. Scanned/image-only PDFs are reported as unreadable because OCR and all image uploads are deferred, and complex multi-column documents still depend on PDF text-extraction quality.
 - **Primary files:**
@@ -446,9 +450,31 @@ Update this file whenever a major feature is started, completed, materially rede
   - `apps/web/components/resume/resume-version-history-page.tsx`
   - `apps/web/components/resume/resume-version-history.module.css`
 
+### 21. Private Resume Sharing
+
+- **Date:** 2026-10-13
+- **Status:** Complete
+- **Scope delivered:**
+  - Added persistent owner-controlled private links bound to one immutable resume version, with high-entropy opaque bearer tokens and unique MongoDB indexes.
+  - Added create, copy, preview, disable, re-enable, and regenerate controls directly in the version-history workspace. Regeneration immediately invalidates the previous URL.
+  - Added the unlisted `/r/:shareToken` experience with the selected version's saved template and presentation settings, responsive desktop/mobile rendering, a public PDF download, and a neutral unavailable state for disabled, regenerated, unknown, deleted-version, or deleted-resume links.
+  - Kept public responses free of account, source-file, provenance, and unrelated-version data; only the derived display document and selected presentation settings are returned.
+  - Added `noindex`, `nofollow`, and no-cache metadata to the public page, `no-store` response headers to public and owner share APIs, and bearer-token redaction for API request URLs.
+  - Protected public PDF generation with a per-link-and-client-IP limit of 20 downloads per minute plus a bounded ten-minute, version-specific in-process cache that coalesces concurrent renders and avoids repeated R2 reads and PDF rendering.
+  - Connected resume and version deletion to private-link cleanup. Even if cleanup is interrupted, ownership/version resolution prevents an orphaned link from exposing deleted content.
+- **Verification:** 102 API tests and 63 web tests pass, including owner isolation, idempotent link creation, selected-version rendering, cached and rate-limited private PDF export, immediate disable/re-enable behavior, token regeneration, neutral invalid-link handling, deleted-version cleanup, retryable R2 cancellation, parser resource budgets, shared in-memory version visibility, owner dialog interactions, public rendering, and public download behavior. Full workspace type checking, linting, Prettier validation, production builds, and `git diff --check` pass. A live browser pass verified the valid and unavailable public states, saved-template rendering, clickable email/phone/web contacts, `noindex` metadata, zero horizontal overflow at the available compact viewport, and no application console warnings or errors. Live API logs confirmed that share bearer tokens are redacted.
+- **Important limitations:** Private links are bearer URLs: anyone who receives the exact URL can access the selected version until the owner disables or regenerates it. Expiring links, password protection, access analytics, and durable pre-generated export artifacts are intentionally outside this MVP increment. The current export cache is bounded, process-local, and short-lived; cache misses still generate the PDF on demand without placing it in public storage.
+- **Primary files:**
+  - `packages/contracts/src/resume/share.ts`
+  - `apps/api/src/modules/resumes/resume-share-repository.ts`
+  - `apps/api/src/http/routes/resume-shares.ts`
+  - `apps/web/components/resume/public-resume-page.tsx`
+  - `apps/web/components/resume/resume-version-history-page.tsx`
+  - `apps/web/app/r/[shareToken]/page.tsx`
+
 ## Next Major Milestone
 
-Private resume sharing is next: create unlisted, revocable share links for selected versions, render the saved template on a noindex public page, provide a PDF download, and let the owner disable or regenerate access immediately. Saved export artifacts can follow once sharing is stable.
+The resume-tailoring MVP workflow is now complete. The next milestone is production launch readiness: finish and verify Google OAuth, deploy the web/API/worker stack with MongoDB, R2, and Resend, validate HTTPS cookies and proxy configuration, add operational monitoring and backups, and run a clean end-to-end production QA pass. Saved export artifacts, expiring/password-protected links, and share analytics can follow after launch stability.
 
 ## Status Definitions
 

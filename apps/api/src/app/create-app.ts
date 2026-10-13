@@ -17,6 +17,10 @@ import {
   type ResumeVersionRouteServices,
 } from "../http/routes/resume-versions.js";
 import {
+  createResumeShareRouter,
+  type ResumeShareRouteServices,
+} from "../http/routes/resume-shares.js";
+import {
   createJobDescriptionRouter,
   type JobDescriptionServices,
 } from "../http/routes/job-descriptions.js";
@@ -34,6 +38,13 @@ function normalizeForwardedHeader(value: string | string[] | undefined) {
   return values?.at(-1)?.trim();
 }
 
+export function redactSensitiveRequestUrl(value: string) {
+  return value.replace(
+    /(\/api\/v1\/public\/resumes\/)[A-Za-z0-9_-]+/g,
+    "$1[REDACTED]",
+  );
+}
+
 export function createApp(
   environment: Environment,
   auth: Auth,
@@ -42,6 +53,7 @@ export function createApp(
   jobDescriptionServices?: JobDescriptionServices,
   tailoringServices?: TailoringRouteServices,
   resumeVersionServices?: ResumeVersionRouteServices,
+  resumeShareServices?: ResumeShareRouteServices,
 ) {
   const app = express();
   const logger = createLogger(environment);
@@ -50,12 +62,30 @@ export function createApp(
   if (environment.TRUSTED_PROXY_IPS.length > 0) {
     app.set("trust proxy", environment.TRUSTED_PROXY_IPS);
   }
-  app.use(pinoHttp({ logger }));
+  app.use(
+    pinoHttp({
+      logger,
+      serializers: {
+        req(request: unknown) {
+          if (!request || typeof request !== "object") return request;
+          const serialized = request as Record<string, unknown>;
+          return {
+            ...serialized,
+            url:
+              typeof serialized.url === "string"
+                ? redactSensitiveRequestUrl(serialized.url)
+                : serialized.url,
+          };
+        },
+      },
+    }),
+  );
   app.use(helmet());
   app.use(
     cors({
       origin: environment.BETTER_AUTH_TRUSTED_ORIGINS,
       credentials: true,
+      exposedHeaders: ["Content-Disposition", "Content-Length"],
     }),
   );
   app.use("/api/auth", (request, _response, next) => {
@@ -98,6 +128,9 @@ export function createApp(
   }
   if (resumeVersionServices) {
     app.use(createResumeVersionRouter(auth, resumeVersionServices));
+  }
+  if (resumeShareServices) {
+    app.use(createResumeShareRouter(auth, resumeShareServices));
   }
 
   return app;

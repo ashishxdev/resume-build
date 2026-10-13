@@ -7,6 +7,7 @@ import type {
 import { MongoClient, type Db } from "mongodb";
 
 import type { Environment } from "../../config/environment.js";
+import type { MemoryResumeStore } from "./memory-resume-store.js";
 
 export interface ResumeImportRecord {
   id: string;
@@ -22,12 +23,21 @@ export interface ResumeImportRecord {
   status: ResumeImportStatus;
   failureCode: string | null;
   etag: string | null;
+  cancellationPending?: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
 
 export interface ResumeImportRepository {
-  cancel(userId: string, importId: string): Promise<ResumeImportRecord | null>;
+  claimForCancellation(
+    userId: string,
+    importId: string,
+  ): Promise<ResumeImportRecord | null>;
+  completeCancellation(
+    userId: string,
+    importId: string,
+  ): Promise<ResumeImportRecord | null>;
+  releaseCancellation(userId: string, importId: string): Promise<void>;
   claimForVerification(
     userId: string,
     importId: string,
@@ -106,12 +116,16 @@ function toSummary(record: ResumeImportRecord): ResumeSummary {
   };
 }
 
-export function createMemoryResumeImportRepository(): ResumeImportRepository {
+export function createMemoryResumeImportRepository(
+  store?: MemoryResumeStore,
+): ResumeImportRepository {
   const records = new Map<string, ResumeImportRecord>();
 
   return {
     async create(record) {
       records.set(record.id, structuredClone(record));
+      store?.resumeNames.set(record.resumeId, record.name);
+      store?.activeVersionIds.set(record.resumeId, null);
     },
 
     async findOwned(userId, importId) {
@@ -145,6 +159,9 @@ export function createMemoryResumeImportRepository(): ResumeImportRepository {
           candidate.userId === userId && candidate.resumeId === resumeId,
       );
       for (const record of recordsToDelete) records.delete(record.id);
+      store?.resumeNames.delete(resumeId);
+      store?.activeVersionIds.delete(resumeId);
+      store?.versions.delete(resumeId);
       return recordsToDelete.length > 0;
     },
 
@@ -164,6 +181,7 @@ export function createMemoryResumeImportRepository(): ResumeImportRepository {
       if (
         !record ||
         record.userId !== userId ||
+        record.cancellationPending ||
         record.status !== "awaiting_upload"
       ) {
         return null;
@@ -178,6 +196,7 @@ export function createMemoryResumeImportRepository(): ResumeImportRepository {
       if (
         !record ||
         record.userId !== userId ||
+        record.cancellationPending ||
         record.status !== "verifying"
       ) {
         return null;
@@ -194,6 +213,7 @@ export function createMemoryResumeImportRepository(): ResumeImportRepository {
       if (
         !record ||
         record.userId !== userId ||
+        record.cancellationPending ||
         record.status !== "verifying"
       ) {
         return null;
@@ -204,8 +224,15 @@ export function createMemoryResumeImportRepository(): ResumeImportRepository {
       return structuredClone(record);
     },
 
-    async cancel(userId, importId) {
+    async claimForCancellation(userId, importId) {
       const record = records.get(importId);
+      if (
+        record?.userId === userId &&
+        record.cancellationPending &&
+        ["awaiting_upload", "verifying", "failed"].includes(record.status)
+      ) {
+        return structuredClone(record);
+      }
       if (
         !record ||
         record.userId !== userId ||
@@ -214,9 +241,28 @@ export function createMemoryResumeImportRepository(): ResumeImportRepository {
       ) {
         return null;
       }
-      record.status = "cancelled";
+      record.cancellationPending = true;
       record.updatedAt = new Date();
       return structuredClone(record);
+    },
+
+    async completeCancellation(userId, importId) {
+      const record = records.get(importId);
+      if (!record || record.userId !== userId || !record.cancellationPending) {
+        return null;
+      }
+      record.status = "cancelled";
+      record.cancellationPending = false;
+      record.updatedAt = new Date();
+      return structuredClone(record);
+    },
+
+    async releaseCancellation(userId, importId) {
+      const record = records.get(importId);
+      if (!record || record.userId !== userId || !record.cancellationPending)
+        return;
+      record.cancellationPending = false;
+      record.updatedAt = new Date();
     },
   };
 }
@@ -313,7 +359,12 @@ function createMongoResumeImportRepository(
 
     async claimForVerification(userId, importId) {
       return imports.findOneAndUpdate(
-        { id: importId, userId, status: "awaiting_upload" },
+        {
+          id: importId,
+          userId,
+          status: "awaiting_upload",
+          cancellationPending: { $ne: true },
+        },
         { $set: { status: "verifying", updatedAt: new Date() } },
         { returnDocument: "after" },
       );
@@ -322,7 +373,12 @@ function createMongoResumeImportRepository(
     async markUploaded(userId, importId, etag) {
       const updatedAt = new Date();
       const record = await imports.findOneAndUpdate(
-        { id: importId, userId, status: "verifying" },
+        {
+          id: importId,
+          userId,
+          status: "verifying",
+          cancellationPending: { $ne: true },
+        },
         {
           $set: {
             status: "uploaded",
@@ -351,7 +407,12 @@ function createMongoResumeImportRepository(
     async markFailed(userId, importId, failureCode) {
       const updatedAt = new Date();
       const record = await imports.findOneAndUpdate(
-        { id: importId, userId, status: "verifying" },
+        {
+          id: importId,
+          userId,
+          status: "verifying",
+          cancellationPending: { $ne: true },
+        },
         { $set: { status: "failed", failureCode, updatedAt } },
         { returnDocument: "after" },
       );
@@ -364,15 +425,34 @@ function createMongoResumeImportRepository(
       return record;
     },
 
-    async cancel(userId, importId) {
+    async claimForCancellation(userId, importId) {
+      return imports.findOneAndUpdate(
+        {
+          id: importId,
+          userId,
+          status: { $in: ["awaiting_upload", "verifying", "failed"] },
+        },
+        { $set: { cancellationPending: true, updatedAt: new Date() } },
+        { returnDocument: "after" },
+      );
+    },
+
+    async completeCancellation(userId, importId) {
       const updatedAt = new Date();
       const record = await imports.findOneAndUpdate(
         {
           id: importId,
           userId,
           status: { $in: ["awaiting_upload", "verifying", "failed"] },
+          cancellationPending: true,
         },
-        { $set: { status: "cancelled", updatedAt } },
+        {
+          $set: {
+            status: "cancelled",
+            cancellationPending: false,
+            updatedAt,
+          },
+        },
         { returnDocument: "after" },
       );
       if (record) {
@@ -389,13 +469,26 @@ function createMongoResumeImportRepository(
       }
       return record;
     },
+
+    async releaseCancellation(userId, importId) {
+      await imports.updateOne(
+        { id: importId, userId, cancellationPending: true },
+        {
+          $unset: { cancellationPending: "" },
+          $set: { updatedAt: new Date() },
+        },
+      );
+    },
   };
 }
 
-export function createResumeImportRepositoryRuntime(environment: Environment) {
+export function createResumeImportRepositoryRuntime(
+  environment: Environment,
+  memoryStore?: MemoryResumeStore,
+) {
   if (environment.AUTH_STORAGE !== "mongodb" || !environment.MONGODB_URI) {
     return {
-      repository: createMemoryResumeImportRepository(),
+      repository: createMemoryResumeImportRepository(memoryStore),
       close: async () => {},
     };
   }

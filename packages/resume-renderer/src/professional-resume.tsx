@@ -20,6 +20,23 @@ export interface ProfessionalResumeProps {
   className?: string;
 }
 
+function contactHref(value: string) {
+  const trimmed = value.trim();
+  if (/^[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}$/.test(trimmed)) {
+    return `mailto:${trimmed}`;
+  }
+  if (/^\+?[\d ().-]{8,}$/.test(trimmed)) {
+    return `tel:${trimmed.replace(/[^\d+]/g, "")}`;
+  }
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  if (
+    /^(?:www\.)?[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+(?:\/[^\s]*)?$/i.test(trimmed)
+  ) {
+    return `https://${trimmed}`;
+  }
+  return null;
+}
+
 export function ProfessionalResume({
   document,
   density,
@@ -49,9 +66,24 @@ export function ProfessionalResume({
         {displayedDocument.headline && <p>{displayedDocument.headline}</p>}
         {displayedDocument.contact.length > 0 && (
           <ul aria-label="Contact information">
-            {displayedDocument.contact.map((detail) => (
-              <li key={detail}>{detail}</li>
-            ))}
+            {displayedDocument.contact.map((detail) => {
+              const href = contactHref(detail);
+              return (
+                <li key={detail}>
+                  {href ? (
+                    <a
+                      href={href}
+                      rel={href.startsWith("http") ? "noreferrer" : undefined}
+                      target={href.startsWith("http") ? "_blank" : undefined}
+                    >
+                      {detail}
+                    </a>
+                  ) : (
+                    detail
+                  )}
+                </li>
+              );
+            })}
           </ul>
         )}
       </header>
