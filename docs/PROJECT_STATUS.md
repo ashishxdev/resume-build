@@ -492,13 +492,14 @@ Update this file whenever a major feature is started, completed, materially rede
 - **Date:** 2026-10-14
 - **Status:** In progress
 - **Scope delivered:**
-  - Added a Vercel-discoverable `apps/api/src/index.ts` entrypoint that exports the Express application without opening a port.
+  - Added a Vercel-discoverable `apps/api/src/index.ts` entrypoint that directly imports and instantiates Express, then exports the configured application without opening a port.
   - Extracted API dependency composition and resource cleanup into a reusable runtime shared by Vercel and the local Node listener.
   - Removed every extraction, job-analysis, tailoring, and ATS polling loop from the API process. Durable queue execution now belongs exclusively to the standalone worker entrypoint, avoiding duplicate or request-lifetime-bound workers on Vercel.
   - Kept local API development available through the existing `pnpm api` command, while queued work runs independently through `pnpm worker`.
   - Added spoof-resistant Vercel client-IP resolution: the API trusts the edge-overwritten `x-vercel-forwarded-for` value only when the runtime identifies itself with `VERCEL=1`; other deployments continue to use Express's configured proxy allowlist.
   - Documented the two Vercel monorepo projects, the always-on worker commands, required MongoDB/R2/Resend/Gemini environment, R2 production CORS policy, deployment order, and production smoke-test scope.
   - Removed obsolete payment-provider placeholders from the example environment so deployment configuration reflects the current free product scope.
+  - Declared backend deployment variables as Turborepo build passthrough inputs so Vercel preserves runtime configuration without producing platform-environment warnings.
 - **Verification:** 125 API tests, 68 web tests, and 8 resume-engine tests pass, including Vercel-header trust and non-Vercel spoof-resistance regressions. Full workspace type checking, linting, formatting, production builds, and `git diff --check` pass. A production-compiled import of the serverless entrypoint returned the expected HTTP 200 health response without using the local listener entrypoint.
 - **Remaining work:** Create the external Vercel and worker services, configure final production domains and secrets, verify HTTPS authentication cookies and CORS against those exact origins, add operational monitoring and backups, and run a complete production QA pass.
 - **Primary files:**

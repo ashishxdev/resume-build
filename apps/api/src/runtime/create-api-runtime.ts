@@ -1,3 +1,5 @@
+import type { Express } from "express";
+
 import { createApp } from "../app/create-app.js";
 import type { Environment } from "../config/environment.js";
 import { createAuthRuntime } from "../infrastructure/auth/auth.js";
@@ -13,7 +15,7 @@ import { createTailoringRepositoryRuntime } from "../modules/tailoring/tailoring
 
 export function createApiRuntime(
   environment: Environment,
-  options: { trustVercelProxyHeaders?: boolean } = {},
+  options: { app?: Express; trustVercelProxyHeaders?: boolean } = {},
 ) {
   const authRuntime = createAuthRuntime(environment);
   const memoryResumeStore =

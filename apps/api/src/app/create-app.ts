@@ -1,5 +1,5 @@
 import cors from "cors";
-import express from "express";
+import express, { type Express } from "express";
 import helmet from "helmet";
 import { pinoHttp } from "pino-http";
 import { toNodeHandler } from "better-auth/node";
@@ -72,9 +72,9 @@ export function createApp(
   tailoringServices?: TailoringRouteServices,
   resumeVersionServices?: ResumeVersionRouteServices,
   resumeShareServices?: ResumeShareRouteServices,
-  options: { trustVercelProxyHeaders?: boolean } = {},
+  options: { app?: Express; trustVercelProxyHeaders?: boolean } = {},
 ) {
-  const app = express();
+  const app = options.app ?? express();
   const logger = createLogger(environment);
 
   app.disable("x-powered-by");
