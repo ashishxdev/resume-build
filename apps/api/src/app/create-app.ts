@@ -1,6 +1,6 @@
 import cors from "cors";
 import express, { type Express } from "express";
-import helmet from "helmet";
+import * as helmetModule from "helmet";
 import { pinoHttp } from "pino-http";
 import { toNodeHandler } from "better-auth/node";
 
@@ -99,7 +99,7 @@ export function createApp(
       },
     }),
   );
-  app.use(helmet());
+  app.use(helmetModule.default());
   app.use(
     cors({
       origin: environment.BETTER_AUTH_TRUSTED_ORIGINS,
