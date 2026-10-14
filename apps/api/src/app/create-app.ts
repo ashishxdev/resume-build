@@ -1,6 +1,20 @@
 import cors from "cors";
 import express, { type Express } from "express";
-import * as helmetModule from "helmet";
+import {
+  contentSecurityPolicy,
+  crossOriginOpenerPolicy,
+  crossOriginResourcePolicy,
+  originAgentCluster,
+  referrerPolicy,
+  strictTransportSecurity,
+  xContentTypeOptions,
+  xDnsPrefetchControl,
+  xDownloadOptions,
+  xFrameOptions,
+  xPermittedCrossDomainPolicies,
+  xPoweredBy,
+  xXssProtection,
+} from "helmet";
 import { pinoHttp } from "pino-http";
 import { toNodeHandler } from "better-auth/node";
 
@@ -99,7 +113,22 @@ export function createApp(
       },
     }),
   );
-  app.use(helmetModule.default());
+  // Register Helmet's default middleware individually. This preserves the
+  // default security headers without relying on its CJS/ESM default export,
+  // which Vercel's Express builder can type as a non-callable module object.
+  app.use(contentSecurityPolicy());
+  app.use(crossOriginOpenerPolicy());
+  app.use(crossOriginResourcePolicy());
+  app.use(originAgentCluster());
+  app.use(referrerPolicy());
+  app.use(strictTransportSecurity());
+  app.use(xContentTypeOptions());
+  app.use(xDnsPrefetchControl());
+  app.use(xDownloadOptions());
+  app.use(xFrameOptions());
+  app.use(xPermittedCrossDomainPolicies());
+  app.use(xPoweredBy());
+  app.use(xXssProtection());
   app.use(
     cors({
       origin: environment.BETTER_AUTH_TRUSTED_ORIGINS,
