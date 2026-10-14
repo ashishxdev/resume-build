@@ -7,8 +7,8 @@ import type {
 
 const sectionOrder: Exclude<ResumeClaimCategory, "personal_info">[] = [
   "summary",
-  "experience",
   "skills",
+  "experience",
   "projects",
   "education",
   "certifications",
@@ -23,7 +23,7 @@ const sectionTitles: Record<
   summary: "Professional Summary",
   experience: "Experience",
   education: "Education",
-  skills: "Skills",
+  skills: "Technical Skills",
   projects: "Projects",
   certifications: "Certifications",
   achievements: "Achievements",
@@ -74,14 +74,16 @@ function contactDetails(values: string[]) {
   const text = values.join("\n");
   const emails = text.match(/[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}/g) ?? [];
   const urls =
-    text.match(
-      /(?:https?:\/\/|www\.)[^\s,;|]+|(?:linkedin\.com|github\.com)\/[^\s,;|]+/gi,
-    ) ?? [];
+    text
+      .match(
+        /(?:https?:\/\/|www\.)[^\s,;|]+|(?:linkedin\.com|github\.com)\/[^\s,;|]+/gi,
+      )
+      ?.map((value) => value.replace(/[.)]+$/, "")) ?? [];
   const phones =
     text
       .match(/(?:\+?\d[\d ().-]{7,}\d)(?![\d/])/g)
       ?.map((value) => value.trim()) ?? [];
-  return unique([...emails, ...phones, ...urls]);
+  return unique([...phones, ...emails, ...urls]);
 }
 
 function identity(values: string[], contacts: string[]) {
@@ -168,6 +170,30 @@ function formatDetailedItem(
   ].join("\n");
 }
 
+const dateRangePattern =
+  /(?:(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:t(?:ember)?)?\.?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+)?(?:19|20)\d{2}\s*(?:--|[-–—])\s*(?:(?:(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:t(?:ember)?)?\.?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+)?(?:19|20)\d{2}|Present)/i;
+
+function cleanMetadataPart(value: string) {
+  return value
+    .replace(/^[\s|,:;()\-.]+|[\s|,:;()\-.]+$/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function cleanProjectMetadata(value: string) {
+  return value
+    .replace(/^[\s|,:;(\-.]+|[\s|,:;(\-.]+$/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function metadataParts(value: string) {
+  return value
+    .split(/\s*(?:\||—)\s*|\s*,\s*/)
+    .map(cleanMetadataPart)
+    .filter(Boolean);
+}
+
 function experienceLeadMetadata(value: string, heading: string | null) {
   if (!heading) return null;
   const headingMatch = heading.match(/^(.+?)\s+at\s+(.+)$/i);
@@ -195,8 +221,39 @@ function formatExperience(value: string, heading: string | null) {
   const sentences = splitSentences(value);
   const [first, ...remaining] = sentences;
   const metadata = first ? experienceLeadMetadata(first, heading) : null;
-  if (!metadata) return formatDetailedItem(value, heading, true);
-  return [metadata, ...remaining.map(asBullet)].join("\n");
+  if (metadata) return [metadata, ...remaining.map(asBullet)].join("\n");
+  if (!first || !heading) return formatDetailedItem(value, heading, true);
+
+  const dateMatch = first.match(dateRangePattern);
+  if (!dateMatch) return formatDetailedItem(value, heading, true);
+  const date = cleanMetadataPart(dateMatch[0]);
+  const beforeDate = first.slice(0, dateMatch.index).trim();
+  const afterDate = first
+    .slice((dateMatch.index ?? 0) + dateMatch[0].length)
+    .replace(/^[\s).,:;-]+/, "")
+    .trim();
+  const headingAt = heading.match(/^(.+?)\s+at\s+(.+)$/i);
+  const role = headingAt?.[1] ?? heading;
+  const organizationFromHeading = headingAt?.[2] ?? null;
+  const leadParts = metadataParts(withoutRepeatedHeading(beforeDate, role))
+    .filter(
+      (part) => part.toLocaleLowerCase("en") !== role.toLocaleLowerCase("en"),
+    )
+    .filter(
+      (part) =>
+        !organizationFromHeading ||
+        part.toLocaleLowerCase("en") !==
+          organizationFromHeading.toLocaleLowerCase("en"),
+    );
+  const organization = organizationFromHeading ?? leadParts.shift() ?? "";
+  const location = leadParts.join(", ");
+  const bullets = [afterDate, ...remaining].filter(Boolean).map(asBullet);
+  return [
+    [organization, location, date].filter(Boolean).join(" | "),
+    ...bullets,
+  ]
+    .filter(Boolean)
+    .join("\n");
 }
 
 function formatEducation(value: string, heading: string | null) {
@@ -208,7 +265,45 @@ function formatEducation(value: string, heading: string | null) {
     const [, dates, institution] = datedInstitution;
     return [institution, dates].filter(Boolean).join(" | ");
   }
+  const dateMatch = remainder.match(dateRangePattern);
+  if (dateMatch) {
+    const date = cleanMetadataPart(dateMatch[0]);
+    const withoutDate = cleanMetadataPart(
+      `${remainder.slice(0, dateMatch.index)} ${remainder.slice(
+        (dateMatch.index ?? 0) + dateMatch[0].length,
+      )}`,
+    );
+    const withoutDegree = heading
+      ? withoutDate.replace(
+          new RegExp(heading.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i"),
+          "",
+        )
+      : withoutDate;
+    const parts = withoutDegree
+      .split(/\s*,\s*/)
+      .map(cleanMetadataPart)
+      .filter(Boolean);
+    const institution = parts.shift() ?? "";
+    const location = parts.join(", ");
+    return [institution, location, date].filter(Boolean).join(" | ");
+  }
   return remainder || value.trim();
+}
+
+function formatProject(value: string, heading: string | null) {
+  const remainder = withoutRepeatedHeading(value, heading);
+  const dateMatch = remainder.match(dateRangePattern);
+  if (!dateMatch) return formatDetailedItem(value, heading, true);
+  const date = cleanMetadataPart(dateMatch[0]);
+  const beforeDate = cleanProjectMetadata(remainder.slice(0, dateMatch.index));
+  const afterDate = remainder
+    .slice((dateMatch.index ?? 0) + dateMatch[0].length)
+    .replace(/^[\s).,:;-]+/, "")
+    .trim();
+  const bullets = splitSentences(afterDate).map(asBullet);
+  return [[beforeDate, date].filter(Boolean).join(" | "), ...bullets]
+    .filter(Boolean)
+    .join("\n");
 }
 
 function documentItem(claim: ResumeClaim, tailored: ReadonlySet<string>) {
@@ -223,7 +318,7 @@ function documentItem(claim: ResumeClaim, tailored: ReadonlySet<string>) {
       const candidate = body.split("|")[0]?.trim();
       if (candidate && candidate.length <= 120) heading = candidate;
     }
-    body = formatDetailedItem(body, heading, true);
+    body = formatProject(body, heading);
   }
   if (claim.category === "experience") {
     body = formatExperience(body, heading);
@@ -242,7 +337,7 @@ function documentItem(claim: ResumeClaim, tailored: ReadonlySet<string>) {
 }
 
 export function buildProfessionalResumeDocument(
-  claims: ResumeClaim[],
+  claims: readonly ResumeClaim[],
   options: { tailoredClaimIds?: Iterable<string> } = {},
 ): ProfessionalResumeDocument {
   const ordered = [...claims]
@@ -262,10 +357,14 @@ export function buildProfessionalResumeDocument(
   const parts = personalParts(personal);
   const detectedContacts = contactDetails(personal);
   const name = identity(parts.length ? parts : personal, detectedContacts);
-  const contacts = unique([
-    ...parts.filter((part) => part !== name),
-    ...detectedContacts,
-  ]);
+  const standaloneParts = parts.filter((part) => {
+    if (part === name || part.includes(name)) return false;
+    const embeddedContacts = detectedContacts.filter((contact) =>
+      part.includes(contact),
+    );
+    return embeddedContacts.length === 0;
+  });
+  const contacts = unique([...detectedContacts, ...standaloneParts]);
   const tailored = new Set(options.tailoredClaimIds ?? []);
   const sections: ResumeDocumentSection[] = [];
 

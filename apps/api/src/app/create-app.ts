@@ -5,7 +5,7 @@ import { pinoHttp } from "pino-http";
 import { toNodeHandler } from "better-auth/node";
 
 import type { Environment } from "../config/environment.js";
-import { createAuthInfoRouter } from "../http/routes/auth.js";
+import { createAuthRouter } from "../http/routes/auth.js";
 import { healthRouter } from "../http/routes/health.js";
 import {
   createResumeImportRouter,
@@ -48,7 +48,6 @@ export function redactSensitiveRequestUrl(value: string) {
 export function createApp(
   environment: Environment,
   auth: Auth,
-  googleEnabled = false,
   resumeImportServices?: ResumeImportServices,
   jobDescriptionServices?: JobDescriptionServices,
   tailoringServices?: TailoringRouteServices,
@@ -108,7 +107,7 @@ export function createApp(
   app.all("/api/auth/*splat", toNodeHandler(auth));
   app.use(express.json({ limit: "1mb" }));
   app.use(healthRouter);
-  app.use(createAuthInfoRouter(auth, googleEnabled));
+  app.use(createAuthRouter(auth));
   if (resumeImportServices) {
     app.use(createResumeImportRouter(auth, resumeImportServices));
     if (resumeImportServices.extractionRepository) {

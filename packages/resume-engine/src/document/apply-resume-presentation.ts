@@ -4,14 +4,35 @@ import {
   type ResumePresentationSettings,
 } from "@make-my-resume/contracts";
 
+const legacyDefaultSectionOrder = [
+  "summary",
+  "experience",
+  "education",
+  "skills",
+  "projects",
+  "certifications",
+  "achievements",
+  "custom",
+] as const;
+
+function usesLegacyDefaultOrder(order: readonly string[] | null | undefined) {
+  return (
+    order?.length === legacyDefaultSectionOrder.length &&
+    order.every((kind, index) => kind === legacyDefaultSectionOrder[index])
+  );
+}
+
 export function normalizeResumePresentation(
   presentation?: Partial<ResumePresentationSettings> | null,
 ): ResumePresentationSettings {
+  const suppliedOrder = presentation?.sectionOrder;
   return {
     ...DEFAULT_RESUME_PRESENTATION,
     ...presentation,
     sectionOrder:
-      presentation?.sectionOrder ?? DEFAULT_RESUME_PRESENTATION.sectionOrder,
+      !suppliedOrder || usesLegacyDefaultOrder(suppliedOrder)
+        ? DEFAULT_RESUME_PRESENTATION.sectionOrder
+        : suppliedOrder,
     hiddenSections:
       presentation?.hiddenSections ??
       DEFAULT_RESUME_PRESENTATION.hiddenSections,

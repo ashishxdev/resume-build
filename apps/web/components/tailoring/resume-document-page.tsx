@@ -13,6 +13,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import { WorkspaceShell } from "./workspace-shell";
 import styles from "./tailoring.module.css";
+import { PrivateResumeShareButton } from "@/components/resume/private-resume-share-button";
 import { authClient } from "@/lib/auth/client";
 import {
   downloadTailoredResume,
@@ -212,6 +213,14 @@ export function ResumeDocumentPage() {
                   ? "Creating DOCX…"
                   : "Download editable DOCX"}
               </button>
+              <PrivateResumeShareButton
+                resumeId={session.resumeId}
+                versionId={
+                  session.atsImprovementActive && session.atsImprovedVersionId
+                    ? session.atsImprovedVersionId
+                    : session.tailoredVersionId
+                }
+              />
             </div>
             <p className={styles.exportPrivacy}>
               Downloads are generated privately from version{" "}

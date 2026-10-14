@@ -1,0 +1,94 @@
+.action {
+  display: grid;
+  gap: 7px;
+}
+
+.action button {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  padding: 0 15px;
+  border: 1px solid #d8cfe0;
+  border-radius: 6px;
+  background: #f8f4fa;
+  color: #38204e;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  transition:
+    border-color 0.18s ease,
+    background 0.18s ease,
+    transform 0.18s ease;
+}
+
+.action button:hover:not(:disabled) {
+  border-color: #8f76a6;
+  background: #f1eaf5;
+  transform: translateY(-1px);
+}
+
+.action button:focus-visible {
+  outline: 3px solid rgba(104, 68, 219, 0.24);
+  outline-offset: 2px;
+}
+
+.action button:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.action svg {
+  width: 17px;
+  height: 17px;
+  flex: 0 0 auto;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+
+.action[data-compact="true"] {
+  display: inline-grid;
+}
+
+.action[data-compact="true"] button {
+  min-height: 34px;
+  padding: 0 11px;
+  background: #fff;
+  font-size: 11px;
+}
+
+.success,
+.error {
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.success {
+  color: #207052;
+}
+
+.error {
+  color: #963d39;
+}
+
+.manualLink {
+  display: grid;
+  gap: 5px;
+  color: #625868;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.manualLink input {
+  width: 100%;
+  min-width: 0;
+  padding: 9px 10px;
+  border: 1px solid #d9d1dd;
+  border-radius: 5px;
+  color: #392845;
+  font-size: 10px;
+}

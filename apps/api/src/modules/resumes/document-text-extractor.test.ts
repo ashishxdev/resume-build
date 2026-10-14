@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { Document, Packer, Paragraph } from "docx";
+import { Document, ExternalHyperlink, Packer, Paragraph, TextRun } from "docx";
 
 import {
+  attachPdfLinksToTextItems,
   assertDocxArchiveLimits,
   assertPdfPageLimit,
   createDocxDocumentPage,
   documentExtractionLimits,
+  docxHtmlToLinkedText,
   DocumentExtractionLimitError,
   extractDocumentText,
   joinPdfTextItems,
@@ -49,6 +51,36 @@ describe("joinPdfTextItems", () => {
       ]),
     ).toBe("Experience\nProduct Designer");
   });
+
+  it("preserves safe hyperlink annotations beside their visible PDF label", () => {
+    const items = [item("Portfolio", 0, 42), item("Live", 50, 20)];
+    const linked = attachPdfLinksToTextItems(items, [
+      {
+        subtype: "Link",
+        url: "https://example.com/project",
+        rect: [49, 696, 72, 712],
+      },
+      {
+        subtype: "Link",
+        url: "https://example.com/portfolio",
+        rect: [0, 696, 42, 712],
+      },
+    ]);
+
+    expect(joinPdfTextItems(linked)).toBe(
+      "Portfolio (https://example.com/portfolio) Live (https://example.com/project)",
+    );
+  });
+});
+
+describe("docxHtmlToLinkedText", () => {
+  it("keeps safe hyperlink destinations with their labels", () => {
+    expect(
+      docxHtmlToLinkedText(
+        '<p>My project | <a href="https://example.com/demo">Live</a></p>',
+      ),
+    ).toBe("My project | Live (https://example.com/demo)");
+  });
 });
 
 describe("createDocxDocumentPage", () => {
@@ -82,6 +114,35 @@ describe("createDocxDocumentPage", () => {
     ).resolves.toEqual([
       { pageNumber: 1, text: "Built reliable TypeScript services." },
     ]);
+  });
+
+  it("preserves an external DOCX project hyperlink", async () => {
+    const bytes = await Packer.toBuffer(
+      new Document({
+        sections: [
+          {
+            children: [
+              new Paragraph({
+                children: [
+                  new TextRun("My project | "),
+                  new ExternalHyperlink({
+                    link: "https://example.com/demo",
+                    children: [new TextRun("Live")],
+                  }),
+                ],
+              }),
+            ],
+          },
+        ],
+      }),
+    );
+    const result = await extractDocumentText(
+      bytes,
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    );
+    expect(result[0]?.text).toContain(
+      "My project | Live (https://example.com/demo)",
+    );
   });
 });
 

@@ -6,6 +6,7 @@ import {
   type ResumeVersion,
   type ResumeVersionList,
   type ResumeVersionSummary,
+  type ResumeClaim,
 } from "@make-my-resume/contracts";
 import { buildProfessionalResumeDocument } from "@make-my-resume/resume-engine";
 import { fromNodeHeaders } from "better-auth/node";
@@ -21,7 +22,8 @@ import type {
 } from "../../modules/resumes/resume-version-repository.js";
 import type { ResumeShareRepository } from "../../modules/resumes/resume-share-repository.js";
 import {
-  extractPdfLiveLinks,
+  attachContactLinksToClaims,
+  attachProjectLinksToClaims,
   renderProfessionalResume,
 } from "../../modules/tailoring/resume-export-service.js";
 
@@ -120,10 +122,11 @@ function serializeSummary(
 function serializeVersion(
   record: ResumeVersionRecord,
   collection: ResumeVersionCollection,
+  claims: readonly ResumeClaim[] = record.claims,
 ): ResumeVersion {
   return {
     ...serializeSummary(record, collection),
-    claims: record.claims,
+    claims: [...claims],
   };
 }
 
@@ -185,6 +188,10 @@ export function createResumeVersionRouter(
     return collection;
   }
 
+  function withSourceDocumentLinks(claims: readonly ResumeClaim[]) {
+    return attachContactLinksToClaims(attachProjectLinksToClaims(claims));
+  }
+
   router.get(
     "/api/v1/resumes/:resumeId/versions",
     async (request, response, next) => {
@@ -226,8 +233,9 @@ export function createResumeVersionRouter(
             "VERSION_NOT_FOUND",
             "Resume version was not found.",
           );
+        const claims = withSourceDocumentLinks(record.claims);
         response.status(200).json({
-          data: serializeVersion(record, collection),
+          data: serializeVersion(record, collection, claims),
         });
       } catch (error) {
         next(error);
@@ -483,28 +491,15 @@ export function createResumeVersionRouter(
             "VERSION_NOT_FOUND",
             "Resume version was not found.",
           );
-        const document = buildProfessionalResumeDocument(record.claims);
+        const claims = withSourceDocumentLinks(record.claims);
+        const document = buildProfessionalResumeDocument(claims);
         const presentation = density.data
           ? { ...record.presentation, density: density.data }
           : record.presentation;
-        let sourceProjectLinks: string[] = [];
-        if (format.data === "pdf" && services.objectStorage) {
-          const sourceImport =
-            await services.resumeImportRepository.findOwnedByResumeId(
-              userId,
-              record.resumeId,
-            );
-          if (sourceImport?.mimeType === "application/pdf") {
-            sourceProjectLinks = await extractPdfLiveLinks(
-              await services.objectStorage.readObject(sourceImport.objectKey),
-            );
-          }
-        }
         const exported = await renderProfessionalResume(
           document,
           format.data,
           presentation,
-          sourceProjectLinks,
         );
         response.setHeader("Cache-Control", "private, no-store");
         response.setHeader("Content-Type", exported.contentType);

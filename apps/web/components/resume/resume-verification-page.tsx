@@ -42,6 +42,8 @@ export function ResumeVerificationPage({ resumeId }: { resumeId: string }) {
   const [claims, setClaims] = useState<ResumeClaim[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [saveNotice, setSaveNotice] = useState<string | null>(null);
   const [isRetrying, setIsRetrying] = useState(false);
   const [pollGeneration, setPollGeneration] = useState(0);
 
@@ -50,6 +52,8 @@ export function ResumeVerificationPage({ resumeId }: { resumeId: string }) {
       const next = await getResumeVerification(resumeId);
       setVerification(next);
       setClaims(next.claims);
+      setHasUnsavedChanges(false);
+      setSaveNotice(null);
       setError(null);
       return next;
     } catch (caught) {
@@ -102,6 +106,8 @@ export function ResumeVerificationPage({ resumeId }: { resumeId: string }) {
   );
 
   function updateClaim(id: string, patch: Partial<ResumeClaim>) {
+    setHasUnsavedChanges(true);
+    setSaveNotice(null);
     setClaims((current) =>
       current.map((claim) =>
         claim.id === id ? { ...claim, ...patch } : claim,
@@ -110,6 +116,8 @@ export function ResumeVerificationPage({ resumeId }: { resumeId: string }) {
   }
 
   function moveClaim(id: string, direction: -1 | 1) {
+    setHasUnsavedChanges(true);
+    setSaveNotice(null);
     setClaims((current) => {
       const index = current.findIndex((claim) => claim.id === id);
       const destination = index + direction;
@@ -126,6 +134,8 @@ export function ResumeVerificationPage({ resumeId }: { resumeId: string }) {
   }
 
   function addClaim() {
+    setHasUnsavedChanges(true);
+    setSaveNotice(null);
     setClaims((current) => [
       ...current,
       {
@@ -153,6 +163,12 @@ export function ResumeVerificationPage({ resumeId }: { resumeId: string }) {
       const updated = await saveResumeVerification(resumeId, claims);
       setVerification(updated);
       setClaims(updated.claims);
+      setHasUnsavedChanges(false);
+      setSaveNotice(
+        updated.status === "verified"
+          ? "Verified baseline saved. Future tailoring will use these details."
+          : "Your review progress has been saved.",
+      );
     } catch (caught) {
       setError(
         caught instanceof Error
@@ -216,24 +232,46 @@ export function ResumeVerificationPage({ resumeId }: { resumeId: string }) {
   }
 
   if (verification.status === "failed") {
+    const normalizedFailureMessage =
+      verification.failureMessage?.toLocaleLowerCase("en") ?? "";
+    const hasNoSelectableText =
+      normalizedFailureMessage.includes("scanned or flattened") ||
+      normalizedFailureMessage.includes("no readable text was found");
     return (
       <main className={styles.statePage}>
         <span className={styles.eyebrow}>Extraction needs attention</span>
-        <h1>We couldn’t read this document.</h1>
-        <p>
+        <h1>
+          {hasNoSelectableText
+            ? "This document has no selectable text."
+            : "We couldn’t read this document."}
+        </h1>
+        <p role={hasNoSelectableText ? "alert" : undefined}>
           {verification.failureMessage ??
             "Try the original again or upload a text-based PDF or DOCX."}
         </p>
+        {hasNoSelectableText && (
+          <p>
+            Use the original DOCX or export the source document directly to PDF.
+            You should be able to highlight and copy its text before uploading
+            it.
+          </p>
+        )}
         {error && <p role="alert">{error}</p>}
         <div className={styles.stateActions}>
-          <button
-            disabled={isRetrying}
-            onClick={() => void retry()}
-            type="button"
-          >
-            {isRetrying ? "Retrying…" : "Retry extraction"}
-          </button>
-          <Link href="/dashboard">Return to dashboard</Link>
+          {!hasNoSelectableText && (
+            <button
+              disabled={isRetrying}
+              onClick={() => void retry()}
+              type="button"
+            >
+              {isRetrying ? "Retrying…" : "Retry extraction"}
+            </button>
+          )}
+          <Link href="/dashboard">
+            {hasNoSelectableText
+              ? "Upload a different file"
+              : "Return to dashboard"}
+          </Link>
         </div>
       </main>
     );
@@ -262,9 +300,9 @@ export function ResumeVerificationPage({ resumeId }: { resumeId: string }) {
           <span className={styles.eyebrow}>Zero-hallucination baseline</span>
           <h1>Make every detail true to you.</h1>
           <p>
-            Confirm what we extracted, correct anything we misread, or reject
-            details that should not be used. Source text remains visible for
-            traceability.
+            Review the résumé content below. Keep each detail as written, edit
+            it, remove it, or add anything that is missing. Saved changes will
+            be used for future tailored resumes.
           </p>
           <div className={styles.reviewTrack}>
             <i
@@ -281,6 +319,34 @@ export function ResumeVerificationPage({ resumeId }: { resumeId: string }) {
           <p className={styles.error} role="alert">
             {error}
           </p>
+        )}
+
+        {saveNotice && (
+          <p className={styles.success} role="status">
+            <span aria-hidden="true">✓</span> {saveNotice}
+          </p>
+        )}
+
+        {verification.status === "verified" && !hasUnsavedChanges && (
+          <section
+            className={styles.nextStep}
+            aria-labelledby="next-step-title"
+          >
+            <div>
+              <span className={styles.eyebrow}>Baseline ready</span>
+              <h2 id="next-step-title">Tailor it for your next role.</h2>
+              <p>
+                Add a job description to compare requirements and create an
+                evidence-backed tailored version.
+              </p>
+            </div>
+            <div className={styles.nextStepActions}>
+              <Link href={`/resumes/${resumeId}/tailor`}>
+                Tailor this résumé <span aria-hidden="true">→</span>
+              </Link>
+              <Link href="/dashboard">Return to dashboard</Link>
+            </div>
+          </section>
         )}
 
         <div className={styles.groups}>
@@ -327,25 +393,21 @@ export function ResumeVerificationPage({ resumeId }: { resumeId: string }) {
                     </div>
                     <span>{claim.status.replace("_", " ")}</span>
                   </div>
-                  <textarea
-                    aria-label={`${claim.label} value`}
-                    value={claim.value}
-                    onChange={(event) =>
-                      updateClaim(claim.id, {
-                        value: event.target.value,
-                        status: "edited",
-                      })
-                    }
-                  />
-                  {claim.sourceText && (
-                    <blockquote>
-                      <b>
-                        Source
-                        {claim.pageNumber ? ` · page ${claim.pageNumber}` : ""}
-                      </b>
-                      {claim.sourceText}
-                    </blockquote>
-                  )}
+                  <label className={styles.editableField}>
+                    <span>
+                      Resume text <small>Edit if needed</small>
+                    </span>
+                    <textarea
+                      aria-label={`${claim.label} value`}
+                      value={claim.value}
+                      onChange={(event) =>
+                        updateClaim(claim.id, {
+                          value: event.target.value,
+                          status: "edited",
+                        })
+                      }
+                    />
+                  </label>
                   <div className={styles.claimActions}>
                     <button
                       onClick={() =>
@@ -378,11 +440,13 @@ export function ResumeVerificationPage({ resumeId }: { resumeId: string }) {
                       ↓
                     </button>
                     <button
-                      onClick={() =>
+                      onClick={() => {
+                        setHasUnsavedChanges(true);
+                        setSaveNotice(null);
                         setClaims((current) =>
                           current.filter((item) => item.id !== claim.id),
-                        )
-                      }
+                        );
+                      }}
                       type="button"
                     >
                       Remove
@@ -402,15 +466,23 @@ export function ResumeVerificationPage({ resumeId }: { resumeId: string }) {
             <span>{claims.length - reviewedCount} still need review</span>
             <button
               className={styles.saveButton}
-              disabled={isSaving}
+              disabled={
+                isSaving ||
+                (!hasUnsavedChanges &&
+                  (verification.status === "verified" || Boolean(saveNotice)))
+              }
               onClick={() => void save()}
               type="button"
             >
               {isSaving
                 ? "Saving…"
-                : reviewedCount === claims.length && claims.length > 0
-                  ? "Save verified baseline"
-                  : "Save progress"}
+                : !hasUnsavedChanges && verification.status === "verified"
+                  ? "Baseline saved"
+                  : !hasUnsavedChanges && saveNotice
+                    ? "Progress saved"
+                    : reviewedCount === claims.length && claims.length > 0
+                      ? "Save verified baseline"
+                      : "Save progress"}
             </button>
           </div>
         </div>

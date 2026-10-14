@@ -299,9 +299,7 @@ Address:
 
 # 8.2 Authentication
 
-Authentication will use **Better Auth**.
-
-Better Auth currently supports email/password authentication and social providers such as Google, integrates with Next.js, and provides a MongoDB adapter.
+Authentication will use **Better Auth** with email/password credentials, Next.js integration, and the MongoDB adapter.
 
 ## Required authentication methods
 
@@ -313,11 +311,7 @@ Better Auth currently supports email/password authentication and social provider
 - Password reset
 - Session management
 
-### Google
-
-- Continue with Google
-- Login with Google
-- Account linking where applicable
+Social OAuth is intentionally outside the current product scope.
 
 ## Authentication requirements
 
@@ -1853,11 +1847,10 @@ MongoDB
 
 ```text
 Better Auth
-├── Email/password
-└── Google OAuth
+└── Email/password
 ```
 
-Better Auth's current documentation provides the required email/password and social authentication capabilities, Next.js integration, and MongoDB adapter.
+Better Auth provides the required email/password authentication, Next.js integration, and MongoDB adapter.
 
 ## File storage
 

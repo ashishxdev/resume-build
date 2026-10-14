@@ -79,6 +79,7 @@ export function JobDescriptionWorkflow() {
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     if (!canSubmit) return;
+    let navigationStarted = false;
     setError(null);
     setAnalyzing(true);
     try {
@@ -91,6 +92,7 @@ export function JobDescriptionWorkflow() {
             rawText,
           });
       if (["queued", "analyzing", "completed"].includes(result.status)) {
+        navigationStarted = true;
         router.push(`/job-descriptions/${result.id}`);
         return;
       }
@@ -103,7 +105,7 @@ export function JobDescriptionWorkflow() {
           : "The analysis could not be completed.",
       );
     } finally {
-      setAnalyzing(false);
+      if (!navigationStarted) setAnalyzing(false);
     }
   }
 

@@ -119,6 +119,11 @@ describe("WorkspaceCollectionPage", () => {
     expect(await screen.findByText("product-designer.pdf")).toBeTruthy();
     expect(screen.getByText("design-systems.docx")).toBeTruthy();
     expect(
+      screen.getByRole("button", {
+        name: "Share Product Designer privately",
+      }),
+    ).toBeTruthy();
+    expect(
       screen
         .getAllByRole("link", { name: "Resumes" })[0]
         ?.getAttribute("aria-current"),

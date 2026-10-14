@@ -48,8 +48,8 @@ describe("buildProfessionalResumeDocument", () => {
 
     expect(document.name).toBe("Alex Mercer");
     expect(document.contact).toEqual([
-      "alex@example.com",
       "+1 555 867 5309",
+      "alex@example.com",
       "Bengaluru, India",
     ]);
     expect(document.sections.map((section) => section.kind)).toEqual([
@@ -68,6 +68,21 @@ describe("buildProfessionalResumeDocument", () => {
     ]);
     expect(document.name).toBe("Professional Resume");
     expect(document.sections).toEqual([]);
+  });
+
+  it("does not repeat grouped personal information beside detected contacts", () => {
+    const document = buildProfessionalResumeDocument([
+      {
+        ...claims[0]!,
+        value: "Aashish Rana, +91 8447345079, ashishrana2004@gmail.com",
+      },
+    ]);
+
+    expect(document.name).toBe("Aashish Rana");
+    expect(document.contact).toEqual([
+      "+91 8447345079",
+      "ashishrana2004@gmail.com",
+    ]);
   });
 
   it("restores line structure for grouped skills and projects", () => {
@@ -96,7 +111,52 @@ describe("buildProfessionalResumeDocument", () => {
     );
     expect(document.sections[1]?.items[0]).toMatchObject({
       heading: "MyJEEPredictor",
-      body: "Live | Next.js, TypeScript, PostgreSQL (March 2026 - Present).\n- Built and deployed a full-stack JEE prediction platform.\n- Processed and analyzed 1,000+ cutoff records.\n- Developed 4 prediction tools.",
+      body: "Live | Next.js, TypeScript, PostgreSQL | March 2026 - Present\n- Built and deployed a full-stack JEE prediction platform.\n- Processed and analyzed 1,000+ cutoff records.\n- Developed 4 prediction tools.",
+    });
+  });
+
+  it("normalizes common AI-grouped entries into LaTeX-style resume rows", () => {
+    const document = buildProfessionalResumeDocument([
+      {
+        ...claims[1]!,
+        id: "experience",
+        category: "experience",
+        label: "Full Stack Developer Intern",
+        value:
+          "Full Stack Developer Intern, Medit, Remote, May 2026 - July 2026. Developed an admin dashboard. Built backend APIs.",
+        order: 1,
+      },
+      {
+        ...claims[1]!,
+        id: "project",
+        category: "projects",
+        label: "Interview AI",
+        value:
+          "Interview AI | Live (https://example.com) | React, Node.js (July 2026 - Present): Built and deployed an interview platform. Integrated Gemini API.",
+        order: 2,
+      },
+      {
+        ...claims[1]!,
+        id: "education",
+        category: "education",
+        label: "Bachelor of Technology in Information Technology",
+        value:
+          "HMRITM - GGSIPU, Delhi, India, Bachelor of Technology in Information Technology, Sept. 2022 - May 2026",
+        order: 3,
+      },
+    ]);
+
+    expect(document.sections[0]?.items[0]).toMatchObject({
+      heading: "Full Stack Developer Intern",
+      body: "Medit | Remote | May 2026 - July 2026\n- Developed an admin dashboard.\n- Built backend APIs.",
+    });
+    expect(document.sections[1]?.items[0]).toMatchObject({
+      heading: "Interview AI",
+      body: "Live (https://example.com) | React, Node.js | July 2026 - Present\n- Built and deployed an interview platform.\n- Integrated Gemini API.",
+    });
+    expect(document.sections[2]?.items[0]).toMatchObject({
+      heading: "Bachelor of Technology in Information Technology",
+      body: "HMRITM - GGSIPU | Delhi, India | Sept. 2022 - May 2026",
     });
   });
 });

@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   createMemoryPublicResumeExportCache,
   createMemoryPublicResumeExportRateLimiter,
+  createMemoryPublicResumePreviewCache,
   publicResumeExportRequestsPerMinute,
 } from "./public-resume-export-protection.js";
 
@@ -43,5 +44,41 @@ describe("public resume export protection", () => {
     expect(await first).toEqual(await concurrent);
     await cache.getOrCreate("version_1:revision_1", render);
     expect(render).toHaveBeenCalledTimes(1);
+  });
+
+  it("caches previews by immutable version and coalesces concurrent work", async () => {
+    const cache = createMemoryPublicResumePreviewCache();
+    let finish!: () => void;
+    const pending = new Promise<void>((resolve) => {
+      finish = resolve;
+    });
+    const create = vi.fn(async () => {
+      await pending;
+      return {
+        versionName: "Acme Engineer",
+        document: {
+          name: "Alex Mercer",
+          headline: null,
+          contact: [],
+          sections: [],
+        },
+        presentation: {
+          template: "professional" as const,
+          fontFamily: "hybrid" as const,
+          accentColor: "plum" as const,
+          density: "comfortable" as const,
+          sectionOrder: [],
+          hiddenSections: [],
+        },
+        updatedAt: "2026-10-14T00:00:00.000Z",
+      };
+    });
+
+    const first = cache.getOrCreate("version_1:revision_1", create);
+    const concurrent = cache.getOrCreate("version_1:revision_1", create);
+    finish();
+    expect(await first).toEqual(await concurrent);
+    await cache.getOrCreate("version_1:revision_1", create);
+    expect(create).toHaveBeenCalledTimes(1);
   });
 });

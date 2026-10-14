@@ -4,9 +4,12 @@ import {
 } from "@make-my-resume/contracts";
 import express from "express";
 import request from "supertest";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
-import { createResumeShareRouter } from "./resume-shares.js";
+import {
+  createResumeShareRouter,
+  type ResumeShareRouteServices,
+} from "./resume-shares.js";
 import type { Auth } from "../../infrastructure/auth/auth.js";
 import { createMemoryResumeImportRepository } from "../../modules/resumes/resume-import-repository.js";
 import { createMemoryResumeShareRepository } from "../../modules/resumes/resume-share-repository.js";
@@ -63,7 +66,10 @@ function authFor(userId: string | null) {
   } as unknown as Auth;
 }
 
-function createTestApp(userId: string | null) {
+function createTestApp(
+  userId: string | null,
+  overrides: Partial<ResumeShareRouteServices> = {},
+) {
   const shareRepository = createMemoryResumeShareRepository();
   const versionRepository = createMemoryResumeVersionRepository([
     {
@@ -83,6 +89,7 @@ function createTestApp(userId: string | null) {
       repository: shareRepository,
       resumeVersionRepository: versionRepository,
       resumeImportRepository: createMemoryResumeImportRepository(),
+      ...overrides,
     }),
   );
   return app;
@@ -163,6 +170,59 @@ describe("resume share routes", () => {
     const limited = await request(app).get(exportPath).expect(429);
     expect(limited.body.error.code).toBe("PUBLIC_EXPORT_RATE_LIMITED");
     expect(Number(limited.headers["retry-after"])).toBeGreaterThan(0);
+  });
+
+  it("validates share tokens before creating export rate-limit state", async () => {
+    const consume = vi.fn(() => ({ allowed: true, retryAfterSeconds: 60 }));
+    const app = createTestApp(null, {
+      publicExportRateLimiter: { consume },
+    });
+
+    await request(app)
+      .get(`/api/v1/public/resumes/${"z".repeat(43)}/export`)
+      .expect(404);
+
+    expect(consume).not.toHaveBeenCalled();
+  });
+
+  it("rate limits valid public previews after resolving the share", async () => {
+    const app = createTestApp("user_1", {
+      publicPreviewRateLimiter: {
+        consume: () => ({ allowed: false, retryAfterSeconds: 12 }),
+      },
+    });
+    const created = await request(app).post(ownerPath).expect(201);
+
+    const limited = await request(app)
+      .get(`/api/v1/public/resumes/${created.body.data.token}`)
+      .expect(429);
+    expect(limited.body.error.code).toBe("PUBLIC_PREVIEW_RATE_LIMITED");
+    expect(limited.headers["retry-after"]).toBe("12");
+  });
+
+  it("keeps fabricated-token traffic in a separate IP limiter", async () => {
+    const exportConsume = vi.fn(() => ({
+      allowed: true,
+      retryAfterSeconds: 60,
+    }));
+    const invalidConsume = vi.fn(() => ({
+      allowed: false,
+      retryAfterSeconds: 20,
+    }));
+    const app = createTestApp(null, {
+      publicExportRateLimiter: { consume: exportConsume },
+      invalidPublicRequestRateLimiter: { consume: invalidConsume },
+    });
+
+    const limited = await request(app)
+      .get(`/api/v1/public/resumes/${"z".repeat(43)}/export`)
+      .expect(429);
+    expect(limited.body.error.code).toBe("PUBLIC_SHARE_RATE_LIMITED");
+    expect(invalidConsume).toHaveBeenCalledWith(
+      "invalid-share",
+      expect.any(String),
+    );
+    expect(exportConsume).not.toHaveBeenCalled();
   });
 
   it("disables immediately and can re-enable the same private link", async () => {

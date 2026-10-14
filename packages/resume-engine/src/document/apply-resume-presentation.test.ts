@@ -54,4 +54,25 @@ describe("applyResumePresentation", () => {
       "skills",
     ]);
   });
+
+  it("migrates the legacy default order to the LaTeX-style professional order", () => {
+    const result = applyResumePresentation(document, {
+      ...DEFAULT_RESUME_PRESENTATION,
+      sectionOrder: [
+        "summary",
+        "experience",
+        "education",
+        "skills",
+        "projects",
+        "certifications",
+        "achievements",
+        "custom",
+      ],
+    });
+
+    expect(result.sections.map((section) => section.kind)).toEqual([
+      "skills",
+      "experience",
+    ]);
+  });
 });

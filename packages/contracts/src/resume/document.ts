@@ -105,7 +105,16 @@ export const DEFAULT_RESUME_PRESENTATION: ResumePresentationSettings = {
   fontFamily: "hybrid",
   accentColor: "plum",
   density: "comfortable",
-  sectionOrder: [...resumeDocumentSectionKindSchema.options],
+  sectionOrder: [
+    "summary",
+    "skills",
+    "experience",
+    "projects",
+    "education",
+    "certifications",
+    "achievements",
+    "custom",
+  ],
   hiddenSections: [],
 };
 

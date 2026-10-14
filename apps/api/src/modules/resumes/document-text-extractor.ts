@@ -17,6 +17,7 @@ export const documentExtractionLimits = {
   maximumDocxUncompressedBytes: 50 * 1024 * 1024,
   maximumExtractedCharacters: 250_000,
   maximumPdfPages: 100,
+  maximumPdfAnnotationsPerPage: 200,
   maximumParsingMilliseconds: 15_000,
 } as const;
 
@@ -118,6 +119,12 @@ interface PdfTextItem {
   transform: number[];
 }
 
+interface PdfLinkAnnotation {
+  subtype?: unknown;
+  url?: unknown;
+  rect?: unknown;
+}
+
 function isPdfTextItem(item: unknown): item is PdfTextItem {
   if (!item || typeof item !== "object") return false;
   const candidate = item as Partial<PdfTextItem>;
@@ -128,6 +135,94 @@ function isPdfTextItem(item: unknown): item is PdfTextItem {
     typeof candidate.height === "number" &&
     Array.isArray(candidate.transform)
   );
+}
+
+function safeDocumentLink(value: unknown) {
+  if (typeof value !== "string" || value.length > 2_048) return null;
+  try {
+    const parsed = new URL(value);
+    return parsed.protocol === "http:" || parsed.protocol === "https:"
+      ? parsed.toString()
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+function textOverlapsAnnotation(item: PdfTextItem, rect: number[]) {
+  const [firstX, firstY, secondX, secondY] = rect;
+  if (
+    firstX === undefined ||
+    firstY === undefined ||
+    secondX === undefined ||
+    secondY === undefined
+  ) {
+    return false;
+  }
+  const left = Math.min(firstX, secondX);
+  const right = Math.max(firstX, secondX);
+  const bottom = Math.min(firstY, secondY);
+  const top = Math.max(firstY, secondY);
+  const x = item.transform[4] ?? 0;
+  const baseline = item.transform[5] ?? 0;
+  const itemRight = x + item.width;
+  const itemBottom = baseline - Math.max(2, item.height * 0.35);
+  const itemTop = baseline + Math.max(2, item.height);
+  return (
+    itemRight >= left - 1 &&
+    x <= right + 1 &&
+    itemTop >= bottom - 1 &&
+    itemBottom <= top + 1
+  );
+}
+
+export function attachPdfLinksToTextItems(
+  items: unknown[],
+  annotations: unknown[],
+) {
+  const linkedItems = items.map((item) =>
+    isPdfTextItem(item) ? { ...item, transform: [...item.transform] } : item,
+  );
+  const textItems = linkedItems
+    .map((item, index) => ({ item, index }))
+    .filter((entry): entry is { item: PdfTextItem; index: number } =>
+      isPdfTextItem(entry.item),
+    );
+
+  for (const value of annotations.slice(
+    0,
+    documentExtractionLimits.maximumPdfAnnotationsPerPage,
+  )) {
+    if (!value || typeof value !== "object") continue;
+    const annotation = value as PdfLinkAnnotation;
+    const url = safeDocumentLink(annotation.url);
+    if (
+      annotation.subtype !== "Link" ||
+      !url ||
+      !Array.isArray(annotation.rect) ||
+      !annotation.rect.every((coordinate) => typeof coordinate === "number")
+    ) {
+      continue;
+    }
+    const overlapping = textItems.filter(({ item }) =>
+      textOverlapsAnnotation(item, annotation.rect as number[]),
+    );
+    if (!overlapping.length) continue;
+    const anchor = overlapping.map(({ item }) => item.str).join(" ");
+    if (anchor.includes(url)) continue;
+    const preservesUsefulLink =
+      /\bLive\b/i.test(anchor) ||
+      /\b(?:LinkedIn|GitHub|Portfolio|Website|Site)\b/i.test(anchor);
+    if (!preservesUsefulLink) continue;
+    const last = overlapping.at(-1);
+    if (!last) continue;
+    linkedItems[last.index] = {
+      ...last.item,
+      str: `${last.item.str} (${url})`,
+    };
+  }
+
+  return linkedItems;
 }
 
 export function joinPdfTextItems(items: unknown[]) {
@@ -174,6 +269,52 @@ export function joinPdfTextItems(items: unknown[]) {
   return text
     .replace(/[ \t]+\n/g, "\n")
     .replace(/[ \t]{2,}/g, " ")
+    .trim();
+}
+
+function decodeHtmlEntities(value: string) {
+  const named: Record<string, string> = {
+    amp: "&",
+    apos: "'",
+    gt: ">",
+    lt: "<",
+    nbsp: " ",
+    quot: '"',
+  };
+  return value.replace(
+    /&(?:#(\d+)|#x([\da-f]+)|([a-z]+));/gi,
+    (_match, decimal: string, hexadecimal: string, name: string) => {
+      if (decimal) return String.fromCodePoint(Number.parseInt(decimal, 10));
+      if (hexadecimal)
+        return String.fromCodePoint(Number.parseInt(hexadecimal, 16));
+      return named[name.toLocaleLowerCase("en")] ?? _match;
+    },
+  );
+}
+
+export function docxHtmlToLinkedText(html: string) {
+  const linked = html.replace(
+    /<a\b[^>]*\bhref=(?:"([^"]*)"|'([^']*)')[^>]*>([\s\S]*?)<\/a>/gi,
+    (_match, doubleQuoted: string, singleQuoted: string, labelHtml: string) => {
+      const label = decodeHtmlEntities(labelHtml.replace(/<[^>]+>/g, ""));
+      const url = safeDocumentLink(
+        decodeHtmlEntities(doubleQuoted ?? singleQuoted ?? ""),
+      );
+      if (!url) return label;
+      return label.trim() === url ? url : `${label} (${url})`;
+    },
+  );
+  return decodeHtmlEntities(
+    linked
+      .replace(/<br\s*\/?\s*>/gi, "\n")
+      .replace(/<li\b[^>]*>/gi, "\n- ")
+      .replace(/<\/(?:p|div|h[1-6]|li|ul|ol|table|tr)>/gi, "\n")
+      .replace(/<[^>]+>/g, ""),
+  )
+    .split(/\r?\n/)
+    .map((line) => line.replace(/[ \t]{2,}/g, " ").trimEnd())
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
     .trim();
 }
 
@@ -229,8 +370,13 @@ export async function extractDocumentText(
           document.getPage(pageNumber),
           deadline,
         );
-        const content = await beforeDeadline(page.getTextContent(), deadline);
-        const text = joinPdfTextItems(content.items);
+        const [content, annotations] = await beforeDeadline(
+          Promise.all([page.getTextContent(), page.getAnnotations()]),
+          deadline,
+        );
+        const text = joinPdfTextItems(
+          attachPdfLinksToTextItems(content.items, annotations),
+        );
         extractedCharacters += text.length;
         assertCharacterLimit(extractedCharacters);
         if (text) pages.push({ pageNumber, text });
@@ -243,8 +389,8 @@ export async function extractDocumentText(
 
   await assertSafeDocxArchive(bytes, deadline);
   const result = await beforeDeadline(
-    mammoth.extractRawText({ buffer: Buffer.from(bytes) }),
+    mammoth.convertToHtml({ buffer: Buffer.from(bytes) }),
     deadline,
   );
-  return createDocxDocumentPage(result.value);
+  return createDocxDocumentPage(docxHtmlToLinkedText(result.value));
 }

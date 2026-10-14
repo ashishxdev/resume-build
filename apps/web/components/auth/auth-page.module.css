@@ -156,7 +156,6 @@
   line-height: 1.6;
 }
 
-.googleButton,
 .submitButton {
   width: 100%;
   min-height: 48px;
@@ -171,47 +170,8 @@
   line-height: 1.2;
 }
 
-.googleButton {
-  padding: 0 18px;
-  border: 1px solid #ded8e1;
-  background: white;
-  color: #1b1b1e;
-  box-shadow: 0 3px 9px rgba(37, 23, 61, 0.04);
-}
-
-.googleButton:hover {
-  background: #f6f2f7;
-}
-.googleButton:disabled {
-  cursor: wait;
-  opacity: 0.65;
-}
-.googleButton svg {
-  width: 19px;
-  height: 19px;
-}
-
-.divider {
-  position: relative;
-  height: 1px;
-  margin: 28px 0;
-  background: #e4e1e6;
-  text-align: center;
-}
-
-.divider span {
-  position: relative;
-  top: -8px;
-  padding: 0 12px;
-  background: white;
-  color: #7a757e;
-  font-size: 8px;
-  font-weight: 800;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-}
-
 .form {
+  margin-top: 28px;
   display: grid;
   gap: 17px;
 }

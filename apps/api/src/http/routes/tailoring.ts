@@ -27,7 +27,8 @@ import {
   type TailoringSessionRecord,
 } from "../../modules/tailoring/tailoring-repository.js";
 import {
-  extractPdfLiveLinks,
+  attachContactLinksToClaims,
+  attachProjectLinksToClaims,
   renderProfessionalResume,
 } from "../../modules/tailoring/resume-export-service.js";
 import { createId } from "../../shared/ids/create-id.js";
@@ -112,6 +113,25 @@ export function createTailoringRouter(
     if (!id)
       sendError(response, 401, "UNAUTHORIZED", "Authentication is required.");
     return id;
+  }
+  async function serializeWithSourceLinks(record: TailoringSessionRecord) {
+    const data = serialize(record);
+    return {
+      ...data,
+      evidenceClaims: attachContactLinksToClaims(
+        attachProjectLinksToClaims(data.evidenceClaims),
+      ),
+      finalClaims: data.finalClaims
+        ? attachContactLinksToClaims(
+            attachProjectLinksToClaims(data.finalClaims),
+          )
+        : null,
+      atsImprovedClaims: data.atsImprovedClaims
+        ? attachContactLinksToClaims(
+            attachProjectLinksToClaims(data.atsImprovedClaims),
+          )
+        : null,
+    };
   }
 
   router.post(
@@ -202,7 +222,7 @@ export function createTailoringRouter(
             "TAILORING_SESSION_NOT_FOUND",
             "Tailoring session was not found.",
           );
-        response.json({ data: serialize(record) });
+        response.json({ data: await serializeWithSourceLinks(record) });
       } catch (error) {
         next(error);
       }
@@ -279,7 +299,10 @@ export function createTailoringRouter(
         const tailoredClaimIds = record.suggestions
           .filter((suggestion) => suggestion.status === "accepted")
           .map((suggestion) => suggestion.sourceClaimId);
-        const document = buildProfessionalResumeDocument(exportClaims, {
+        const linkedExportClaims = attachContactLinksToClaims(
+          attachProjectLinksToClaims(exportClaims),
+        );
+        const document = buildProfessionalResumeDocument(linkedExportClaims, {
           tailoredClaimIds,
         });
         const exportedVersionId =
@@ -297,29 +320,10 @@ export function createTailoringRouter(
           ...(savedVersion?.presentation ?? DEFAULT_RESUME_PRESENTATION),
           ...(density.data ? { density: density.data } : {}),
         };
-        let sourceProjectLinks: string[] = [];
-        if (
-          format.data === "pdf" &&
-          services.resumeImportRepository &&
-          services.objectStorage
-        ) {
-          const sourceImport =
-            await services.resumeImportRepository.findOwnedByResumeId(
-              ownerId,
-              record.resumeId,
-            );
-          if (sourceImport?.mimeType === "application/pdf") {
-            const sourceBytes = await services.objectStorage.readObject(
-              sourceImport.objectKey,
-            );
-            sourceProjectLinks = await extractPdfLiveLinks(sourceBytes);
-          }
-        }
         const exported = await renderProfessionalResume(
           document,
           format.data,
           presentation,
-          sourceProjectLinks,
         );
         response.setHeader("Cache-Control", "private, no-store");
         response.setHeader("Content-Type", exported.contentType);

@@ -1,3 +1,5 @@
+import type { PublicResumeShare } from "@make-my-resume/contracts";
+
 import type { ResumeExportResult } from "../tailoring/resume-export-service.js";
 
 export interface PublicResumeExportRateLimitResult {
@@ -19,13 +21,24 @@ export interface PublicResumeExportCache {
   ): Promise<ResumeExportResult>;
 }
 
+export interface PublicResumePreviewCache {
+  getOrCreate(
+    versionKey: string,
+    create: () => Promise<PublicResumeShare>,
+  ): Promise<PublicResumeShare>;
+}
+
 export const publicResumeExportRequestsPerMinute = 20;
+export const publicResumePreviewRequestsPerMinute = 60;
+export const invalidPublicResumeRequestsPerMinute = 30;
 const rateLimitWindowMilliseconds = 60_000;
 const cacheTtlMilliseconds = 10 * 60_000;
 const maximumCacheEntries = 100;
 const maximumCachedBytes = 50 * 1024 * 1024;
 
-export function createMemoryPublicResumeExportRateLimiter(): PublicResumeExportRateLimiter {
+export function createMemoryPublicResumeRateLimiter(
+  requestsPerMinute = publicResumeExportRequestsPerMinute,
+): PublicResumeExportRateLimiter {
   const windows = new Map<string, { count: number; resetAt: number }>();
 
   return {
@@ -51,7 +64,7 @@ export function createMemoryPublicResumeExportRateLimiter(): PublicResumeExportR
       }
 
       return {
-        allowed: window.count <= publicResumeExportRequestsPerMinute,
+        allowed: window.count <= requestsPerMinute,
         retryAfterSeconds: Math.max(
           1,
           Math.ceil((window.resetAt - now) / 1_000),
@@ -59,6 +72,12 @@ export function createMemoryPublicResumeExportRateLimiter(): PublicResumeExportR
       };
     },
   };
+}
+
+export function createMemoryPublicResumeExportRateLimiter(): PublicResumeExportRateLimiter {
+  return createMemoryPublicResumeRateLimiter(
+    publicResumeExportRequestsPerMinute,
+  );
 }
 
 export function createMemoryPublicResumeExportCache(): PublicResumeExportCache {
@@ -113,6 +132,51 @@ export function createMemoryPublicResumeExportCache(): PublicResumeExportCache {
             cachedBytes += size;
             prune(Date.now());
           }
+          return result;
+        })
+        .finally(() => inFlight.delete(versionKey));
+      inFlight.set(versionKey, pending);
+      return pending;
+    },
+  };
+}
+
+export function createMemoryPublicResumePreviewCache(): PublicResumePreviewCache {
+  const cache = new Map<
+    string,
+    { result: PublicResumeShare; expiresAt: number }
+  >();
+  const inFlight = new Map<string, Promise<PublicResumeShare>>();
+
+  function prune(now: number) {
+    for (const [key, entry] of cache) {
+      if (entry.expiresAt <= now) cache.delete(key);
+    }
+    while (cache.size > maximumCacheEntries) {
+      const oldestKey = cache.keys().next().value as string | undefined;
+      if (!oldestKey) break;
+      cache.delete(oldestKey);
+    }
+  }
+
+  return {
+    async getOrCreate(versionKey, create) {
+      const now = Date.now();
+      prune(now);
+      const cached = cache.get(versionKey);
+      if (cached && cached.expiresAt > now) return cached.result;
+
+      const existing = inFlight.get(versionKey);
+      if (existing) return existing;
+
+      const pending = create()
+        .then((result) => {
+          cache.delete(versionKey);
+          cache.set(versionKey, {
+            result,
+            expiresAt: Date.now() + cacheTtlMilliseconds,
+          });
+          prune(Date.now());
           return result;
         })
         .finally(() => inFlight.delete(versionKey));

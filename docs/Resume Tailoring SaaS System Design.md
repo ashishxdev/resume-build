@@ -1299,8 +1299,9 @@ Better Auth handles:
 - User authentication
 - Sessions
 - Email/password
-- Google OAuth
 - Authentication-related account state
+
+Social OAuth is intentionally outside the current product scope.
 
 Application-level authorization remains in the Express API.
 
@@ -1987,7 +1988,6 @@ Secrets include:
 - MongoDB credentials
 - R2 credentials
 - AI provider keys
-- Google OAuth credentials
 - Better Auth secrets
 - Resend API key
 - Payment credentials
@@ -2884,9 +2884,6 @@ DATABASE_URL
 
 BETTER_AUTH_SECRET
 BETTER_AUTH_URL
-
-GOOGLE_CLIENT_ID
-GOOGLE_CLIENT_SECRET
 
 R2_ACCOUNT_ID
 R2_ACCESS_KEY_ID

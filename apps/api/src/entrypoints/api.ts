@@ -82,7 +82,6 @@ const stopAtsAnalysisLoop = startAtsAnalysisLoop(
 const app = createApp(
   environment,
   authRuntime.auth,
-  authRuntime.googleEnabled,
   {
     repository: resumeImportRuntime.repository,
     extractionRepository: resumeExtractionRuntime.repository,

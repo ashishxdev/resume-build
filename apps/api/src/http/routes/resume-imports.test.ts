@@ -26,8 +26,6 @@ const testEnvironment = {
   BETTER_AUTH_API_KEY: undefined,
   BETTER_AUTH_TRUSTED_ORIGINS: ["http://localhost:3000"],
   TRUSTED_PROXY_IPS: ["loopback"] as string[],
-  GOOGLE_CLIENT_ID: undefined,
-  GOOGLE_CLIENT_SECRET: undefined,
   RESEND_API_KEY: undefined,
   EMAIL_FROM: undefined,
   EMAIL_REPLY_TO: undefined,
@@ -100,7 +98,7 @@ describe("resume imports", () => {
     const repository = createMemoryResumeImportRepository();
     const extractionRepository = createMemoryResumeExtractionRepository();
     const { storage } = createStorage();
-    const app = createApp(testEnvironment, authRuntime.auth, false, {
+    const app = createApp(testEnvironment, authRuntime.auth, {
       repository,
       extractionRepository,
       objectStorage: storage,
@@ -153,7 +151,7 @@ describe("resume imports", () => {
       "deleteManyOwnedByResumeId",
     );
     const { storage, deletedKeys } = createStorage();
-    const app = createApp(testEnvironment, authRuntime.auth, false, {
+    const app = createApp(testEnvironment, authRuntime.auth, {
       repository,
       extractionRepository,
       jobDescriptionRepository,
@@ -201,7 +199,7 @@ describe("resume imports", () => {
     const repository = createMemoryResumeImportRepository();
     const extractionRepository = createMemoryResumeExtractionRepository();
     const { storage, deletedKeys } = createStorage();
-    const app = createApp(testEnvironment, authRuntime.auth, false, {
+    const app = createApp(testEnvironment, authRuntime.auth, {
       repository,
       extractionRepository,
       objectStorage: storage,
@@ -233,7 +231,7 @@ describe("resume imports", () => {
     vi.spyOn(storage, "deleteObject").mockRejectedValueOnce(
       new Error("R2 unavailable"),
     );
-    const app = createApp(testEnvironment, authRuntime.auth, false, {
+    const app = createApp(testEnvironment, authRuntime.auth, {
       repository,
       extractionRepository,
       objectStorage: storage,
@@ -258,7 +256,7 @@ describe("resume imports", () => {
     const authRuntime = createAuthRuntime(testEnvironment);
     const repository = createMemoryResumeImportRepository();
     const { storage } = createStorage();
-    const app = createApp(testEnvironment, authRuntime.auth, false, {
+    const app = createApp(testEnvironment, authRuntime.auth, {
       repository,
       objectStorage: storage,
     });
@@ -286,7 +284,7 @@ describe("resume imports", () => {
       reportedMimeType: "application/pdf",
       size: 245,
     });
-    const app = createApp(testEnvironment, authRuntime.auth, false, {
+    const app = createApp(testEnvironment, authRuntime.auth, {
       repository,
       objectStorage: storageRuntime.storage,
     });
@@ -333,7 +331,7 @@ describe("resume imports", () => {
           size: 245,
         };
       });
-      const app = createApp(testEnvironment, authRuntime.auth, false, {
+      const app = createApp(testEnvironment, authRuntime.auth, {
         repository,
         objectStorage: storageRuntime.storage,
       });
@@ -371,7 +369,7 @@ describe("resume imports", () => {
     vi.spyOn(storageRuntime.storage, "deleteObject").mockRejectedValueOnce(
       new Error("R2 unavailable"),
     );
-    const app = createApp(testEnvironment, authRuntime.auth, false, {
+    const app = createApp(testEnvironment, authRuntime.auth, {
       repository,
       objectStorage: storageRuntime.storage,
     });
@@ -403,7 +401,7 @@ describe("resume imports", () => {
   it("requires authentication, complete configuration, and valid metadata", async () => {
     const authRuntime = createAuthRuntime(testEnvironment);
     const repository = createMemoryResumeImportRepository();
-    const app = createApp(testEnvironment, authRuntime.auth, false, {
+    const app = createApp(testEnvironment, authRuntime.auth, {
       repository,
       objectStorage: null,
     });
@@ -419,7 +417,7 @@ describe("resume imports", () => {
     const authRuntime = createAuthRuntime(testEnvironment);
     const repository = createMemoryResumeImportRepository();
     const { storage } = createStorage();
-    const app = createApp(testEnvironment, authRuntime.auth, false, {
+    const app = createApp(testEnvironment, authRuntime.auth, {
       repository,
       objectStorage: storage,
     });
@@ -442,7 +440,7 @@ describe("resume imports", () => {
     const authRuntime = createAuthRuntime(testEnvironment);
     const repository = createMemoryResumeImportRepository();
     const { storage } = createStorage();
-    const app = createApp(testEnvironment, authRuntime.auth, false, {
+    const app = createApp(testEnvironment, authRuntime.auth, {
       repository,
       objectStorage: storage,
     });
@@ -483,7 +481,7 @@ describe("resume imports", () => {
     const repository = createMemoryResumeImportRepository();
     const extractionRepository = createMemoryResumeExtractionRepository();
     const { storage } = createStorage();
-    const app = createApp(testEnvironment, authRuntime.auth, false, {
+    const app = createApp(testEnvironment, authRuntime.auth, {
       repository,
       extractionRepository,
       objectStorage: storage,

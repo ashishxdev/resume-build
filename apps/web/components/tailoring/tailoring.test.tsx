@@ -149,6 +149,10 @@ describe("tailoring workflow", () => {
     await waitFor(() =>
       expect(mocks.push).toHaveBeenCalledWith("/job-descriptions/jd_queued"),
     );
+    expect(
+      screen.getByRole("heading", { name: /Reading the role/ }),
+    ).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /Analyze match/ })).toBeNull();
   });
 
   it("renders a saved ATS snapshot with transparent missing evidence", async () => {
@@ -823,6 +827,9 @@ describe("tailoring workflow", () => {
       await screen.findByRole("heading", { name: "Alex Mercer" }),
     ).toBeTruthy();
     expect(screen.getByText("Led accessible design systems.")).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: "Share this resume privately" }),
+    ).toBeTruthy();
     fireEvent.click(screen.getByLabelText(/Compact/));
     fireEvent.click(
       screen.getByRole("button", { name: "Download editable DOCX" }),

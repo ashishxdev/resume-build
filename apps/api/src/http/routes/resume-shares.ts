@@ -21,11 +21,17 @@ import type {
 import {
   createMemoryPublicResumeExportCache,
   createMemoryPublicResumeExportRateLimiter,
+  createMemoryPublicResumePreviewCache,
+  createMemoryPublicResumeRateLimiter,
+  invalidPublicResumeRequestsPerMinute,
+  publicResumePreviewRequestsPerMinute,
   type PublicResumeExportCache,
   type PublicResumeExportRateLimiter,
+  type PublicResumePreviewCache,
 } from "../../modules/resumes/public-resume-export-protection.js";
 import {
-  extractPdfLiveLinks,
+  attachContactLinksToClaims,
+  attachProjectLinksToClaims,
   renderProfessionalResume,
 } from "../../modules/tailoring/resume-export-service.js";
 
@@ -36,6 +42,9 @@ export interface ResumeShareRouteServices {
   objectStorage?: ResumeObjectStorage | null;
   publicExportCache?: PublicResumeExportCache;
   publicExportRateLimiter?: PublicResumeExportRateLimiter;
+  publicPreviewCache?: PublicResumePreviewCache;
+  publicPreviewRateLimiter?: PublicResumeExportRateLimiter;
+  invalidPublicRequestRateLimiter?: PublicResumeExportRateLimiter;
 }
 
 const shareTokenPattern = /^[A-Za-z0-9_-]{43}$/;
@@ -91,6 +100,14 @@ export function createResumeShareRouter(
   const publicExportRateLimiter =
     services.publicExportRateLimiter ??
     createMemoryPublicResumeExportRateLimiter();
+  const publicPreviewCache =
+    services.publicPreviewCache ?? createMemoryPublicResumePreviewCache();
+  const publicPreviewRateLimiter =
+    services.publicPreviewRateLimiter ??
+    createMemoryPublicResumeRateLimiter(publicResumePreviewRequestsPerMinute);
+  const invalidPublicRequestRateLimiter =
+    services.invalidPublicRequestRateLimiter ??
+    createMemoryPublicResumeRateLimiter(invalidPublicResumeRequestsPerMinute);
 
   async function requireUser(request: Request, response: Response) {
     const session = await auth.api.getSession({
@@ -136,6 +153,57 @@ export function createResumeShareRouter(
       share.versionId,
     );
     return version ? { share, version } : null;
+  }
+
+  function clientIp(request: Request) {
+    return request.ip ?? request.socket.remoteAddress ?? "unknown";
+  }
+
+  function rateLimited(
+    response: Response,
+    retryAfterSeconds: number,
+    code: string,
+    message: string,
+  ) {
+    response.setHeader("Cache-Control", "no-store, max-age=0");
+    response.setHeader("Retry-After", String(retryAfterSeconds));
+    return sendError(response, 429, code, message);
+  }
+
+  async function resolveRateLimitedPublicVersion(
+    request: Request,
+    response: Response,
+    limiter: PublicResumeExportRateLimiter,
+    code: string,
+    message: string,
+  ) {
+    const rawToken = request.params.shareToken;
+    const token = Array.isArray(rawToken) ? "" : (rawToken ?? "");
+    const resolved = await resolvePublicVersion(token);
+    if (!resolved) {
+      const invalidLimit = invalidPublicRequestRateLimiter.consume(
+        "invalid-share",
+        clientIp(request),
+      );
+      if (!invalidLimit.allowed) {
+        rateLimited(
+          response,
+          invalidLimit.retryAfterSeconds,
+          "PUBLIC_SHARE_RATE_LIMITED",
+          "Too many private link requests. Please wait before trying again.",
+        );
+        return null;
+      }
+      unavailable(response);
+      return null;
+    }
+
+    const limit = limiter.consume(resolved.share.token, clientIp(request));
+    if (!limit.allowed) {
+      rateLimited(response, limit.retryAfterSeconds, code, message);
+      return null;
+    }
+    return resolved;
   }
 
   const ownerPath = "/api/v1/resumes/:resumeId/versions/:versionId/share";
@@ -268,14 +336,28 @@ export function createResumeShareRouter(
     "/api/v1/public/resumes/:shareToken",
     async (request, response, next) => {
       try {
-        const resolved = await resolvePublicVersion(request.params.shareToken);
-        if (!resolved) return unavailable(response);
-        const data: PublicResumeShare = {
-          versionName: resolved.version.name,
-          document: buildProfessionalResumeDocument(resolved.version.claims),
-          presentation: resolved.version.presentation,
-          updatedAt: resolved.version.updatedAt.toISOString(),
-        };
+        const resolved = await resolveRateLimitedPublicVersion(
+          request,
+          response,
+          publicPreviewRateLimiter,
+          "PUBLIC_PREVIEW_RATE_LIMITED",
+          "Too many preview requests. Please wait before trying again.",
+        );
+        if (!resolved) return;
+        const data = await publicPreviewCache.getOrCreate(
+          `${resolved.version.id}:${resolved.version.updatedAt.toISOString()}`,
+          async (): Promise<PublicResumeShare> => {
+            const claims = attachContactLinksToClaims(
+              attachProjectLinksToClaims(resolved.version.claims),
+            );
+            return {
+              versionName: resolved.version.name,
+              document: buildProfessionalResumeDocument(claims),
+              presentation: resolved.version.presentation,
+              updatedAt: resolved.version.updatedAt.toISOString(),
+            };
+          },
+        );
         response.setHeader("Cache-Control", "no-store, max-age=0");
         response.status(200).json({ data });
       } catch (error) {
@@ -288,48 +370,24 @@ export function createResumeShareRouter(
     "/api/v1/public/resumes/:shareToken/export",
     async (request, response, next) => {
       try {
-        const rateLimit = publicExportRateLimiter.consume(
-          request.params.shareToken,
-          request.ip ?? request.socket.remoteAddress ?? "unknown",
+        const resolved = await resolveRateLimitedPublicVersion(
+          request,
+          response,
+          publicExportRateLimiter,
+          "PUBLIC_EXPORT_RATE_LIMITED",
+          "Too many download requests. Please wait before trying again.",
         );
-        if (!rateLimit.allowed) {
-          response.setHeader("Cache-Control", "no-store, max-age=0");
-          response.setHeader(
-            "Retry-After",
-            String(rateLimit.retryAfterSeconds),
-          );
-          return sendError(
-            response,
-            429,
-            "PUBLIC_EXPORT_RATE_LIMITED",
-            "Too many download requests. Please wait before trying again.",
-          );
-        }
-        const resolved = await resolvePublicVersion(request.params.shareToken);
-        if (!resolved) return unavailable(response);
+        if (!resolved) return;
         const exported = await publicExportCache.getOrCreate(
           `${resolved.version.id}:${resolved.version.updatedAt.toISOString()}`,
           async () => {
-            let sourceProjectLinks: string[] = [];
-            if (services.objectStorage) {
-              const sourceImport =
-                await services.resumeImportRepository.findOwnedByResumeId(
-                  resolved.share.userId,
-                  resolved.share.resumeId,
-                );
-              if (sourceImport?.mimeType === "application/pdf") {
-                sourceProjectLinks = await extractPdfLiveLinks(
-                  await services.objectStorage.readObject(
-                    sourceImport.objectKey,
-                  ),
-                );
-              }
-            }
+            const exportClaims = attachContactLinksToClaims(
+              attachProjectLinksToClaims(resolved.version.claims),
+            );
             return renderProfessionalResume(
-              buildProfessionalResumeDocument(resolved.version.claims),
+              buildProfessionalResumeDocument(exportClaims),
               "pdf",
               resolved.version.presentation,
-              sourceProjectLinks,
             );
           },
         );

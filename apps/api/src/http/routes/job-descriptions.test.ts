@@ -24,8 +24,6 @@ const environment = {
   BETTER_AUTH_API_KEY: undefined,
   BETTER_AUTH_TRUSTED_ORIGINS: ["http://localhost:3000"],
   TRUSTED_PROXY_IPS: ["loopback"],
-  GOOGLE_CLIENT_ID: undefined,
-  GOOGLE_CLIENT_SECRET: undefined,
   RESEND_API_KEY: undefined,
   EMAIL_FROM: undefined,
   EMAIL_REPLY_TO: undefined,
@@ -123,7 +121,7 @@ function analyzer(): JobDescriptionAnalyzer {
 describe("job descriptions", () => {
   it("requires authentication and a verified owned resume", async () => {
     const authRuntime = createAuthRuntime(environment);
-    const app = createApp(environment, authRuntime.auth, false, undefined, {
+    const app = createApp(environment, authRuntime.auth, undefined, {
       repository: createMemoryJobDescriptionRepository(),
       extractionRepository: createMemoryResumeExtractionRepository(),
       rateLimiter: createMemoryJobAnalysisRateLimiter(),
@@ -148,7 +146,7 @@ describe("job descriptions", () => {
     const extractionRepository = createMemoryResumeExtractionRepository();
     const jobRepository = createMemoryJobDescriptionRepository();
     const jobAnalyzer = analyzer();
-    const app = createApp(environment, authRuntime.auth, false, undefined, {
+    const app = createApp(environment, authRuntime.auth, undefined, {
       repository: jobRepository,
       extractionRepository,
       rateLimiter: createMemoryJobAnalysisRateLimiter(),
@@ -201,7 +199,7 @@ describe("job descriptions", () => {
     const deniedLimiter = {
       consume: vi.fn(async () => ({ allowed: false, retryAfterSeconds: 120 })),
     };
-    const app = createApp(environment, authRuntime.auth, false, undefined, {
+    const app = createApp(environment, authRuntime.auth, undefined, {
       repository: jobRepository,
       extractionRepository,
       rateLimiter: deniedLimiter,
@@ -240,7 +238,7 @@ describe("job descriptions", () => {
     const authRuntime = createAuthRuntime(environment);
     const extractionRepository = createMemoryResumeExtractionRepository();
     const jobRepository = createMemoryJobDescriptionRepository();
-    const app = createApp(environment, authRuntime.auth, false, undefined, {
+    const app = createApp(environment, authRuntime.auth, undefined, {
       repository: jobRepository,
       extractionRepository,
       rateLimiter: createMemoryJobAnalysisRateLimiter(),
@@ -262,7 +260,7 @@ describe("job descriptions", () => {
     const authRuntime = createAuthRuntime(environment);
     const extractionRepository = createMemoryResumeExtractionRepository();
     const jobRepository = createMemoryJobDescriptionRepository();
-    const app = createApp(environment, authRuntime.auth, false, undefined, {
+    const app = createApp(environment, authRuntime.auth, undefined, {
       repository: jobRepository,
       extractionRepository,
       rateLimiter: createMemoryJobAnalysisRateLimiter(),

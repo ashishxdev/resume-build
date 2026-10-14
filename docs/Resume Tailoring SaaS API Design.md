@@ -139,7 +139,8 @@ Express API
 Required authentication methods:
 
 - Email/password
-- Google OAuth
+
+Social OAuth is intentionally outside the current API scope.
 
 ---
 

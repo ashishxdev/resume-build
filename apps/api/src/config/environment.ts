@@ -49,8 +49,6 @@ const environmentSchema = z
           .map((address) => address.trim())
           .filter(Boolean),
       ),
-    GOOGLE_CLIENT_ID: z.string().min(1).optional(),
-    GOOGLE_CLIENT_SECRET: z.string().min(1).optional(),
     RESEND_API_KEY: z.string().min(1).optional(),
     EMAIL_FROM: z.string().min(1).optional(),
     EMAIL_REPLY_TO: z.email().optional(),
@@ -125,17 +123,6 @@ const environmentSchema = z
         code: "custom",
         path: ["MONGODB_URI"],
         message: "MONGODB_URI is required when AUTH_STORAGE is mongodb",
-      });
-    }
-
-    if (
-      (environment.GOOGLE_CLIENT_ID && !environment.GOOGLE_CLIENT_SECRET) ||
-      (!environment.GOOGLE_CLIENT_ID && environment.GOOGLE_CLIENT_SECRET)
-    ) {
-      context.addIssue({
-        code: "custom",
-        path: ["GOOGLE_CLIENT_ID"],
-        message: "Google OAuth requires both client ID and client secret",
       });
     }
 

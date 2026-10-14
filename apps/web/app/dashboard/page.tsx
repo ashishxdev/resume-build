@@ -317,12 +317,6 @@ export default function DashboardPage() {
     }
   }
 
-  function announceCreateFeature() {
-    setFeatureNotice(
-      "Creating a resume from scratch will be added after resume import and verification.",
-    );
-  }
-
   function showNotifications() {
     setFeatureNotice("You’re all caught up—there are no new notifications.");
   }
@@ -379,13 +373,6 @@ export default function DashboardPage() {
               type="button"
             >
               <Icon name="upload" /> Upload resume
-            </button>
-            <button
-              className={styles.secondaryButton}
-              onClick={announceCreateFeature}
-              type="button"
-            >
-              <Icon name="plus" /> Create
             </button>
           </div>
         </section>

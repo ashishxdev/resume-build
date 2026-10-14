@@ -174,6 +174,28 @@
   letter-spacing: 0.08em;
   color: #756c7b;
 }
+.editableField {
+  display: grid;
+  gap: 5px;
+  margin-top: 16px;
+}
+.editableField > span {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  color: #3d2a50;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.editableField small {
+  color: #7b7280;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: normal;
+  text-transform: none;
+}
 .claim textarea {
   width: 100%;
   min-height: 74px;
@@ -184,30 +206,13 @@
   color: #21182b;
   font: inherit;
   line-height: 1.55;
-  padding: 14px 0;
+  padding: 8px 0 14px;
 }
 .claim textarea:focus,
 .claimHead input:focus,
 .claimHead select:focus {
   outline: 2px solid #b8a4df;
   outline-offset: 3px;
-}
-.claim blockquote {
-  margin: 14px 0 0;
-  padding: 12px 14px;
-  background: #f2edf5;
-  color: #625a68;
-  font-size: 12px;
-  line-height: 1.5;
-  border-radius: 6px;
-}
-.claim blockquote b {
-  display: block;
-  color: #3d2a50;
-  margin-bottom: 4px;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  font-size: 9px;
 }
 .claimActions {
   display: flex;
@@ -269,6 +274,72 @@
   background: #fff3f2;
   color: #842f2b;
   border-radius: 8px;
+}
+.success {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px;
+  border: 1px solid #cde7dc;
+  background: #edf8f3;
+  color: #176149;
+  border-radius: 8px;
+  font-weight: 700;
+}
+.success span {
+  width: 22px;
+  height: 22px;
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: #2c8466;
+  color: white;
+  font-size: 12px;
+}
+.nextStep {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 28px;
+  margin: 20px 0 28px;
+  padding: 24px;
+  border: 1px solid #d8cce0;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 12px 40px rgba(44, 27, 59, 0.05);
+}
+.nextStep h2 {
+  margin: 6px 0 7px;
+  color: #29183f;
+  font:
+    600 26px/1.15 Georgia,
+    serif;
+}
+.nextStep p {
+  max-width: 540px;
+  margin: 0;
+  color: #68606d;
+  font-size: 13px;
+  line-height: 1.55;
+}
+.nextStepActions {
+  display: grid;
+  flex: 0 0 auto;
+  gap: 10px;
+  text-align: center;
+}
+.nextStepActions a {
+  border-radius: 5px;
+  padding: 12px 18px;
+  color: #4f31a8;
+  font-size: 12px;
+  font-weight: 800;
+  text-decoration: none;
+}
+.nextStepActions a:first-child {
+  background: #2b1941;
+  color: white;
 }
 .statePage {
   min-height: 100vh;
@@ -338,6 +409,14 @@
   }
   .intro h1 {
     font-size: 42px;
+  }
+  .nextStep {
+    align-items: stretch;
+    flex-direction: column;
+    padding: 20px;
+  }
+  .nextStepActions a {
+    width: 100%;
   }
   .group {
     padding: 18px 14px;

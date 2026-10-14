@@ -9,6 +9,24 @@ import type { ResumeAiParser } from "./resume-ai-parser.js";
 import type { ResumeExtractionRepository } from "./resume-extraction-repository.js";
 import { parseResumeClaims } from "./structured-resume-parser.js";
 
+export const scannedPdfFailureMessage =
+  "This PDF appears to be scanned or flattened and contains no selectable text. Upload the original text-based PDF or a DOCX file. Retrying this same file will not work.";
+
+class NoReadableDocumentError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "NoReadableDocumentError";
+  }
+}
+
+export function noReadableDocumentFailureMessage(
+  mimeType: "application/pdf" | string,
+) {
+  return mimeType === "application/pdf"
+    ? scannedPdfFailureMessage
+    : "No readable text was found in this document. Upload a DOCX file containing editable text.";
+}
+
 export async function parseExtractedResume(
   pages: Awaited<ReturnType<typeof extractDocumentText>>,
   aiParser?: ResumeAiParser | null,
@@ -69,15 +87,16 @@ export function createResumeExtractionService(
         );
       }
       if (claims.length === 0) {
-        throw new Error("No readable text was found in this document.");
+        throw new NoReadableDocumentError(
+          noReadableDocumentFailureMessage(job.mimeType),
+        );
       }
       await repository.complete(job.id, job.processingToken, claims);
     } catch (error) {
       const message =
         error instanceof DocumentExtractionLimitError
           ? error.message
-          : error instanceof Error &&
-              error.message === "No readable text was found in this document."
+          : error instanceof NoReadableDocumentError
             ? error.message
             : "The document could not be extracted. Try a text-based PDF or DOCX file.";
       logger?.warn({ error, jobId: job.id }, "Resume extraction failed");

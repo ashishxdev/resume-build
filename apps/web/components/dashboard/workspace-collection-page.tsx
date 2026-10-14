@@ -20,6 +20,7 @@ import {
 } from "react";
 
 import styles from "@/app/dashboard/dashboard.module.css";
+import { PrivateResumeShareButton } from "@/components/resume/private-resume-share-button";
 import tailoringStyles from "@/components/tailoring/tailoring.module.css";
 import { authClient } from "@/lib/auth/client";
 import { deleteResume, listResumes } from "@/lib/resume/import-client";
@@ -597,6 +598,11 @@ export function WorkspaceCollectionPage({ page }: { page: CollectionPage }) {
                               <Link href={`/resumes/${resume.id}/versions`}>
                                 Version history
                               </Link>
+                              <PrivateResumeShareButton
+                                compact
+                                resumeId={resume.id}
+                                resumeName={resume.name}
+                              />
                               <Link href={`/resumes/${resume.id}/tailor`}>
                                 Tailor to a job →
                               </Link>

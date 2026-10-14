@@ -23,8 +23,6 @@ const environment = {
   BETTER_AUTH_API_KEY: undefined,
   BETTER_AUTH_TRUSTED_ORIGINS: ["http://localhost:3000"],
   TRUSTED_PROXY_IPS: ["loopback"],
-  GOOGLE_CLIENT_ID: undefined,
-  GOOGLE_CLIENT_SECRET: undefined,
   RESEND_API_KEY: undefined,
   EMAIL_FROM: undefined,
   EMAIL_REPLY_TO: undefined,
@@ -70,18 +68,11 @@ describe("tailoring routes", () => {
     const rateLimiter = {
       consume: vi.fn(async () => ({ allowed: true as const })),
     };
-    const app = createApp(
-      environment,
-      authRuntime.auth,
-      false,
-      undefined,
-      undefined,
-      {
-        repository: tailoring,
-        jobDescriptionRepository: jobs,
-        rateLimiter,
-      },
-    );
+    const app = createApp(environment, authRuntime.auth, undefined, undefined, {
+      repository: tailoring,
+      jobDescriptionRepository: jobs,
+      rateLimiter,
+    });
     const owner = request.agent(app);
     const stranger = request.agent(app);
     const ownerId = await signUp(owner, "tailoring-owner@example.com");

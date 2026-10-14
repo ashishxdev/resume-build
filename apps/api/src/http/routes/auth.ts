@@ -3,12 +3,8 @@ import { Router } from "express";
 
 import type { Auth } from "../../infrastructure/auth/auth.js";
 
-export function createAuthInfoRouter(auth: Auth, googleEnabled: boolean) {
+export function createAuthRouter(auth: Auth) {
   const router = Router();
-
-  router.get("/api/v1/auth/config", (_request, response) => {
-    response.status(200).json({ googleEnabled });
-  });
 
   router.get("/api/v1/me", async (request, response, next) => {
     try {

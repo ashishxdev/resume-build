@@ -19,7 +19,7 @@ The final counts are based only on executed tests. A case fixed and successfully
 - `/api/v1/me` performs a server-side session check and returns `401` without a valid session.
 - `/dashboard` is a client-rendered route that shows only a loading shell until `useSession` succeeds; protected data remains behind authenticated APIs.
 - Local cookies are `HttpOnly`, `SameSite=Lax`, `Path=/`, and intentionally omit `Secure` over HTTP. Production configuration requests `Secure` and `SameSite=None`.
-- Google OAuth is conditional and was not configured in the tested environment.
+- Authentication is intentionally limited to email/password; social OAuth was removed from product scope on 2026-10-13.
 
 ## Test Results
 
@@ -72,7 +72,7 @@ The final counts are based only on executed tests. A case fixed and successfully
 | D12 | Chrome console and failed requests | No unexpected app failures | No app runtime errors; expected negative-auth `401` requests and one unrelated Chrome-extension message were observed | PASS |
 | D13 | Production cookie behavior | Verify `Secure; SameSite=None` on HTTPS deployment | Configuration was reviewed, but no production HTTPS environment was available | BLOCKED |
 | D14 | Natural expiry/renewal timing | Verify renewal over the configured lifetime | Expiry rejection was tested; real-time multi-day renewal was not practical in this run | BLOCKED |
-| D15 | Google OAuth | Complete provider redirect/callback | Provider is disabled without local Google credentials; button explains this state | NOT APPLICABLE |
+| D15 | Social OAuth | Confirm whether a provider flow is required | Social sign-in is intentionally outside the supported authentication scope | NOT APPLICABLE |
 
 ## Bugs Fixed
 
@@ -104,7 +104,7 @@ The final counts are based only on executed tests. A case fixed and successfully
 ## Remaining Limitations and Security Notes
 
 - `/dashboard` protection is client-side. Its unauthenticated HTML is only a loading shell and no private data is embedded, while `/api/v1/me` is server-protected. Every future dashboard data endpoint must continue to enforce authorization server-side.
-- Production HTTPS cookie attributes and Google OAuth need deployment credentials/environment coverage.
+- Production HTTPS cookie attributes need deployment-environment coverage.
 - Natural multi-day session renewal and a forced database outage remain untested.
 - A brand-new signup was executed through the local API, not submitted through Chrome, because UI account creation requires action-time confirmation. All Chrome signup validation and duplicate-account scenarios were executed.
 - Dedicated QA users remain in the local MongoDB database for repeatability; their sessions were revoked.

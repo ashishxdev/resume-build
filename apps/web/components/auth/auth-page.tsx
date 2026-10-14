@@ -7,7 +7,6 @@ import type { FormEvent } from "react";
 
 import { authClient } from "@/lib/auth/client";
 import { prepareEmailCredentials } from "@/lib/auth/email-credentials";
-import { clientEnvironment } from "@/lib/env/client";
 
 import styles from "./auth-page.module.css";
 
@@ -16,29 +15,6 @@ type AuthMode = "signin" | "signup";
 interface AuthPageProps {
   mode: AuthMode;
   redirectTo: string;
-}
-
-function GoogleIcon() {
-  return (
-    <svg aria-hidden="true" viewBox="0 0 24 24">
-      <path
-        d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.1 5.1 0 0 1-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09Z"
-        fill="#4285F4"
-      />
-      <path
-        d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84A11 11 0 0 0 12 23Z"
-        fill="#34A853"
-      />
-      <path
-        d="M5.84 14.09A6.6 6.6 0 0 1 5.49 12c0-.73.13-1.43.35-2.09V7.06H2.18A11 11 0 0 0 1 12c0 1.78.43 3.45 1.18 4.94l3.66-2.85Z"
-        fill="#FBBC05"
-      />
-      <path
-        d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15A10.93 10.93 0 0 0 2.18 7.06L5.84 9.9C6.71 7.3 9.14 5.38 12 5.38Z"
-        fill="#EA4335"
-      />
-    </svg>
-  );
 }
 
 export function AuthBrand() {
@@ -65,8 +41,6 @@ export function AuthPage({ mode, redirectTo }: AuthPageProps) {
   const [rememberMe, setRememberMe] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isGoogleSigningIn, setIsGoogleSigningIn] = useState(false);
-  const [googleEnabled, setGoogleEnabled] = useState<boolean | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const isSignIn = mode === "signin";
@@ -74,29 +48,6 @@ export function AuthPage({ mode, redirectTo }: AuthPageProps) {
   useEffect(() => {
     if (session.data) window.location.replace(redirectTo);
   }, [redirectTo, session.data]);
-
-  useEffect(() => {
-    const controller = new AbortController();
-
-    fetch(`${clientEnvironment.NEXT_PUBLIC_API_URL}/api/v1/auth/config`, {
-      credentials: "include",
-      signal: controller.signal,
-    })
-      .then((response) => (response.ok ? response.json() : null))
-      .then((result: { googleEnabled?: boolean } | null) => {
-        setGoogleEnabled(Boolean(result?.googleEnabled));
-      })
-      .catch((fetchError: unknown) => {
-        if (
-          fetchError instanceof DOMException &&
-          fetchError.name === "AbortError"
-        )
-          return;
-        setGoogleEnabled(false);
-      });
-
-    return () => controller.abort();
-  }, []);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -142,39 +93,6 @@ export function AuthPage({ mode, redirectTo }: AuthPageProps) {
     }
   }
 
-  async function handleGoogleSignIn() {
-    setError(null);
-
-    if (googleEnabled === null) {
-      setError(
-        "Google sign-in is still being checked. Please try again shortly.",
-      );
-      return;
-    }
-
-    if (!googleEnabled) {
-      setError("Google sign-in is not configured for this environment yet.");
-      return;
-    }
-
-    setIsGoogleSigningIn(true);
-
-    try {
-      const result = await authClient.signIn.social({
-        provider: "google",
-        callbackURL: redirectTo,
-      });
-
-      if (result.error) {
-        setError(result.error.message ?? "We could not start Google sign-in.");
-      }
-    } catch {
-      setError("Google sign-in is unavailable. Please try again.");
-    } finally {
-      setIsGoogleSigningIn(false);
-    }
-  }
-
   return (
     <div className={styles.page}>
       <header className={styles.siteHeader}>
@@ -200,26 +118,6 @@ export function AuthPage({ mode, redirectTo }: AuthPageProps) {
                 ? "Continue crafting honest, tailored applications with quiet precision."
                 : "Start tailoring stronger applications without compromising what is true."}
             </span>
-          </div>
-
-          <button
-            className={styles.googleButton}
-            disabled={
-              googleEnabled === null || isGoogleSigningIn || isSubmitting
-            }
-            type="button"
-            onClick={handleGoogleSignIn}
-          >
-            <GoogleIcon />
-            {googleEnabled === null
-              ? "Checking Google sign-in…"
-              : isGoogleSigningIn
-                ? "Opening Google…"
-                : "Continue with Google"}
-          </button>
-
-          <div className={styles.divider}>
-            <span>or continue with email</span>
           </div>
 
           <form className={styles.form} onSubmit={handleSubmit}>

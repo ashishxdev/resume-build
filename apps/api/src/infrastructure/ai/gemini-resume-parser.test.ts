@@ -132,6 +132,61 @@ describe("parseGroundedGeminiClaims", () => {
     expect(claims).toHaveLength(1);
     expect(claims[0]).toMatchObject({ pageNumber: 1 });
   });
+
+  it("retains a grounded project URL even when the model omits it", () => {
+    const projectPages = createDocxDocumentPage(
+      "Projects\nProject Atlas | Live (https://example.com/atlas) | TypeScript",
+    );
+    const claims = parseGroundedGeminiClaims(
+      JSON.stringify({
+        claims: [
+          {
+            category: "projects",
+            label: "Project Atlas",
+            value: "Project Atlas | Live | TypeScript",
+            source: {
+              pageNumber: 1,
+              quote:
+                "Project Atlas | Live (https://example.com/atlas) | TypeScript",
+            },
+          },
+        ],
+      }),
+      projectPages,
+    );
+
+    expect(claims[0]?.value).toBe(
+      "Project Atlas | Live (https://example.com/atlas) | TypeScript",
+    );
+  });
+
+  it("retains grounded named contact links when the model omits them", () => {
+    const contactPages = createDocxDocumentPage(
+      "Alex Mercer | LinkedIn (https://linkedin.com/in/alex) | GitHub (https://github.com/alex)",
+    );
+    const claims = parseGroundedGeminiClaims(
+      JSON.stringify({
+        claims: [
+          {
+            category: "personal_info",
+            label: "Contact information",
+            value: "Alex Mercer",
+            source: {
+              pageNumber: 1,
+              quote:
+                "Alex Mercer | LinkedIn (https://linkedin.com/in/alex) | GitHub (https://github.com/alex)",
+            },
+          },
+        ],
+      }),
+      contactPages,
+    );
+
+    expect(claims[0]?.value).toContain(
+      "LinkedIn (https://linkedin.com/in/alex)",
+    );
+    expect(claims[0]?.value).toContain("GitHub (https://github.com/alex)");
+  });
 });
 
 describe("createGeminiResumeParser", () => {
@@ -162,7 +217,7 @@ describe("createGeminiResumeParser", () => {
     expect(result).toMatchObject({
       provider: "gemini",
       model: "gemini-test-model",
-      promptVersion: "resume-structure-v1",
+      promptVersion: "resume-structure-v2",
     });
     expect(result.claims).toHaveLength(1);
     expect(create).toHaveBeenCalledWith(

@@ -35,10 +35,6 @@ export function createAuthRuntime(
         verification: [],
       });
 
-  const googleEnabled = Boolean(
-    environment.GOOGLE_CLIENT_ID && environment.GOOGLE_CLIENT_SECRET,
-  );
-
   const auth = betterAuth({
     appName: "Make My Resume",
     baseURL: environment.BETTER_AUTH_URL,
@@ -70,14 +66,6 @@ export function createAuthRuntime(
       enabled: true,
       storage: environment.AUTH_STORAGE === "mongodb" ? "database" : "memory",
     },
-    socialProviders: googleEnabled
-      ? {
-          google: {
-            clientId: environment.GOOGLE_CLIENT_ID!,
-            clientSecret: environment.GOOGLE_CLIENT_SECRET!,
-          },
-        }
-      : undefined,
     plugins: [
       passwordResetTokenStatus(),
       ...(environment.BETTER_AUTH_API_KEY
@@ -101,7 +89,6 @@ export function createAuthRuntime(
 
   return {
     auth,
-    googleEnabled,
     close: async () => {
       await mongoClient?.close();
     },

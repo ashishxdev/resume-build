@@ -21,8 +21,6 @@ const testEnvironment = {
   BETTER_AUTH_API_KEY: undefined,
   BETTER_AUTH_TRUSTED_ORIGINS: ["http://localhost:3000"],
   TRUSTED_PROXY_IPS: [] as string[],
-  GOOGLE_CLIENT_ID: undefined,
-  GOOGLE_CLIENT_SECRET: undefined,
   RESEND_API_KEY: undefined,
   EMAIL_FROM: undefined,
   EMAIL_REPLY_TO: undefined,
@@ -30,7 +28,7 @@ const testEnvironment = {
 
 function createTestApp(emailService?: TransactionalEmailService) {
   const authRuntime = createAuthRuntime(testEnvironment, emailService);
-  return createApp(testEnvironment, authRuntime.auth, false);
+  return createApp(testEnvironment, authRuntime.auth);
 }
 
 describe("GET /health", () => {
@@ -60,6 +58,10 @@ describe("sensitive request URL logging", () => {
 });
 
 describe("authentication", () => {
+  it("does not expose social-provider configuration", async () => {
+    await request(createTestApp()).get("/api/v1/auth/config").expect(404);
+  });
+
   it("creates a session and exposes only the authenticated user", async () => {
     const app = createTestApp();
     const agent = request.agent(app);

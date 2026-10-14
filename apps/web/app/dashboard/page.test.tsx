@@ -87,6 +87,7 @@ describe("DashboardPage", () => {
     expect(screen.getByRole("heading", { name: "Your resumes" })).toBeTruthy();
     expect(screen.getByText("0 uploaded")).toBeTruthy();
     expect(screen.getByText("No activity yet")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Create" })).toBeNull();
     expect(screen.getAllByRole("link", { name: "Resumes" })[0]).toHaveProperty(
       "href",
       "http://localhost:3000/resumes",

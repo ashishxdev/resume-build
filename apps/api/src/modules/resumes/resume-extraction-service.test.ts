@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { parseExtractedResume } from "./resume-extraction-service.js";
+import {
+  noReadableDocumentFailureMessage,
+  parseExtractedResume,
+  scannedPdfFailureMessage,
+} from "./resume-extraction-service.js";
 
 const pages = [
   {
@@ -47,5 +51,24 @@ describe("parseExtractedResume", () => {
       "summary",
       "experience",
     ]);
+  });
+});
+
+describe("noReadableDocumentFailureMessage", () => {
+  it("explains that scanned or flattened PDFs need a different source file", () => {
+    expect(noReadableDocumentFailureMessage("application/pdf")).toBe(
+      scannedPdfFailureMessage,
+    );
+    expect(scannedPdfFailureMessage).toContain("scanned or flattened");
+    expect(scannedPdfFailureMessage).toContain("no selectable text");
+    expect(scannedPdfFailureMessage).toContain("Retrying this same file");
+  });
+
+  it("gives empty DOCX files a format-appropriate recovery message", () => {
+    expect(
+      noReadableDocumentFailureMessage(
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      ),
+    ).toContain("DOCX file containing editable text");
   });
 });
