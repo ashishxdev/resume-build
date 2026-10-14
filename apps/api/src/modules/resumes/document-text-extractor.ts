@@ -125,6 +125,20 @@ interface PdfLinkAnnotation {
   rect?: unknown;
 }
 
+interface PdfPage {
+  getTextContent(): Promise<{ items: unknown[] }>;
+  getAnnotations(): Promise<unknown[]>;
+}
+
+function isPdfPage(value: unknown): value is PdfPage {
+  if (!value || typeof value !== "object") return false;
+  const candidate = value as Record<string, unknown>;
+  return (
+    typeof candidate.getTextContent === "function" &&
+    typeof candidate.getAnnotations === "function"
+  );
+}
+
 function isPdfTextItem(item: unknown): item is PdfTextItem {
   if (!item || typeof item !== "object") return false;
   const candidate = item as Partial<PdfTextItem>;
@@ -366,10 +380,15 @@ export async function extractDocumentText(
         pageNumber += 1
       ) {
         assertWithinDeadline(deadline);
-        const page = await beforeDeadline(
-          document.getPage(pageNumber),
+        const page = await beforeDeadline<unknown>(
+          document.getPage(pageNumber) as Promise<unknown>,
           deadline,
         );
+        if (!isPdfPage(page)) {
+          throw new DocumentExtractionLimitError(
+            "The PDF page could not be parsed safely.",
+          );
+        }
         const [content, annotations] = await beforeDeadline(
           Promise.all([page.getTextContent(), page.getAnnotations()]),
           deadline,
