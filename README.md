@@ -65,3 +65,6 @@ pnpm format:check
 ```
 
 Architecture and product decisions are maintained in `docs/`.
+
+Production setup for the Vercel web/API projects and the standalone queue
+worker is documented in [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md).

@@ -1,6 +1,6 @@
 # Make My Resume — Project Status
 
-Last updated: 2026-10-13
+Last updated: 2026-10-14
 
 ## Purpose
 
@@ -18,6 +18,7 @@ Update this file whenever a major feature is started, completed, materially rede
 | Dashboard workspace      | Complete | Responsive authenticated dashboard implements the approved desktop and mobile Stitch designs with truthful empty, loading, navigation, activity, resume management, tailored-draft management, trust states, and dedicated resume/activity routes. |
 | Resume workflows         | Complete | The full MVP flow is implemented: PDF/DOCX import, grounded extraction and verification, job matching, evidence-backed tailoring, ATS improvement, immutable versions, customizable PDF/DOCX export, deletion, and unlisted revocable sharing.     |
 | Backend business modules | Complete | Owned imports, private R2 originals, recoverable queues, grounded AI workflows, transactional versions, ATS analysis, deterministic export, and persistent owner-controlled private sharing are complete for the MVP.                              |
+| Production launch        | In progress | Vercel-safe web/API boundaries and a standalone worker deployment path are prepared; external deployment, production configuration, monitoring, backups, and end-to-end production QA remain.                                                    |
 
 ## Milestones
 
@@ -485,6 +486,27 @@ Update this file whenever a major feature is started, completed, materially rede
   - `apps/web/components/resume/private-resume-share-button.tsx`
   - `apps/web/components/resume/resume-version-history-page.tsx`
   - `apps/web/app/r/[shareToken]/page.tsx`
+
+### 22. Production Deployment Foundation
+
+- **Date:** 2026-10-14
+- **Status:** In progress
+- **Scope delivered:**
+  - Added a Vercel-discoverable `apps/api/src/index.ts` entrypoint that exports the Express application without opening a port.
+  - Extracted API dependency composition and resource cleanup into a reusable runtime shared by Vercel and the local Node listener.
+  - Removed every extraction, job-analysis, tailoring, and ATS polling loop from the API process. Durable queue execution now belongs exclusively to the standalone worker entrypoint, avoiding duplicate or request-lifetime-bound workers on Vercel.
+  - Kept local API development available through the existing `pnpm api` command, while queued work runs independently through `pnpm worker`.
+  - Added spoof-resistant Vercel client-IP resolution: the API trusts the edge-overwritten `x-vercel-forwarded-for` value only when the runtime identifies itself with `VERCEL=1`; other deployments continue to use Express's configured proxy allowlist.
+  - Documented the two Vercel monorepo projects, the always-on worker commands, required MongoDB/R2/Resend/Gemini environment, R2 production CORS policy, deployment order, and production smoke-test scope.
+  - Removed obsolete payment-provider placeholders from the example environment so deployment configuration reflects the current free product scope.
+- **Verification:** 125 API tests, 68 web tests, and 8 resume-engine tests pass, including Vercel-header trust and non-Vercel spoof-resistance regressions. Full workspace type checking, linting, formatting, production builds, and `git diff --check` pass. A production-compiled import of the serverless entrypoint returned the expected HTTP 200 health response without using the local listener entrypoint.
+- **Remaining work:** Create the external Vercel and worker services, configure final production domains and secrets, verify HTTPS authentication cookies and CORS against those exact origins, add operational monitoring and backups, and run a complete production QA pass.
+- **Primary files:**
+  - `apps/api/src/index.ts`
+  - `apps/api/src/runtime/create-api-runtime.ts`
+  - `apps/api/src/entrypoints/api.ts`
+  - `apps/api/src/app/create-app.ts`
+  - `docs/DEPLOYMENT.md`
 
 ## Next Major Milestone
 

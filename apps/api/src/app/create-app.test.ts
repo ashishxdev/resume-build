@@ -1,7 +1,11 @@
 import request from "supertest";
 import { describe, expect, it } from "vitest";
 
-import { createApp, redactSensitiveRequestUrl } from "./create-app.js";
+import {
+  createApp,
+  redactSensitiveRequestUrl,
+  resolveClientIp,
+} from "./create-app.js";
 import { createAuthRuntime } from "../infrastructure/auth/auth.js";
 import type {
   PasswordResetEmail,
@@ -54,6 +58,30 @@ describe("sensitive request URL logging", () => {
       "/api/v1/public/resumes/[REDACTED]/export?download=1",
     );
     expect(sanitized).not.toContain(token);
+  });
+});
+
+describe("client IP resolution", () => {
+  it("trusts Vercel's edge-overwritten client IP header on Vercel", () => {
+    expect(
+      resolveClientIp({
+        trustVercelProxyHeaders: true,
+        vercelForwardedFor: "203.0.113.10",
+        resolvedIp: "10.0.0.2",
+        remoteAddress: "10.0.0.3",
+      }),
+    ).toBe("203.0.113.10");
+  });
+
+  it("ignores a spoofable Vercel header outside Vercel", () => {
+    expect(
+      resolveClientIp({
+        trustVercelProxyHeaders: false,
+        vercelForwardedFor: "203.0.113.10",
+        resolvedIp: "192.0.2.20",
+        remoteAddress: "10.0.0.3",
+      }),
+    ).toBe("192.0.2.20");
   });
 });
 

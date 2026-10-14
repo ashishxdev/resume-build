@@ -38,6 +38,25 @@ function normalizeForwardedHeader(value: string | string[] | undefined) {
   return values?.at(-1)?.trim();
 }
 
+export function resolveClientIp({
+  trustVercelProxyHeaders,
+  vercelForwardedFor,
+  resolvedIp,
+  remoteAddress,
+}: {
+  trustVercelProxyHeaders: boolean;
+  vercelForwardedFor: string | string[] | undefined;
+  resolvedIp: string | undefined;
+  remoteAddress: string | undefined;
+}) {
+  if (trustVercelProxyHeaders) {
+    const vercelClientIp = normalizeForwardedHeader(vercelForwardedFor);
+    if (vercelClientIp) return vercelClientIp;
+  }
+
+  return resolvedIp ?? remoteAddress ?? "127.0.0.1";
+}
+
 export function redactSensitiveRequestUrl(value: string) {
   return value.replace(
     /(\/api\/v1\/public\/resumes\/)[A-Za-z0-9_-]+/g,
@@ -53,6 +72,7 @@ export function createApp(
   tailoringServices?: TailoringRouteServices,
   resumeVersionServices?: ResumeVersionRouteServices,
   resumeShareServices?: ResumeShareRouteServices,
+  options: { trustVercelProxyHeaders?: boolean } = {},
 ) {
   const app = express();
   const logger = createLogger(environment);
@@ -99,8 +119,12 @@ export function createApp(
     // Better Auth receives a Fetch Request rather than the Express request, so
     // pass along the client IP that Express resolved using our trusted-proxy
     // configuration. Always overwrite the inbound header to prevent spoofing.
-    request.headers[betterAuthClientIpHeader] =
-      request.ip ?? request.socket.remoteAddress ?? "127.0.0.1";
+    request.headers[betterAuthClientIpHeader] = resolveClientIp({
+      trustVercelProxyHeaders: options.trustVercelProxyHeaders === true,
+      vercelForwardedFor: request.headers["x-vercel-forwarded-for"],
+      resolvedIp: request.ip,
+      remoteAddress: request.socket.remoteAddress,
+    });
 
     next();
   });

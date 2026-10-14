@@ -1,0 +1,35 @@
+from reportlab.lib.pagesizes import letter
+from reportlab.pdfgen import canvas
+
+
+OUTPUT = "/Users/aashishrana/Documents/resume-build/tmp/pdfs/production-qa-resume.pdf"
+
+pdf = canvas.Canvas(OUTPUT, pagesize=letter)
+pdf.setTitle("Production QA Resume")
+pdf.setFont("Helvetica-Bold", 18)
+pdf.drawString(72, 742, "Jordan Quality")
+pdf.setFont("Helvetica", 10)
+pdf.drawString(72, 722, "qa.resume@example.test | +1 202 555 0147 | Test City")
+pdf.setFont("Helvetica-Bold", 12)
+pdf.drawString(72, 690, "SUMMARY")
+pdf.setFont("Helvetica", 10)
+pdf.drawString(72, 674, "Software quality engineer focused on reliable web applications.")
+pdf.setFont("Helvetica-Bold", 12)
+pdf.drawString(72, 642, "EXPERIENCE")
+pdf.setFont("Helvetica-Bold", 10)
+pdf.drawString(72, 624, "Senior QA Engineer at Example Labs")
+pdf.setFont("Helvetica", 10)
+pdf.drawString(72, 608, "January 2023 - Present | Remote")
+pdf.drawString(84, 592, "- Built automated regression coverage for authentication and uploads.")
+pdf.drawString(84, 576, "- Reduced escaped defects by 35 percent using risk-based testing.")
+pdf.setFont("Helvetica-Bold", 12)
+pdf.drawString(72, 544, "SKILLS")
+pdf.setFont("Helvetica", 10)
+pdf.drawString(72, 528, "Testing: Playwright, Vitest, API testing; Platforms: Chrome, Node.js, MongoDB")
+pdf.setFont("Helvetica-Bold", 12)
+pdf.drawString(72, 496, "EDUCATION")
+pdf.setFont("Helvetica-Bold", 10)
+pdf.drawString(72, 478, "Bachelor of Engineering in Computer Science")
+pdf.setFont("Helvetica", 10)
+pdf.drawString(72, 462, "Example University | 2018 - 2022")
+pdf.save()
