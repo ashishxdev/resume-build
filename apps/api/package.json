@@ -8,6 +8,7 @@
     "dev:api": "tsx watch src/entrypoints/api.ts",
     "dev:worker": "tsx watch src/entrypoints/worker.ts",
     "start": "node dist/entrypoints/api.js",
+    "start:render": "node dist/entrypoints/render.js",
     "start:worker": "node dist/entrypoints/worker.js",
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",

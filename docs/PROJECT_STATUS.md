@@ -489,7 +489,7 @@ Update this file whenever a major feature is started, completed, materially rede
 
 ### 22. Production Deployment Foundation
 
-- **Date:** 2026-10-14
+- **Date:** 2026-10-15
 - **Status:** In progress
 - **Scope delivered:**
   - Added a Vercel-discoverable `apps/api/src/index.ts` entrypoint that directly imports and instantiates Express, then exports the configured application without opening a port.
@@ -500,12 +500,17 @@ Update this file whenever a major feature is started, completed, materially rede
   - Documented the two Vercel monorepo projects, the always-on worker commands, required MongoDB/R2/Resend/Gemini environment, R2 production CORS policy, deployment order, and production smoke-test scope.
   - Removed obsolete payment-provider placeholders from the example environment so deployment configuration reflects the current free product scope.
   - Declared backend deployment variables as Turborepo build passthrough inputs so Vercel preserves runtime configuration without producing platform-environment warnings.
-- **Verification:** 125 API tests, 68 web tests, and 8 resume-engine tests pass, including Vercel-header trust and non-Vercel spoof-resistance regressions. Full workspace type checking, linting, formatting, production builds, and `git diff --check` pass. A production-compiled import of the serverless entrypoint returned the expected HTTP 200 health response without using the local listener entrypoint.
-- **Remaining work:** Create the external Vercel and worker services, configure final production domains and secrets, verify HTTPS authentication cookies and CORS against those exact origins, add operational monitoring and backups, and run a complete production QA pass.
+  - Extracted all four polling loops and their repository/service composition into a reusable worker runtime shared by standalone and combined deployments.
+  - Added a Render Web Service entrypoint that binds Express to `0.0.0.0:$PORT`, runs the API and durable processing loops in one process, and shuts down the listener, loops, and database resources coherently on platform termination.
+  - Added `start:render` and documented a budget-oriented Vercel-web plus combined-Render topology, including its free-service sleep/cold-start limitation and the requirement not to run duplicate API/worker deployments.
+- **Verification:** 125 API tests, 68 web tests, and 8 resume-engine tests pass, including Vercel-header trust and non-Vercel spoof-resistance regressions. Full workspace type checking, linting, formatting, production builds, and `git diff --check` pass. A production-compiled import of the serverless entrypoint returned the expected HTTP 200 health response without using the local listener entrypoint. The compiled combined Render entrypoint started all worker loops, bound to `0.0.0.0` on an injected port, returned HTTP 200 from `/health`, and completed a clean signal-driven shutdown.
+- **Remaining work:** Deploy the selected external API/worker topology, configure final production domains and secrets, verify HTTPS authentication cookies and CORS against those exact origins, add operational monitoring and backups, and run a complete production QA pass.
 - **Primary files:**
   - `apps/api/src/index.ts`
   - `apps/api/src/runtime/create-api-runtime.ts`
+  - `apps/api/src/runtime/create-worker-runtime.ts`
   - `apps/api/src/entrypoints/api.ts`
+  - `apps/api/src/entrypoints/render.ts`
   - `apps/api/src/app/create-app.ts`
   - `docs/DEPLOYMENT.md`
 

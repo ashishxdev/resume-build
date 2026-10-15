@@ -1,13 +1,21 @@
 # Production Deployment
 
-The production topology uses three independently deployed processes:
+The recommended production topology uses three independently deployed
+processes:
 
 - `apps/web`: a Next.js project on Vercel;
 - `apps/api`: an Express project on Vercel; and
 - `apps/api` worker entrypoint: one always-on process on Railway, Render, or an equivalent service.
 
-The API never runs queue polling loops. Resume extraction, job analysis,
-tailoring generation, and ATS analysis run only in the worker process.
+In the recommended topology, the Vercel API never runs queue polling loops.
+Resume extraction, job analysis, tailoring generation, and ATS analysis run
+only in the worker process.
+
+For budget-constrained preview or hobby deployments, the API and worker can
+instead run together in one Render Web Service through the `start:render`
+entrypoint. This two-process topology consists of the Vercel web project plus
+the combined Render service. A free Render service sleeps after inactivity, so
+it is not the preferred production topology.
 
 ## 1. External services
 
@@ -120,7 +128,7 @@ when Vercel supplies `VERCEL=1`. Keep `TRUSTED_PROXY_IPS` empty on Vercel. Set
 it only when another runtime is behind a known reverse proxy whose exact IPs or
 CIDRs can be allowlisted.
 
-## 4. Always-on worker
+## 4A. Always-on worker
 
 Create one worker service from the same repository. Its working directory must
 be the repository root so pnpm can resolve the workspace packages.
@@ -142,15 +150,49 @@ Do not use Vercel Hobby Cron as a replacement for this process. The current
 worker continuously claims durable queued jobs, renews leases, and recovers
 abandoned work.
 
+## 4B. Combined Render API and worker
+
+For a free hobby deployment, create one Render **Web Service** from the same
+repository and leave its root directory empty so pnpm can resolve the complete
+workspace. Use one instance with:
+
+```text
+Build command:
+pnpm install --frozen-lockfile && pnpm --filter @make-my-resume/api... build
+
+Start command:
+pnpm --filter @make-my-resume/api start:render
+
+Health check path:
+/health
+```
+
+The combined entrypoint binds Express to `0.0.0.0:$PORT` and starts the resume
+extraction, job-description analysis, tailoring, and ATS loops in the same
+process. Render supplies `PORT`; do not override it. Copy the complete API
+production environment to the service, set `BETTER_AUTH_URL` to its public
+Render origin, and point the web project's `NEXT_PUBLIC_API_URL` at the same
+origin.
+
+This mode replaces both the Vercel API project and the standalone worker; do
+not run either of those at the same time. Free Render Web Services sleep after
+inactivity and can take about a minute to wake. The first API request wakes the
+service, queued jobs remain durable in MongoDB, and expired processing leases
+are reclaimed after a restart. Use the separate always-on worker topology for
+production availability.
+
 ## 5. Deployment order
 
 1. Provision MongoDB, R2, Resend, and Gemini.
-2. Deploy the API project and assign its final domain.
-3. Deploy the worker with the same production database and storage values.
-4. Configure and deploy the web project with the final API URL.
-5. Replace placeholder origins in the API and R2 CORS policy with the final web
-   origin, then redeploy the API.
-6. Run production smoke testing for authentication, password email, upload,
+2. Choose either the separate Vercel API plus always-on worker topology or the
+   combined Render API-and-worker topology. Do not deploy both.
+3. Deploy the chosen API runtime and assign its final domain.
+4. For the separate topology, deploy the worker with the same production
+   database and storage values.
+5. Configure and deploy the web project with the final API URL.
+6. Replace placeholder origins in the API and R2 CORS policy with the final web
+   origin, then redeploy the API runtime.
+7. Run production smoke testing for authentication, password email, upload,
    extraction, matching, tailoring, ATS analysis, export, sharing, and deletion.
 
 Environment-variable changes apply only to new Vercel deployments. Production
