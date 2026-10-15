@@ -87,6 +87,211 @@ const reviewSections: ReviewSection[] = [
   },
 ];
 
+type PreviewEntry = {
+  id: string;
+  title: string;
+  meta?: string;
+  body?: string;
+  items?: string[];
+  presentation: "paragraph" | "lines" | "bullets";
+  status: ResumeClaim["status"];
+};
+
+const dateRangePattern =
+  /\b(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?|20\d{2})\b[\s\S]{0,35}(?:present|current|20\d{2})\b/i;
+
+function combinedStatus(claims: ResumeClaim[]): ResumeClaim["status"] {
+  if (claims.every((claim) => claim.status === "rejected")) return "rejected";
+  if (claims.some((claim) => claim.status === "edited")) return "edited";
+  if (claims.every((claim) => claim.status !== "unreviewed"))
+    return "confirmed";
+  return "unreviewed";
+}
+
+function joinFragments(claims: ResumeClaim[]) {
+  return claims
+    .map((claim) => claim.value.trim())
+    .filter(Boolean)
+    .join(" ")
+    .replace(/\s+([,.;:!?])/g, "$1")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
+function isStandaloneHeading(claim: ResumeClaim) {
+  const value = claim.value.trim().toLocaleLowerCase("en");
+  return [
+    "professional summary",
+    "summary",
+    "experience",
+    "work experience",
+    "skills",
+    "technical skills",
+    "projects",
+    "education",
+    "certifications",
+    "achievements",
+  ].includes(value);
+}
+
+function groupRecords(
+  claims: ResumeClaim[],
+  startsRecord: (claim: ResumeClaim) => boolean,
+) {
+  const records: ResumeClaim[][] = [];
+  let current: ResumeClaim[] = [];
+  for (const claim of claims.filter((item) => !isStandaloneHeading(item))) {
+    if (startsRecord(claim) && current.length > 0) {
+      records.push(current);
+      current = [];
+    }
+    current.push(claim);
+  }
+  if (current.length > 0) records.push(current);
+  return records;
+}
+
+function splitRecordHeader(value: string, fallbackTitle: string) {
+  const normalized = value.trim();
+  const pipeIndex = normalized.indexOf("|");
+  if (pipeIndex > 0) {
+    return {
+      title: normalized.slice(0, pipeIndex).trim(),
+      meta: normalized.slice(pipeIndex + 1).trim(),
+    };
+  }
+  const dateMatch = normalized.match(dateRangePattern);
+  if (dateMatch?.index && dateMatch.index > 0) {
+    return {
+      title: normalized.slice(0, dateMatch.index).trim(),
+      meta: normalized.slice(dateMatch.index).trim(),
+    };
+  }
+  if (normalized.length <= 100) return { title: normalized };
+  return { title: fallbackTitle, firstItem: normalized };
+}
+
+function recordEntry(
+  claims: ResumeClaim[],
+  fallbackTitle: string,
+): PreviewEntry {
+  const first = claims[0];
+  const header = splitRecordHeader(first?.value ?? "", fallbackTitle);
+  return {
+    id: first?.id ?? fallbackTitle,
+    title: header.title || fallbackTitle,
+    meta: header.meta,
+    items: [
+      ...(header.firstItem ? [header.firstItem] : []),
+      ...claims
+        .slice(1)
+        .map((claim) => claim.value.trim())
+        .filter(Boolean),
+    ],
+    presentation: "bullets",
+    status: combinedStatus(claims),
+  };
+}
+
+function buildPreviewEntries(
+  sectionId: ReviewSectionId,
+  claims: ResumeClaim[],
+): PreviewEntry[] {
+  if (sectionId === "profile") {
+    const headingIndex = claims.findIndex((claim) =>
+      ["professional summary", "summary"].includes(
+        claim.value.trim().toLocaleLowerCase("en"),
+      ),
+    );
+    const personalClaims = (
+      headingIndex >= 0
+        ? claims.slice(0, headingIndex)
+        : claims.filter((claim) => claim.category !== "summary")
+    ).filter((claim) => !isStandaloneHeading(claim));
+    const summaryClaims = (
+      headingIndex >= 0
+        ? claims.slice(headingIndex + 1)
+        : claims.filter((claim) => claim.category === "summary")
+    ).filter((claim) => !isStandaloneHeading(claim));
+    const entries: PreviewEntry[] = [];
+    if (personalClaims.length > 0) {
+      entries.push({
+        id: "personal-information",
+        title: "Personal information",
+        items: personalClaims
+          .map((claim) => claim.value.trim())
+          .filter(Boolean),
+        presentation: "lines",
+        status: combinedStatus(personalClaims),
+      });
+    }
+    if (summaryClaims.length > 0) {
+      entries.push({
+        id: "professional-summary",
+        title: "Professional summary",
+        body: joinFragments(summaryClaims),
+        presentation: "paragraph",
+        status: combinedStatus(summaryClaims),
+      });
+    }
+    return entries;
+  }
+
+  if (sectionId === "skills") {
+    const content = claims.filter((claim) => !isStandaloneHeading(claim));
+    return content.length
+      ? [
+          {
+            id: "skills",
+            title: "Skills",
+            items: content.map((claim) => claim.value.trim()).filter(Boolean),
+            presentation: "lines",
+            status: combinedStatus(content),
+          },
+        ]
+      : [];
+  }
+
+  if (sectionId === "experience") {
+    return groupRecords(claims, (claim) =>
+      dateRangePattern.test(claim.value),
+    ).map((record, index) => recordEntry(record, `Experience ${index + 1}`));
+  }
+
+  if (sectionId === "projects") {
+    return groupRecords(
+      claims,
+      (claim) =>
+        /\|\s*(?:live|github)\b/i.test(claim.value) ||
+        dateRangePattern.test(claim.value),
+    ).map((record, index) => recordEntry(record, `Project ${index + 1}`));
+  }
+
+  const educationClaims = claims.filter(
+    (claim) => claim.category === "education",
+  );
+  const entries = groupRecords(educationClaims, (claim) =>
+    dateRangePattern.test(claim.value),
+  ).map((record, index) => recordEntry(record, `Education ${index + 1}`));
+  for (const category of ["certifications", "achievements"] as const) {
+    const categoryClaims = claims.filter(
+      (claim) => claim.category === category && !isStandaloneHeading(claim),
+    );
+    if (categoryClaims.length > 0) {
+      entries.push({
+        id: category,
+        title: categoryLabels[category],
+        items: categoryClaims
+          .map((claim) => claim.value.trim())
+          .filter(Boolean),
+        presentation: "bullets",
+        status: combinedStatus(categoryClaims),
+      });
+    }
+  }
+  return entries;
+}
+
 export function ResumeVerificationPage({ resumeId }: { resumeId: string }) {
   const router = useRouter();
   const { data: session, isPending } = authClient.useSession();
@@ -159,6 +364,7 @@ export function ResumeVerificationPage({ resumeId }: { resumeId: string }) {
         return {
           ...section,
           claims: sectionClaims,
+          previewEntries: buildPreviewEntries(section.id, sectionClaims),
           reviewed:
             sectionClaims.length > 0 &&
             sectionClaims.every((claim) => claim.status !== "unreviewed"),
@@ -491,11 +697,35 @@ export function ResumeVerificationPage({ resumeId }: { resumeId: string }) {
               {group.claims.length > 0 &&
                 !editingSections.includes(group.id) && (
                   <div className={styles.sectionPreview}>
-                    {group.claims.map((claim) => (
-                      <div data-status={claim.status} key={claim.id}>
-                        <strong>{claim.label}</strong>
-                        <p>{claim.value}</p>
-                      </div>
+                    {group.previewEntries.map((entry) => (
+                      <article
+                        className={styles.previewEntry}
+                        data-status={entry.status}
+                        key={entry.id}
+                      >
+                        <h3>{entry.title}</h3>
+                        {entry.meta && (
+                          <p className={styles.previewMeta}>{entry.meta}</p>
+                        )}
+                        {entry.body && (
+                          <p className={styles.previewBody}>{entry.body}</p>
+                        )}
+                        {entry.items &&
+                          entry.items.length > 0 &&
+                          (entry.presentation === "bullets" ? (
+                            <ul>
+                              {entry.items.map((item, itemIndex) => (
+                                <li key={`${entry.id}-${itemIndex}`}>{item}</li>
+                              ))}
+                            </ul>
+                          ) : (
+                            <div className={styles.previewLines}>
+                              {entry.items.map((item, itemIndex) => (
+                                <p key={`${entry.id}-${itemIndex}`}>{item}</p>
+                              ))}
+                            </div>
+                          ))}
+                      </article>
                     ))}
                   </div>
                 )}

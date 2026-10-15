@@ -171,29 +171,52 @@
 }
 .sectionPreview {
   display: grid;
-  gap: 0;
+  gap: 14px;
+  padding-top: 18px;
   border-top: 1px solid #ebe5ee;
 }
-.sectionPreview > div {
-  display: grid;
-  grid-template-columns: minmax(120px, 0.28fr) 1fr;
-  gap: 18px;
-  padding: 15px 0;
-  border-bottom: 1px solid #f0ebf2;
+.previewEntry {
+  padding: 18px 20px;
+  border: 1px solid #e8e1eb;
+  border-radius: 10px;
+  background: #fcfbfd;
 }
-.sectionPreview > div[data-status="rejected"] {
+.previewEntry[data-status="rejected"] {
   opacity: 0.5;
   text-decoration: line-through;
 }
-.sectionPreview strong {
-  color: #493755;
-  font-size: 12px;
+.previewEntry h3 {
+  margin: 0 0 8px;
+  color: #30213f;
+  font-size: 15px;
 }
-.sectionPreview p {
-  margin: 0;
-  color: #33273d;
+.previewEntry p,
+.previewEntry li {
+  color: #4f4555;
   font-size: 14px;
-  line-height: 1.55;
+  line-height: 1.6;
+}
+.previewMeta {
+  margin: -3px 0 12px;
+  color: #756b7b !important;
+  font-size: 12px !important;
+}
+.previewBody {
+  margin: 0;
+  white-space: pre-wrap;
+}
+.previewEntry ul {
+  display: grid;
+  gap: 6px;
+  margin: 10px 0 0;
+  padding-left: 20px;
+}
+.previewLines {
+  display: grid;
+  gap: 5px;
+}
+.previewLines p {
+  margin: 0;
   white-space: pre-wrap;
 }
 .sectionEditor {
@@ -542,9 +565,8 @@
   .claim {
     padding: 15px 12px;
   }
-  .sectionPreview > div {
-    grid-template-columns: 1fr;
-    gap: 5px;
+  .previewEntry {
+    padding: 15px;
   }
   .claimHead > div {
     align-items: stretch;

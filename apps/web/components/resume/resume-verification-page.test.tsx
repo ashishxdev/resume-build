@@ -175,6 +175,94 @@ describe("ResumeVerificationPage", () => {
     ).toEqual(["confirmed", "confirmed"]);
   });
 
+  it("keeps summary fragments and each project's details together", async () => {
+    const claim = review.claims[0];
+    mocks.getResumeVerification.mockResolvedValue({
+      ...review,
+      claims: [
+        {
+          ...claim,
+          id: "profile_1",
+          category: "personal_info",
+          value: "Aashish Rana",
+          order: 0,
+        },
+        {
+          ...claim,
+          id: "profile_heading",
+          category: "personal_info",
+          value: "Professional Summary",
+          order: 1,
+        },
+        {
+          ...claim,
+          id: "summary_1",
+          category: "personal_info",
+          value: "Full Stack Software Engineer building",
+          order: 2,
+        },
+        {
+          ...claim,
+          id: "summary_2",
+          category: "summary",
+          value: "reliable production applications.",
+          order: 3,
+        },
+        {
+          ...claim,
+          id: "project_1",
+          category: "projects",
+          value:
+            "Interview AI | Live (https://example.com) | React July 2026 – Present",
+          order: 4,
+        },
+        {
+          ...claim,
+          id: "project_1_detail",
+          category: "projects",
+          value: "Built an AI voice interview platform",
+          order: 5,
+        },
+        {
+          ...claim,
+          id: "project_2",
+          category: "projects",
+          value:
+            "MyJEEPredictor | Live (https://jee.example.com) | Next.js March 2026 – Present",
+          order: 6,
+        },
+        {
+          ...claim,
+          id: "project_2_detail",
+          category: "projects",
+          value: "Built a college prediction platform",
+          order: 7,
+        },
+      ],
+    });
+
+    render(<ResumeVerificationPage resumeId="resume_1" />);
+
+    expect(
+      await screen.findByRole("heading", { name: "Professional summary" }),
+    ).toBeTruthy();
+    expect(
+      screen.getByText(
+        "Full Stack Software Engineer building reliable production applications.",
+      ),
+    ).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Interview AI" })).toBeTruthy();
+    expect(
+      screen.getByText("Built an AI voice interview platform"),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole("heading", { name: "MyJEEPredictor" }),
+    ).toBeTruthy();
+    expect(
+      screen.getByText("Built a college prediction platform"),
+    ).toBeTruthy();
+  });
+
   it("restarts polling after a failed extraction is retried", async () => {
     const failed = {
       ...review,
