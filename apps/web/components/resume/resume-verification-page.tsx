@@ -101,6 +101,7 @@ export function ResumeVerificationPage({ resumeId }: { resumeId: string }) {
   const [saveNotice, setSaveNotice] = useState<string | null>(null);
   const [isRetrying, setIsRetrying] = useState(false);
   const [pollGeneration, setPollGeneration] = useState(0);
+  const [editingSections, setEditingSections] = useState<ReviewSectionId[]>([]);
 
   const load = useCallback(async () => {
     try {
@@ -218,6 +219,14 @@ export function ResumeVerificationPage({ resumeId }: { resumeId: string }) {
           ? { ...claim, status: "confirmed" }
           : claim,
       ),
+    );
+  }
+
+  function toggleSectionEditor(sectionId: ReviewSectionId) {
+    setEditingSections((current) =>
+      current.includes(sectionId)
+        ? current.filter((id) => id !== sectionId)
+        : [...current, sectionId],
     );
   }
 
@@ -479,111 +488,148 @@ export function ResumeVerificationPage({ resumeId }: { resumeId: string }) {
                   belongs on your résumé.
                 </p>
               )}
-              {group.claims.map((claim) => (
-                <article
-                  className={styles.claim}
-                  data-status={claim.status}
-                  key={claim.id}
+              {group.claims.length > 0 &&
+                !editingSections.includes(group.id) && (
+                  <div className={styles.sectionPreview}>
+                    {group.claims.map((claim) => (
+                      <div data-status={claim.status} key={claim.id}>
+                        <strong>{claim.label}</strong>
+                        <p>{claim.value}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              {editingSections.includes(group.id) && (
+                <div className={styles.sectionEditor}>
+                  {group.claims.map((claim) => (
+                    <article
+                      className={styles.claim}
+                      data-status={claim.status}
+                      key={claim.id}
+                    >
+                      <div className={styles.claimHead}>
+                        <div>
+                          <input
+                            aria-label="Detail label"
+                            value={claim.label}
+                            onChange={(event) =>
+                              updateClaim(claim.id, {
+                                label: event.target.value,
+                                status: "edited",
+                              })
+                            }
+                          />
+                          <select
+                            aria-label={`${claim.label} section`}
+                            value={claim.category}
+                            onChange={(event) =>
+                              updateClaim(claim.id, {
+                                category: event.target
+                                  .value as ResumeClaimCategory,
+                                status: "edited",
+                              })
+                            }
+                          >
+                            {categories.map((category) => (
+                              <option key={category} value={category}>
+                                {categoryLabels[category]}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <span>{claim.status.replace("_", " ")}</span>
+                      </div>
+                      <label className={styles.editableField}>
+                        <span>
+                          Resume text <small>Edit if needed</small>
+                        </span>
+                        <textarea
+                          aria-label={`${claim.label} value`}
+                          value={claim.value}
+                          onChange={(event) =>
+                            updateClaim(claim.id, {
+                              value: event.target.value,
+                              status: "edited",
+                            })
+                          }
+                        />
+                      </label>
+                      <div className={styles.claimActions}>
+                        <button
+                          onClick={() =>
+                            updateClaim(claim.id, { status: "confirmed" })
+                          }
+                          type="button"
+                        >
+                          ✓ Keep
+                        </button>
+                        <button
+                          onClick={() =>
+                            updateClaim(claim.id, { status: "rejected" })
+                          }
+                          type="button"
+                        >
+                          Exclude
+                        </button>
+                        <button
+                          onClick={() => moveClaim(claim.id, -1)}
+                          type="button"
+                          aria-label="Move detail up"
+                        >
+                          ↑
+                        </button>
+                        <button
+                          onClick={() => moveClaim(claim.id, 1)}
+                          type="button"
+                          aria-label="Move detail down"
+                        >
+                          ↓
+                        </button>
+                        <button
+                          onClick={() => {
+                            setHasUnsavedChanges(true);
+                            setSaveNotice(null);
+                            setClaims((current) =>
+                              current.filter((item) => item.id !== claim.id),
+                            );
+                          }}
+                          type="button"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    </article>
+                  ))}
+                  <button
+                    className={styles.sectionAddButton}
+                    onClick={() => addClaim(group)}
+                    type="button"
+                  >
+                    + Add to {group.title.toLocaleLowerCase("en")}
+                  </button>
+                </div>
+              )}
+              {group.claims.length > 0 ? (
+                <button
+                  aria-expanded={editingSections.includes(group.id)}
+                  aria-label={`${editingSections.includes(group.id) ? "Finish editing" : "Edit"} ${group.title.toLocaleLowerCase("en")} details`}
+                  className={styles.sectionEditButton}
+                  onClick={() => toggleSectionEditor(group.id)}
+                  type="button"
                 >
-                  <div className={styles.claimHead}>
-                    <div>
-                      <input
-                        aria-label="Detail label"
-                        value={claim.label}
-                        onChange={(event) =>
-                          updateClaim(claim.id, {
-                            label: event.target.value,
-                            status: "edited",
-                          })
-                        }
-                      />
-                      <select
-                        aria-label={`${claim.label} section`}
-                        value={claim.category}
-                        onChange={(event) =>
-                          updateClaim(claim.id, {
-                            category: event.target.value as ResumeClaimCategory,
-                            status: "edited",
-                          })
-                        }
-                      >
-                        {categories.map((category) => (
-                          <option key={category} value={category}>
-                            {categoryLabels[category]}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <span>{claim.status.replace("_", " ")}</span>
-                  </div>
-                  <label className={styles.editableField}>
-                    <span>
-                      Resume text <small>Edit if needed</small>
-                    </span>
-                    <textarea
-                      aria-label={`${claim.label} value`}
-                      value={claim.value}
-                      onChange={(event) =>
-                        updateClaim(claim.id, {
-                          value: event.target.value,
-                          status: "edited",
-                        })
-                      }
-                    />
-                  </label>
-                  <div className={styles.claimActions}>
-                    <button
-                      onClick={() =>
-                        updateClaim(claim.id, { status: "confirmed" })
-                      }
-                      type="button"
-                    >
-                      ✓ Keep
-                    </button>
-                    <button
-                      onClick={() =>
-                        updateClaim(claim.id, { status: "rejected" })
-                      }
-                      type="button"
-                    >
-                      Exclude
-                    </button>
-                    <button
-                      onClick={() => moveClaim(claim.id, -1)}
-                      type="button"
-                      aria-label="Move detail up"
-                    >
-                      ↑
-                    </button>
-                    <button
-                      onClick={() => moveClaim(claim.id, 1)}
-                      type="button"
-                      aria-label="Move detail down"
-                    >
-                      ↓
-                    </button>
-                    <button
-                      onClick={() => {
-                        setHasUnsavedChanges(true);
-                        setSaveNotice(null);
-                        setClaims((current) =>
-                          current.filter((item) => item.id !== claim.id),
-                        );
-                      }}
-                      type="button"
-                    >
-                      Remove
-                    </button>
-                  </div>
-                </article>
-              ))}
-              <button
-                className={styles.sectionAddButton}
-                onClick={() => addClaim(group)}
-                type="button"
-              >
-                + Add to {group.title.toLocaleLowerCase("en")}
-              </button>
+                  {editingSections.includes(group.id)
+                    ? "Done editing"
+                    : "Edit section details"}
+                </button>
+              ) : (
+                <button
+                  className={styles.sectionAddButton}
+                  onClick={() => addClaim(group)}
+                  type="button"
+                >
+                  + Add to {group.title.toLocaleLowerCase("en")}
+                </button>
+              )}
             </section>
           ))}
         </div>

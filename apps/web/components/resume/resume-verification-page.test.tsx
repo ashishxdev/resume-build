@@ -86,6 +86,10 @@ describe("ResumeVerificationPage", () => {
     expect(
       screen.getByRole("heading", { name: "Education & achievements" }),
     ).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "✓ Keep" })).toBeNull();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Edit experience details" }),
+    );
     expect(
       await screen.findByDisplayValue("Led a design system rollout"),
     ).toBeTruthy();
