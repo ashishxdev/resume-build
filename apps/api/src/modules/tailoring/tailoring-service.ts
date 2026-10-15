@@ -8,6 +8,33 @@ const genericFailure =
 const busyFailure =
   "Gemini is temporarily busy. Your analysis is saved—try again in a moment.";
 
+function describeFailure(status: number | null, message: string) {
+  if (status === 401 || status === 403)
+    return {
+      code: "AI_AUTHENTICATION_FAILED",
+      message:
+        "The AI provider rejected the server credentials. Check the Gemini API key and permissions in the backend environment, then retry.",
+    };
+  if (status === 404)
+    return {
+      code: "AI_MODEL_UNAVAILABLE",
+      message:
+        "The configured AI model is unavailable. Check AI_MODEL in the backend environment, then retry.",
+    };
+  if (
+    [429, 503, 504].includes(status ?? 0) ||
+    /timeout|high demand|temporarily unavailable/i.test(message)
+  )
+    return { code: "AI_PROVIDER_BUSY", message: busyFailure };
+  if (/AI_UNGROUNDED|AI_EMPTY|AI_INVALID|JSON|schema|Zod/i.test(message))
+    return {
+      code: "AI_OUTPUT_REJECTED",
+      message:
+        "The AI response did not contain usable evidence-backed edits. Your resume and analysis are saved. Try generating suggestions again.",
+    };
+  return { code: "AI_GENERATION_FAILED", message: genericFailure };
+}
+
 export function createTailoringService(
   repository: TailoringRepository,
   generator: TailoringGenerator | null,
@@ -120,16 +147,18 @@ export function createTailoringService(
             ? Number(error.status)
             : null;
         const message = error instanceof Error ? error.message : "";
-        const unavailable =
-          [429, 503, 504].includes(status ?? 0) ||
-          /timeout|high demand|temporarily unavailable/i.test(message);
+        const failure = describeFailure(status, message);
         await repository.fail(
           record.id,
           record.processingToken,
-          unavailable ? busyFailure : genericFailure,
+          failure.message,
         );
         logger.warn(
-          { tailoringSessionId: record.id, providerStatus: status },
+          {
+            tailoringSessionId: record.id,
+            providerStatus: status,
+            failureCode: failure.code,
+          },
           "Tailoring provider request failed",
         );
       }

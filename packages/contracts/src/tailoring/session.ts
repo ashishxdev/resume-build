@@ -20,6 +20,7 @@ export const tailoringSessionStatusSchema = z.enum([
 export const tailoringSuggestionSchema = z.object({
   id: z.string(),
   sourceClaimId: z.string(),
+  sourceClaimIds: z.array(z.string()).min(1).max(50).optional(),
   requirementIds: z.array(z.string()).min(1).max(20),
   section: z.string().trim().min(1).max(120),
   originalText: z.string().trim().min(1).max(10_000),

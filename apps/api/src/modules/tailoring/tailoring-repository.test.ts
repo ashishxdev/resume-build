@@ -5,7 +5,10 @@ import type {
 } from "@make-my-resume/contracts";
 import { describe, expect, it } from "vitest";
 
-import { createMemoryTailoringRepository } from "./tailoring-repository.js";
+import {
+  applySuggestionDecisions,
+  createMemoryTailoringRepository,
+} from "./tailoring-repository.js";
 
 const claim: ResumeClaim = {
   id: "claim_1",
@@ -51,6 +54,31 @@ const suggestion: TailoringSuggestion = {
 };
 
 describe("tailoring repository", () => {
+  it("replaces grouped source fragments without leaving duplicate project text", () => {
+    const detail = {
+      ...claim,
+      id: "claim_2",
+      value: "Integrated Gemini API.",
+      order: 1,
+    };
+    const groupedSuggestion: TailoringSuggestion = {
+      ...suggestion,
+      sourceClaimIds: [claim.id, detail.id],
+      originalText: `${claim.value}\n${detail.value}`,
+      suggestedText: "Integrated Gemini API.\nBuilt APIs with Node.js.",
+      status: "accepted",
+    };
+
+    expect(
+      applySuggestionDecisions([claim, detail], [groupedSuggestion]),
+    ).toEqual([
+      expect.objectContaining({
+        id: claim.id,
+        value: groupedSuggestion.suggestedText,
+      }),
+    ]);
+  });
+
   it("persists decisions and creates a separate tailored version", async () => {
     const repository = createMemoryTailoringRepository();
     const created = await repository.create({

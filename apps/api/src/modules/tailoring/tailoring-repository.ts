@@ -195,40 +195,34 @@ function clone(record: TailoringSessionRecord) {
 }
 
 function buildFinalClaims(record: TailoringSessionRecord) {
-  const decisions = new Map(
-    record.suggestions.map((suggestion) => [
-      suggestion.sourceClaimId,
-      suggestion,
-    ]),
-  );
-  return record.evidenceClaims.map((claim) => {
-    const suggestion = decisions.get(claim.id);
-    if (!suggestion || suggestion.status !== "accepted")
-      return cloneClaim(claim);
-    return {
-      ...cloneClaim(claim),
-      value: suggestion.editedText ?? suggestion.suggestedText,
-      status: "edited" as const,
-    };
-  });
+  return applySuggestionDecisions(record.evidenceClaims, record.suggestions);
 }
 
 export function applySuggestionDecisions(
   claims: ResumeClaim[],
   suggestions: TailoringSuggestion[],
 ) {
-  const decisions = new Map(
-    suggestions.map((suggestion) => [suggestion.sourceClaimId, suggestion]),
+  const accepted = suggestions.filter(
+    (suggestion) => suggestion.status === "accepted",
   );
-  return claims.map((claim) => {
+  const decisions = new Map<string, TailoringSuggestion>();
+  for (const suggestion of accepted) {
+    for (const claimId of suggestion.sourceClaimIds ?? [
+      suggestion.sourceClaimId,
+    ])
+      decisions.set(claimId, suggestion);
+  }
+  return claims.flatMap((claim) => {
     const suggestion = decisions.get(claim.id);
-    if (!suggestion || suggestion.status !== "accepted")
-      return cloneClaim(claim);
-    return {
-      ...cloneClaim(claim),
-      value: suggestion.editedText ?? suggestion.suggestedText,
-      status: "edited" as const,
-    };
+    if (!suggestion) return [cloneClaim(claim)];
+    if (claim.id !== suggestion.sourceClaimId) return [];
+    return [
+      {
+        ...cloneClaim(claim),
+        value: suggestion.editedText ?? suggestion.suggestedText,
+        status: "edited" as const,
+      },
+    ];
   });
 }
 
