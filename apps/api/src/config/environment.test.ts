@@ -49,6 +49,7 @@ describe("loadEnvironment", () => {
     expect(() =>
       loadEnvironment({
         NODE_ENV: "production",
+        PASSWORD_RECOVERY_ENABLED: "true",
         AUTH_STORAGE: "mongodb",
         MONGODB_URI: "mongodb://localhost:27017",
         BETTER_AUTH_SECRET: "a-secure-production-secret-with-32-characters",

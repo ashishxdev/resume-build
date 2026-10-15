@@ -14,7 +14,7 @@ Update this file whenever a major feature is started, completed, materially rede
 | ------------------------ | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Project foundation       | Complete | pnpm/Turborepo monorepo with web, API, shared contracts, resume engine, renderer, linting, TypeScript, and test foundations.                                                                                                                       |
 | Marketing homepage       | Complete | Responsive Stitch-inspired homepage implementing the Atelier Digital visual system and core product messaging.                                                                                                                                     |
-| Authentication           | Complete | Better Auth email/password authentication includes Resend-backed, rate-limited password recovery with single-use tokens and session revocation. Social OAuth was intentionally removed from the supported product scope.                           |
+| Authentication           | Complete | Better Auth email/password sign-in and signup are available. Password recovery is temporarily disabled pending a verified email sender. Social OAuth is outside the supported scope. |
 | Dashboard workspace      | Complete | Responsive authenticated dashboard implements the approved desktop and mobile Stitch designs with truthful empty, loading, navigation, activity, resume management, tailored-draft management, trust states, and dedicated resume/activity routes. |
 | Resume workflows         | Complete | The full MVP flow is implemented: PDF/DOCX import, grounded extraction and verification, job matching, evidence-backed tailoring, ATS improvement, immutable versions, customizable PDF/DOCX export, deletion, and unlisted revocable sharing.     |
 | Backend business modules | Complete | Owned imports, private R2 originals, recoverable queues, grounded AI workflows, transactional versions, ATS analysis, deterministic export, and persistent owner-controlled private sharing are complete for the MVP.                              |
@@ -113,7 +113,9 @@ Update this file whenever a major feature is started, completed, materially rede
 ### 6. Transactional Email and Password Recovery
 
 - **Date:** 2026-10-02
-- **Status:** Complete
+- **Status:** Deferred as of 2026-10-15 by product decision; implementation retained.
+- **Current availability:** Removed the forgot-password link, redirected both recovery pages to login, disabled reset-email callbacks and token-status registration, and blocked reset requests and submissions by default at the API. `PASSWORD_RECOVERY_ENABLED` defaults to disabled; restoring recovery requires enabling the backend setting and restoring the frontend pages/link after a Resend sender domain is verified. The API no longer requires Resend credentials in production while recovery is disabled.
+- **Pause verification (2026-10-15):** 129 API tests, 70 web tests, and 9 resume-engine tests pass, including explicit blocked-endpoint regression coverage. Workspace type checking, linting, formatting, API production build, and the frontend production build with Webpack pass. Local Turbopack verification was blocked by a CSS compiler port-binding permission error.
 - **Scope delivered:**
   - Added a provider-neutral transactional email interface with a Resend implementation and validated production configuration.
   - Added a branded HTML and plain-text password-reset email with escaped user content and an optional reply-to address.

@@ -47,27 +47,32 @@ export function createAuthRuntime(
       maxPasswordLength: 128,
       resetPasswordTokenExpiresIn: 60 * 60,
       revokeSessionsOnPasswordReset: true,
-      sendResetPassword: async ({ user, url }) => {
-        void emailService
-          .sendPasswordReset({
-            name: user.name,
-            resetUrl: url,
-            to: user.email,
-          })
-          .catch(() => {
-            logger.error(
-              { provider: "resend" },
-              "Password reset email delivery failed",
-            );
-          });
-      },
+      sendResetPassword:
+        environment.PASSWORD_RECOVERY_ENABLED === "true"
+          ? async ({ user, url }) => {
+              void emailService
+                .sendPasswordReset({
+                  name: user.name,
+                  resetUrl: url,
+                  to: user.email,
+                })
+                .catch(() => {
+                  logger.error(
+                    { provider: "resend" },
+                    "Password reset email delivery failed",
+                  );
+                });
+            }
+          : undefined,
     },
     rateLimit: {
       enabled: true,
       storage: environment.AUTH_STORAGE === "mongodb" ? "database" : "memory",
     },
     plugins: [
-      passwordResetTokenStatus(),
+      ...(environment.PASSWORD_RECOVERY_ENABLED === "true"
+        ? [passwordResetTokenStatus()]
+        : []),
       ...(environment.BETTER_AUTH_API_KEY
         ? [dash({ apiKey: environment.BETTER_AUTH_API_KEY })]
         : []),

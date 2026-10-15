@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 
-import { PasswordRecoveryPage } from "@/components/auth/password-recovery-page";
+import { redirect } from "next/navigation";
 
 export const metadata: Metadata = {
   title: "Reset password · Make My Resume",
@@ -8,5 +8,6 @@ export const metadata: Metadata = {
 };
 
 export default function ForgotPasswordPage() {
-  return <PasswordRecoveryPage mode="request" />;
+  // Restore the recovery component once production email delivery is enabled.
+  redirect("/login");
 }

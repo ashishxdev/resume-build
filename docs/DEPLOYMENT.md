@@ -109,7 +109,13 @@ AI_MODEL=gemini-3.1-flash-lite
 RESEND_API_KEY=re_xxxxxxxxx
 EMAIL_FROM=Make My Resume <auth@example.com>
 EMAIL_REPLY_TO=support@example.com
+PASSWORD_RECOVERY_ENABLED=false
 ```
+
+Password recovery is temporarily paused in the UI and API. Leave
+`PASSWORD_RECOVERY_ENABLED=false` (or omit it). Resend configuration is optional
+while recovery is disabled. Restore the recovery pages and sign-in link and set
+the flag to `true` only after verifying a sender domain in Resend.
 
 Generate `BETTER_AUTH_SECRET` locally with:
 

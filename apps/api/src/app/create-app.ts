@@ -157,6 +157,24 @@ export function createApp(
 
     next();
   });
+  // Keep recovery routes unreachable while the email sender is unavailable.
+  app.use("/api/auth", (request, response, next) => {
+    const recoveryPath =
+      /^\/(?:request-password-reset|forget-password|reset-password|password-reset-token-status)(?:\/|$)/i;
+    if (
+      environment.PASSWORD_RECOVERY_ENABLED !== "true" &&
+      recoveryPath.test(request.path)
+    ) {
+      response.status(404).json({
+        error: {
+          code: "PASSWORD_RECOVERY_DISABLED",
+          message: "Password recovery is currently unavailable.",
+        },
+      });
+      return;
+    }
+    next();
+  });
   app.all("/api/auth/*splat", toNodeHandler(auth));
   app.use(express.json({ limit: "1mb" }));
   app.use(healthRouter);

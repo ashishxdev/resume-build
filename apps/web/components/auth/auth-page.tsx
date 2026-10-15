@@ -150,11 +150,8 @@ export function AuthPage({ mode, redirectTo }: AuthPageProps) {
             <label>
               <span className={styles.passwordLabel}>
                 Password
-                {isSignIn ? (
-                  <Link href="/forgot-password">Forgot password?</Link>
-                ) : (
-                  <span>Minimum 8 characters</span>
-                )}
+                {/* Password recovery is paused until a production sender is verified. */}
+                {!isSignIn && <span>Minimum 8 characters</span>}
               </span>
               <span className={styles.passwordField}>
                 <input

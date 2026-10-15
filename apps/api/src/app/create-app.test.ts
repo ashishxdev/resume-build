@@ -28,6 +28,7 @@ const testEnvironment = {
   RESEND_API_KEY: undefined,
   EMAIL_FROM: undefined,
   EMAIL_REPLY_TO: undefined,
+  PASSWORD_RECOVERY_ENABLED: "true",
 } as const;
 
 function createTestApp(emailService?: TransactionalEmailService) {
@@ -36,6 +37,26 @@ function createTestApp(emailService?: TransactionalEmailService) {
 }
 
 describe("GET /health", () => {
+  it("blocks every password recovery endpoint when recovery is disabled", async () => {
+    const environment = {
+      ...testEnvironment,
+      PASSWORD_RECOVERY_ENABLED: "false" as const,
+    };
+    const runtime = createAuthRuntime(environment);
+    const app = createApp(environment, runtime.auth);
+    for (const path of [
+      "request-password-reset",
+      "reset-password",
+      "reset-password/token",
+      "password-reset-token-status",
+    ]) {
+      const response = await request(app).post(`/api/auth/${path}`).send({});
+      expect(response.status).toBe(404);
+      expect(response.body.error.code).toBe("PASSWORD_RECOVERY_DISABLED");
+    }
+    await runtime.close();
+  });
+
   it("reports that the API is healthy", async () => {
     const response = await request(createTestApp()).get("/health");
 

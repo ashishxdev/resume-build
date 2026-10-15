@@ -52,6 +52,8 @@ const environmentSchema = z
     RESEND_API_KEY: z.string().min(1).optional(),
     EMAIL_FROM: z.string().min(1).optional(),
     EMAIL_REPLY_TO: z.email().optional(),
+    // Temporarily disabled by default until a production email sender is verified.
+    PASSWORD_RECOVERY_ENABLED: z.enum(["true", "false"]).optional(),
     R2_ACCOUNT_ID: z.string().min(1).optional(),
     R2_ACCESS_KEY_ID: z.string().min(1).optional(),
     R2_SECRET_ACCESS_KEY: z.string().min(1).optional(),
@@ -139,6 +141,7 @@ const environmentSchema = z
 
     if (
       environment.NODE_ENV === "production" &&
+      environment.PASSWORD_RECOVERY_ENABLED === "true" &&
       (!environment.RESEND_API_KEY || !environment.EMAIL_FROM)
     ) {
       context.addIssue({
