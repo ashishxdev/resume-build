@@ -41,6 +41,70 @@ const claims: ResumeClaim[] = [
 ];
 
 describe("buildProfessionalResumeDocument", () => {
+  it("joins legacy summary fragments and renders each project bullet once", () => {
+    const base = claims[1]!;
+    const document = buildProfessionalResumeDocument([
+      {
+        ...base,
+        id: "marker",
+        category: "personal_info",
+        value: "Professional Summary",
+        order: 0,
+      },
+      {
+        ...base,
+        id: "intro",
+        category: "personal_info",
+        value: "Engineer building reliable",
+        order: 1,
+      },
+      {
+        ...base,
+        id: "continuation",
+        value: "applications for teams.",
+        order: 2,
+      },
+      {
+        ...base,
+        id: "project",
+        category: "projects",
+        label: "Projects",
+        value:
+          "Example | Live (https://example.com) | React May 2026 – Present",
+        order: 3,
+      },
+      {
+        ...base,
+        id: "bullet",
+        category: "projects",
+        label: "Projects",
+        value: "Built an application serving 200 users.",
+        order: 4,
+      },
+      {
+        ...base,
+        id: "second",
+        category: "projects",
+        label: "Projects",
+        value: "Processed 1,000 records.",
+        order: 5,
+      },
+    ]);
+    expect(
+      document.sections.find((section) => section.kind === "summary")?.items[0]
+        ?.body,
+    ).toBe("Engineer building reliable applications for teams.");
+    const projects = document.sections.find(
+      (section) => section.kind === "projects",
+    );
+    expect(projects?.items).toHaveLength(1);
+    expect(
+      projects?.items[0]?.body.match(/Built an application serving 200 users/g),
+    ).toHaveLength(1);
+    expect(
+      projects?.items[0]?.body.match(/Processed 1,000 records/g),
+    ).toHaveLength(1);
+  });
   it("builds an ordered, evidence-preserving professional document", () => {
     const document = buildProfessionalResumeDocument(claims, {
       tailoredClaimIds: ["experience"],

@@ -336,13 +336,69 @@ function documentItem(claim: ResumeClaim, tailored: ReadonlySet<string>) {
   };
 }
 
+function coherentClaims(claims: ResumeClaim[]) {
+  const summaryHeading = claims.findIndex((claim) =>
+    /^(professional summary|summary)$/i.test(claim.value.trim()),
+  );
+  const normalized = claims
+    .map((claim, index) => {
+      if (
+        summaryHeading >= 0 &&
+        index > summaryHeading &&
+        claim.category === "personal_info"
+      )
+        return { ...claim, category: "summary" as const };
+      return claim;
+    })
+    .filter(
+      (claim) => !/^(professional summary|summary)$/i.test(claim.value.trim()),
+    );
+  const output: ResumeClaim[] = [];
+  for (const category of ["personal_info", ...sectionOrder]) {
+    const items = normalized.filter((claim) => claim.category === category);
+    if (category === "summary" || category === "skills") {
+      const first = items[0];
+      if (first)
+        output.push({
+          ...first,
+          value: unique(items.map((item) => item.value)).join(
+            category === "summary" ? " " : "\n",
+          ),
+        });
+      continue;
+    }
+    if (category !== "projects" && category !== "experience") {
+      output.push(...items);
+      continue;
+    }
+    let current: ResumeClaim | null = null;
+    for (const item of items) {
+      const startsItem =
+        isUsefulHeading(item.label, item.value) ||
+        (category === "projects"
+          ? /\|\s*(?:live|github)\b/i.test(item.value) ||
+            dateRangePattern.test(item.value)
+          : dateRangePattern.test(item.value));
+      if (!current || startsItem) {
+        current = { ...item };
+        output.push(current);
+      } else {
+        current.value = unique([current.value, item.value]).join("\n");
+      }
+    }
+  }
+  return output.sort((left, right) => left.order - right.order);
+}
+
 export function buildProfessionalResumeDocument(
   claims: readonly ResumeClaim[],
   options: { tailoredClaimIds?: Iterable<string> } = {},
 ): ProfessionalResumeDocument {
-  const ordered = [...claims]
-    .filter((claim) => claim.status !== "rejected")
-    .sort((left, right) => left.order - right.order);
+  const ordered = coherentClaims(
+    [...claims]
+      .filter((claim) => claim.status !== "rejected")
+      .sort((left, right) => left.order - right.order),
+  );
   const headlineClaim = ordered.find(
     (claim) =>
       claim.category === "personal_info" &&

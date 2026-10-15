@@ -219,6 +219,10 @@ export function applySuggestionDecisions(
     return [
       {
         ...cloneClaim(claim),
+        category:
+          suggestion.section === "summary"
+            ? ("summary" as const)
+            : claim.category,
         value: suggestion.editedText ?? suggestion.suggestedText,
         status: "edited" as const,
       },
