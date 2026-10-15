@@ -102,14 +102,18 @@
   background: white;
   border: 1px solid #e4dce8;
   border-radius: 14px;
-  padding: 28px;
+  padding: 26px 28px 22px;
   box-shadow: 0 12px 40px rgba(44, 27, 59, 0.05);
 }
+.group[data-reviewed="true"] {
+  border-color: #cde7dc;
+}
 .groupHeading {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  margin-bottom: 20px;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 16px;
+  align-items: center;
+  margin-bottom: 18px;
 }
 .groupHeading h2 {
   font:
@@ -117,26 +121,71 @@
     serif;
   margin: 0;
 }
-.groupHeading span {
+.groupHeading p {
+  margin: 5px 0 0;
   color: #79717e;
   font-size: 12px;
 }
+.sectionNumber {
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #f1ebf4;
+  color: #39214f;
+  font-size: 11px;
+  font-weight: 800;
+}
+.sectionStatus {
+  display: grid;
+  justify-items: end;
+  gap: 7px;
+}
+.sectionStatus span {
+  color: #79717e;
+  font-size: 12px;
+}
+.sectionStatus button {
+  border: 1px solid #cde7dc;
+  border-radius: 5px;
+  background: #e8f4ef;
+  color: #176149;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 800;
+  padding: 8px 11px;
+}
+.sectionStatus button:disabled {
+  cursor: default;
+  opacity: 0.72;
+}
+.emptySection {
+  margin: 10px 0 16px;
+  padding: 16px;
+  border-radius: 8px;
+  background: #faf8fb;
+  color: #756c7b;
+  font-size: 13px;
+  line-height: 1.55;
+}
 .claim {
-  border: 1px solid #e5dfe8;
-  padding: 18px;
-  border-radius: 10px;
-  margin-top: 14px;
-  background: #fcfbfd;
+  border-top: 1px solid #ebe5ee;
+  padding: 20px 0 16px;
+  background: white;
 }
 .claim[data-status="confirmed"] {
-  border-left: 4px solid #2c8466;
+  box-shadow: inset 3px 0 #2c8466;
+  padding-left: 16px;
 }
 .claim[data-status="edited"] {
-  border-left: 4px solid #6844db;
+  box-shadow: inset 3px 0 #6844db;
+  padding-left: 16px;
 }
 .claim[data-status="rejected"] {
   opacity: 0.65;
-  border-left: 4px solid #a65b59;
+  box-shadow: inset 3px 0 #a65b59;
+  padding-left: 16px;
 }
 .claimHead {
   display: flex;
@@ -221,7 +270,7 @@
   margin-top: 14px;
 }
 .claimActions button,
-.addButton {
+.sectionAddButton {
   border: 1px solid #ddd3e2;
   background: white;
   color: #382548;
@@ -229,6 +278,9 @@
   padding: 8px 11px;
   font-weight: 700;
   cursor: pointer;
+}
+.sectionAddButton {
+  margin-top: 6px;
 }
 .claimActions button:first-child {
   background: #e8f4ef;
@@ -245,6 +297,13 @@
   justify-content: space-between;
   gap: 20px;
   align-items: center;
+}
+.footerActions > p {
+  max-width: 440px;
+  margin: 0;
+  color: #716978;
+  font-size: 12px;
+  line-height: 1.55;
 }
 .footerActions > div {
   display: flex;
@@ -425,6 +484,21 @@
   .groupHeading h2 {
     font-size: 24px;
   }
+  .groupHeading {
+    grid-template-columns: auto 1fr;
+    align-items: start;
+  }
+  .sectionStatus {
+    grid-column: 1 / -1;
+    width: 100%;
+    justify-items: stretch;
+  }
+  .sectionStatus span {
+    display: none;
+  }
+  .sectionStatus button {
+    width: 100%;
+  }
   .claim {
     padding: 15px 12px;
   }
@@ -446,7 +520,7 @@
     flex-direction: column;
   }
   .saveButton,
-  .addButton {
+  .sectionAddButton {
     width: 100%;
   }
   .statePage {

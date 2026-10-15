@@ -32,6 +32,61 @@ const categoryLabels: Record<ResumeClaimCategory, string> = {
 
 const categories = Object.keys(categoryLabels) as ResumeClaimCategory[];
 
+type ReviewSectionId =
+  "profile" | "experience" | "skills" | "projects" | "education";
+
+type ReviewSection = {
+  id: ReviewSectionId;
+  title: string;
+  description: string;
+  categories: ResumeClaimCategory[];
+  defaultCategory: ResumeClaimCategory;
+  addedDetailLabel: string;
+};
+
+const reviewSections: ReviewSection[] = [
+  {
+    id: "profile",
+    title: "Profile",
+    description: "Contact information and professional summary",
+    categories: ["personal_info", "summary", "custom"],
+    defaultCategory: "personal_info",
+    addedDetailLabel: "Profile detail",
+  },
+  {
+    id: "experience",
+    title: "Experience",
+    description: "Roles, responsibilities, and measurable impact",
+    categories: ["experience"],
+    defaultCategory: "experience",
+    addedDetailLabel: "Experience",
+  },
+  {
+    id: "skills",
+    title: "Skills",
+    description: "Languages, frameworks, tools, and technologies",
+    categories: ["skills"],
+    defaultCategory: "skills",
+    addedDetailLabel: "Skills",
+  },
+  {
+    id: "projects",
+    title: "Projects",
+    description: "Projects, outcomes, and verified links",
+    categories: ["projects"],
+    defaultCategory: "projects",
+    addedDetailLabel: "Project",
+  },
+  {
+    id: "education",
+    title: "Education & achievements",
+    description: "Education, certifications, and achievements",
+    categories: ["education", "certifications", "achievements"],
+    defaultCategory: "education",
+    addedDetailLabel: "Education detail",
+  },
+];
+
 export function ResumeVerificationPage({ resumeId }: { resumeId: string }) {
   const router = useRouter();
   const { data: session, isPending } = authClient.useSession();
@@ -96,14 +151,26 @@ export function ResumeVerificationPage({ resumeId }: { resumeId: string }) {
   ).length;
   const groupedClaims = useMemo(
     () =>
-      categories
-        .map((category) => ({
-          category,
-          claims: claims.filter((claim) => claim.category === category),
-        }))
-        .filter((group) => group.claims.length > 0),
+      reviewSections.map((section) => {
+        const sectionClaims = claims.filter((claim) =>
+          section.categories.includes(claim.category),
+        );
+        return {
+          ...section,
+          claims: sectionClaims,
+          reviewed:
+            sectionClaims.length > 0 &&
+            sectionClaims.every((claim) => claim.status !== "unreviewed"),
+        };
+      }),
     [claims],
   );
+  const reviewableSections = groupedClaims.filter(
+    (section) => section.claims.length > 0,
+  );
+  const reviewedSectionCount = reviewableSections.filter(
+    (section) => section.reviewed,
+  ).length;
 
   function updateClaim(id: string, patch: Partial<ResumeClaim>) {
     setHasUnsavedChanges(true);
@@ -120,28 +187,49 @@ export function ResumeVerificationPage({ resumeId }: { resumeId: string }) {
     setSaveNotice(null);
     setClaims((current) => {
       const index = current.findIndex((claim) => claim.id === id);
-      const destination = index + direction;
-      if (index < 0 || destination < 0 || destination >= current.length)
-        return current;
+      const currentClaim = current[index];
+      if (index < 0 || !currentClaim) return current;
+      const section = reviewSections.find((candidate) =>
+        candidate.categories.includes(currentClaim.category),
+      );
+      if (!section) return current;
+      const sectionIndexes = current.flatMap((claim, claimIndex) =>
+        section.categories.includes(claim.category) ? [claimIndex] : [],
+      );
+      const position = sectionIndexes.indexOf(index);
+      const destination = sectionIndexes[position + direction];
+      if (position < 0 || destination === undefined) return current;
       const next = [...current];
-      const currentClaim = next[index];
       const destinationClaim = next[destination];
-      if (!currentClaim || !destinationClaim) return current;
+      if (!destinationClaim) return current;
       next[index] = destinationClaim;
       next[destination] = currentClaim;
       return next.map((claim, order) => ({ ...claim, order }));
     });
   }
 
-  function addClaim() {
+  function confirmSection(section: ReviewSection) {
+    setHasUnsavedChanges(true);
+    setSaveNotice(null);
+    setClaims((current) =>
+      current.map((claim) =>
+        section.categories.includes(claim.category) &&
+        claim.status === "unreviewed"
+          ? { ...claim, status: "confirmed" }
+          : claim,
+      ),
+    );
+  }
+
+  function addClaim(section: ReviewSection) {
     setHasUnsavedChanges(true);
     setSaveNotice(null);
     setClaims((current) => [
       ...current,
       {
         id: `new-${crypto.randomUUID()}`,
-        category: "custom",
-        label: "Additional detail",
+        category: section.defaultCategory,
+        label: section.addedDetailLabel,
         value: "",
         sourceText: null,
         pageNumber: null,
@@ -290,7 +378,8 @@ export function ResumeVerificationPage({ resumeId }: { resumeId: string }) {
               : "Evidence review"}
           </span>
           <b>
-            {reviewedCount} / {claims.length} reviewed
+            {reviewedSectionCount} / {reviewableSections.length} sections
+            reviewed
           </b>
         </div>
         <Link href="/dashboard">Exit review</Link>
@@ -298,17 +387,18 @@ export function ResumeVerificationPage({ resumeId }: { resumeId: string }) {
       <main className={styles.main}>
         <section className={styles.intro}>
           <span className={styles.eyebrow}>Zero-hallucination baseline</span>
-          <h1>Make every detail true to you.</h1>
+          <h1>Review your résumé by section.</h1>
           <p>
-            Review the résumé content below. Keep each detail as written, edit
-            it, remove it, or add anything that is missing. Saved changes will
-            be used for future tailored resumes.
+            Check the five sections below instead of reviewing a long list of
+            separate cards. Keep a whole section in one click, or edit, remove,
+            and add individual details when needed. Saved changes will be used
+            for future tailored resumes.
           </p>
           <div className={styles.reviewTrack}>
             <i
               style={{
-                width: claims.length
-                  ? `${(reviewedCount / claims.length) * 100}%`
+                width: reviewableSections.length
+                  ? `${(reviewedSectionCount / reviewableSections.length) * 100}%`
                   : "0%",
               }}
             />
@@ -350,12 +440,45 @@ export function ResumeVerificationPage({ resumeId }: { resumeId: string }) {
         )}
 
         <div className={styles.groups}>
-          {groupedClaims.map((group) => (
-            <section className={styles.group} key={group.category}>
+          {groupedClaims.map((group, sectionIndex) => (
+            <section
+              className={styles.group}
+              data-reviewed={group.reviewed}
+              key={group.id}
+            >
               <div className={styles.groupHeading}>
-                <h2>{categoryLabels[group.category]}</h2>
-                <span>{group.claims.length} details</span>
+                <span className={styles.sectionNumber}>
+                  {String(sectionIndex + 1).padStart(2, "0")}
+                </span>
+                <div>
+                  <h2>{group.title}</h2>
+                  <p>{group.description}</p>
+                </div>
+                <div className={styles.sectionStatus}>
+                  <span>
+                    {group.claims.length === 0
+                      ? "Nothing extracted"
+                      : group.reviewed
+                        ? "Reviewed"
+                        : `${group.claims.length} details`}
+                  </span>
+                  {group.claims.length > 0 && (
+                    <button
+                      disabled={group.reviewed}
+                      onClick={() => confirmSection(group)}
+                      type="button"
+                    >
+                      {group.reviewed ? "✓ Section reviewed" : "✓ Keep section"}
+                    </button>
+                  )}
+                </div>
               </div>
+              {group.claims.length === 0 && (
+                <p className={styles.emptySection}>
+                  We did not find content for this section. Add it only if it
+                  belongs on your résumé.
+                </p>
+              )}
               {group.claims.map((claim) => (
                 <article
                   className={styles.claim}
@@ -415,7 +538,7 @@ export function ResumeVerificationPage({ resumeId }: { resumeId: string }) {
                       }
                       type="button"
                     >
-                      ✓ Confirm
+                      ✓ Keep
                     </button>
                     <button
                       onClick={() =>
@@ -423,7 +546,7 @@ export function ResumeVerificationPage({ resumeId }: { resumeId: string }) {
                       }
                       type="button"
                     >
-                      Reject
+                      Exclude
                     </button>
                     <button
                       onClick={() => moveClaim(claim.id, -1)}
@@ -454,16 +577,27 @@ export function ResumeVerificationPage({ resumeId }: { resumeId: string }) {
                   </div>
                 </article>
               ))}
+              <button
+                className={styles.sectionAddButton}
+                onClick={() => addClaim(group)}
+                type="button"
+              >
+                + Add to {group.title.toLocaleLowerCase("en")}
+              </button>
             </section>
           ))}
         </div>
 
         <div className={styles.footerActions}>
-          <button className={styles.addButton} onClick={addClaim} type="button">
-            + Add a detail
-          </button>
+          <p>
+            Your original file stays unchanged. This approved structure becomes
+            the source for future tailored versions.
+          </p>
           <div>
-            <span>{claims.length - reviewedCount} still need review</span>
+            <span>
+              {reviewableSections.length - reviewedSectionCount} sections still
+              need review
+            </span>
             <button
               className={styles.saveButton}
               disabled={

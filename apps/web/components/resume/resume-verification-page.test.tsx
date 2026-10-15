@@ -76,8 +76,15 @@ describe("ResumeVerificationPage", () => {
     render(<ResumeVerificationPage resumeId="resume_1" />);
     expect(
       await screen.findByText(
-        /Review the résumé content below\. Keep each detail as written/,
+        /Check the five sections below instead of reviewing a long list/,
       ),
+    ).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Profile" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Experience" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Skills" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Projects" })).toBeTruthy();
+    expect(
+      screen.getByRole("heading", { name: "Education & achievements" }),
     ).toBeTruthy();
     expect(
       await screen.findByDisplayValue("Led a design system rollout"),
@@ -127,6 +134,41 @@ describe("ResumeVerificationPage", () => {
         .getByRole("link", { name: "Return to dashboard" })
         .getAttribute("href"),
     ).toBe("/dashboard");
+  });
+
+  it("lets a user approve an extracted section in one action", async () => {
+    mocks.getResumeVerification.mockResolvedValue({
+      ...review,
+      claims: [
+        review.claims[0],
+        {
+          ...review.claims[0],
+          id: "claim_2",
+          value: "Improved deployment reliability",
+          sourceText: "Improved deployment reliability",
+          order: 1,
+        },
+      ],
+    });
+
+    render(<ResumeVerificationPage resumeId="resume_1" />);
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "✓ Keep section" }),
+    );
+    expect(screen.getByText("1 / 1 sections reviewed")).toBeTruthy();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Save verified baseline" }),
+    );
+
+    await waitFor(() =>
+      expect(mocks.saveResumeVerification).toHaveBeenCalledOnce(),
+    );
+    expect(
+      mocks.saveResumeVerification.mock.calls[0]?.[1].map(
+        (claim: { status: string }) => claim.status,
+      ),
+    ).toEqual(["confirmed", "confirmed"]);
   });
 
   it("restarts polling after a failed extraction is retried", async () => {
